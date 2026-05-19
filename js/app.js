@@ -9,12 +9,11 @@ const S = {
   budgetYear:      CONFIG.budgetYear,
   property:        null,
   systemType:      null,
-  unitCount:       0,
-  quantities:      {},    // programId → qty (for Per Device, Per Elevator, etc.)
   allPrograms:     [],
   programs:        [],    // filtered by system
   decisions:       {},    // programId → { itemId, decision, optOutApproval, ... }
   priorDecisions:  {},
+  budgetAmounts:   {},    // programId → dollar amount entered by PM
   currentOptOutId: null,
   viewingPrior:    false,
 };
@@ -92,12 +91,12 @@ async function launchMain() {
     S.decisions      = decisions;
     S.priorDecisions = priorDecisions;
 
-    // Load saved per-program quantities
+    // Load saved budget amounts
     try {
-      S.quantities = JSON.parse(localStorage.getItem(
-        `rpm_qty_${S.property}_${S.budgetYear}`
+      S.budgetAmounts = JSON.parse(localStorage.getItem(
+        `rpm_budget_${S.property}_${S.budgetYear}`
       )) || {};
-    } catch { S.quantities = {}; }
+    } catch { S.budgetAmounts = {}; }
 
     renderMainScreen();
     showScreen('screen-main');
@@ -108,37 +107,9 @@ async function launchMain() {
   }
 }
 
-// ── Unit count & budget total ─────────────────────────────────────────────────
-document.getElementById('unit-count').addEventListener('input', e => {
-  S.unitCount = parseInt(e.target.value) || 0;
-  updateBudgetTotal();
-  // Re-render cards so per-unit costs update
-  renderMainScreen();
-});
-
-// Returns 'unit-year' | 'unit-month' | 'per-other' | 'flat'
-function costBasisType(program) {
-  const b = (program.costBasis || '').toLowerCase();
-  if (b.includes('unit') && b.includes('month')) return 'unit-month';
-  if (b.includes('unit'))                         return 'unit-year';
-  // Any "Per X" that isn't unit-based
-  if (/per\s+\w/i.test(program.costBasis || '') && !b.includes('unit')) return 'per-other';
-  return 'flat';
-}
-
-// Extract the "X" from "Per X" cost basis
-function perOtherLabel(program) {
-  const m = (program.costBasis || '').match(/per\s+(.+)/i);
-  return m ? m[1].trim() : 'item';
-}
-
+// ── Budget total ──────────────────────────────────────────────────────────────
 function resolvedCost(program) {
-  const type = costBasisType(program);
-  const rate = program.cost || 0;
-  if (type === 'unit-month') return rate * (S.unitCount || 0) * 12;
-  if (type === 'unit-year')  return rate * (S.unitCount || 0);
-  if (type === 'per-other')  return rate * (S.quantities[program.id] || 0);
-  return rate; // flat
+  return S.budgetAmounts[program.id] || 0;
 }
 
 function updateBudgetTotal() {
@@ -274,33 +245,22 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   const excludedOverlay = (!isRequired && dec === 'out')
     ? `<div class="excluded-overlay">Not Including</div>` : '';
 
-  // Build cost display based on basis type
-  const basisType = costBasisType(program);
-  const thingName = perOtherLabel(program);
-  const qty       = S.quantities[program.id] || 0;
-  const total     = resolvedCost(program);
-  const rateStr   = formatCost(program.cost);
-  const totalStr  = total > 0 ? formatCost(total) : '—';
-
-  let costHtml;
-  if (basisType === 'unit-year' || basisType === 'unit-month') {
-    const period = basisType === 'unit-month' ? '/unit/mo' : '/unit/yr';
-    costHtml = `
-      <span class="prog-card-cost">${rateStr}<span class="cost-basis-tag">${period}</span></span>
-      ${S.unitCount > 0
-        ? `<span class="cost-calc">× ${S.unitCount} units = <strong>${totalStr}</strong></span>`
-        : `<span class="cost-calc-hint">Enter units above ↑</span>`}`;
-  } else if (basisType === 'per-other') {
-    costHtml = `
-      <span class="prog-card-cost">${rateStr}<span class="cost-basis-tag">/${thingName.toLowerCase()}</span></span>
-      <span class="cost-calc">×
-        <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
-        <span class="qty-label">${thingName}</span>
-        ${qty > 0 ? `= <strong>${totalStr}</strong>` : ''}
-      </span>`;
-  } else {
-    costHtml = `<span class="prog-card-cost">${rateStr}</span>`;
-  }
+  // Cost display — show raw Monday text + Budget $ input
+  const savedAmt   = S.budgetAmounts[program.id];
+  const prePopAmt  = savedAmt !== undefined ? savedAmt : '';
+  const costRawHtml = (program.costRaw)
+    ? `<div class="cost-raw-text">💬 ${program.costRaw}</div>`
+    : '';
+  const basisTag = program.costBasis
+    ? `<span class="cost-basis-tag">${program.costBasis}</span>`
+    : '';
+  const budgetInputHtml = `
+    <div class="budget-input-row">
+      <span class="budget-input-label">Budget&nbsp;$</span>
+      <input class="budget-input" data-pid="${program.id}" type="number" min="0" step="1"
+             placeholder="Enter amount" value="${prePopAmt}">
+      ${basisTag}
+    </div>`;
 
   const priorCostHtml = program.priorYearCost
     ? `<span class="prog-card-prior-cost">Prior year: ${formatCost(program.priorYearCost)}</span>`
@@ -320,14 +280,13 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       <div class="prog-card-name">${program.name}</div>
       <div class="prog-card-action">${actionHtml}</div>
     </div>
-    <div class="prog-card-cost-row">
-      ${costHtml}
-      ${priorCostHtml}
-    </div>
+    ${costRawHtml}
+    ${budgetInputHtml}
     <div class="prog-card-meta-row">
       <span class="prog-card-gl">GL ${program.glCode}</span>
       ${billingHtml}
       ${ownerHtml}
+      ${priorCostHtml}
       ${resourceLink}
     </div>
     ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
@@ -343,31 +302,22 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     if (e.target.closest('.btn-exclude'))          handleElectiveExclude(program.id);
   });
 
-  // Per-program quantity input
-  const qtyInput = el.querySelector('.qty-input');
-  if (qtyInput) {
-    qtyInput.addEventListener('input', e => {
+  // Budget $ input — save amount and update total
+  const budgetInput = el.querySelector('.budget-input');
+  if (budgetInput) {
+    budgetInput.addEventListener('input', e => {
       e.stopPropagation();
-      S.quantities[program.id] = parseInt(e.target.value) || 0;
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val) && val >= 0) {
+        S.budgetAmounts[program.id] = val;
+      } else {
+        delete S.budgetAmounts[program.id];
+      }
       localStorage.setItem(
-        `rpm_qty_${S.property}_${S.budgetYear}`,
-        JSON.stringify(S.quantities)
+        `rpm_budget_${S.property}_${S.budgetYear}`,
+        JSON.stringify(S.budgetAmounts)
       );
       updateBudgetTotal();
-      // Update the cost calculation display without full re-render
-      const calcEl = el.querySelector('.cost-calc');
-      if (calcEl) {
-        const n = S.quantities[program.id] || 0;
-        const t = resolvedCost(program);
-        calcEl.innerHTML = `× <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${n || ''}"> <span class="qty-label">${thingName}</span> ${n > 0 ? `= <strong>${formatCost(t)}</strong>` : ''}`;
-        // Re-attach listener on new input
-        const newInput = calcEl.querySelector('.qty-input');
-        if (newInput) newInput.addEventListener('input', qtyInput.oninput = e => {
-          S.quantities[program.id] = parseInt(e.target.value) || 0;
-          localStorage.setItem(`rpm_qty_${S.property}_${S.budgetYear}`, JSON.stringify(S.quantities));
-          updateBudgetTotal();
-        });
-      }
     });
   }
 
@@ -529,8 +479,9 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
   showScreen('screen-loading');
   try {
     await resetDecisions(S.property, S.budgetYear);
-    S.decisions  = {};
-    S.quantities = {};
+    S.decisions      = {};
+    S.budgetAmounts  = {};
+    localStorage.removeItem(`rpm_budget_${S.property}_${S.budgetYear}`);
     renderMainScreen();
     showScreen('screen-main');
   } catch (e) {

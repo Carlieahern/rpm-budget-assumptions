@@ -145,6 +145,7 @@ export async function fetchPrograms(forceRefresh = false) {
       groupId:       item.group.id,
       costs,
       glCodes,
+      costRaw:       colMap[columns.cost]?.text          || '',   // full text as written in Monday
       description:   colMap[columns.description]?.text   || '',
       required:      isRequired,
       costBasis:     colMap[columns.costBasis]?.text     || '',

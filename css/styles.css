@@ -780,6 +780,53 @@ body {
 .status-followup     { background: #fef3c7; color: #92400e; }
 .status-acknowledged { background: #dcfce7; color: #16a34a; }
 
+/* ─── Raw Cost Text (from Monday) ─── */
+.cost-raw-text {
+  font-size: 12px;
+  color: var(--text2);
+  background: #f8f9fb;
+  border-left: 3px solid var(--copper);
+  border-radius: 0 6px 6px 0;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+/* ─── Budget $ Input Row ─── */
+.budget-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.budget-input-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--navy);
+  white-space: nowrap;
+}
+
+.budget-input {
+  width: 120px;
+  padding: 5px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--navy);
+  background: white;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.budget-input:focus {
+  border-color: var(--copper);
+  box-shadow: 0 0 0 3px rgba(184,115,58,0.12);
+}
+.budget-input::placeholder { color: var(--text3); font-weight: 400; font-size: 13px; }
+
 /* ─── Card Cost Row ─── */
 .prog-card-cost-row {
   display: flex;
