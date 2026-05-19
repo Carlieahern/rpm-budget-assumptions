@@ -133,9 +133,14 @@ function renderColumn(programs, containerId, isRequired) {
   });
 
   Object.entries(groups).forEach(([dept, deptPrograms]) => {
+    const gs = groupStyle(dept);
     const groupEl = document.createElement('div');
     groupEl.className = 'dept-group';
-    groupEl.innerHTML = `<div class="dept-group-hdr">${dept}</div>`;
+
+    const hdr = document.createElement('div');
+    hdr.className = `dept-group-hdr dept-hdr-${gs.key}`;
+    hdr.innerHTML = `<span class="dept-hdr-label">${dept}</span><span class="dept-hdr-count">${deptPrograms.length}</span>`;
+    groupEl.appendChild(hdr);
 
     deptPrograms.forEach(p => {
       const card = buildProgramCard(p, S.decisions[p.id], S.priorDecisions[p.id], isRequired);
@@ -144,10 +149,23 @@ function renderColumn(programs, containerId, isRequired) {
 
     container.appendChild(groupEl);
   });
+
+  updateColumnCounts();
+}
+
+function updateColumnCounts() {
+  const req    = S.programs.filter(p => p.required);
+  const elec   = S.programs.filter(p => !p.required);
+  const ackCount  = req.filter(p  => S.decisions[p.id]?.decision === 'acknowledged').length;
+  const incCount  = elec.filter(p => S.decisions[p.id]?.decision === 'in').length;
+
+  const nonElCount = document.getElementById('col-count-nonelective');
+  const elecCount  = document.getElementById('col-count-elective');
+  if (nonElCount) nonElCount.textContent = `${ackCount} of ${req.length} Acknowledged`;
+  if (elecCount)  elecCount.textContent  = `${incCount} of ${elec.length} Included`;
 }
 
 function buildProgramCard(program, decision, priorDecision, isRequired) {
-  const gs = groupStyle(program.group);
   const el = document.createElement('div');
   el.className = 'prog-card';
   el.dataset.programId = program.id;
@@ -155,15 +173,19 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   const dec = decision?.decision;
   if (dec === 'opted-out')      el.classList.add('is-opted-out');
   if (dec === 'needs-followup') el.classList.add('is-followup');
+  if (dec === 'acknowledged')   el.classList.add('is-acknowledged');
   if (dec === 'in')             el.classList.add('is-included');
+  if (dec === 'out')            el.classList.add('is-excluded');
 
   const priorChip = priorDecision
-    ? `<div class="prior-year-chip was-${priorDecision.decision === 'opted-out' || priorDecision.decision === 'out' ? 'out' : 'in'}">
-         ${priorDecision.decision === 'out' ? '✕ Skipped last year'
-           : priorDecision.decision === 'opted-out' ? '↩ Opted out last year'
-           : '✓ Included last year'}
+    ? `<div class="prior-year-chip was-${['opted-out','out'].includes(priorDecision.decision) ? 'out' : 'in'}">
+         ${{ 'out': '✕ Skipped last year', 'opted-out': '↩ Opted out last year', 'in': '✓ Included last year', 'acknowledged': '✓ Acknowledged last year' }[priorDecision.decision] || ''}
        </div>`
     : '';
+
+  const resourceLink = program.resourceUrl
+    ? `<a class="prog-card-resource" href="${program.resourceUrl}" target="_blank" rel="noopener">📖 Learn More</a>`
+    : `<a class="prog-card-resource prog-card-resource-placeholder" href="#" onclick="return false;">📖 Learn More</a>`;
 
   let actionHtml;
   if (isRequired) {
@@ -175,18 +197,35 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       actionHtml = `
         <span class="card-status-badge status-followup">⚑ Follow-up Needed</span>
         <button class="btn-card-ghost btn-opt-out-trigger" data-pid="${program.id}">Opt Out</button>`;
+    } else if (dec === 'acknowledged') {
+      actionHtml = `
+        <span class="card-status-badge status-acknowledged">✓ Acknowledged</span>
+        <button class="btn-card-ghost btn-undo-acknowledge" data-pid="${program.id}">Undo</button>
+        <button class="btn-card-ghost btn-opt-out-trigger" data-pid="${program.id}">Opt Out</button>`;
     } else {
-      actionHtml = `<button class="btn-card-ghost btn-opt-out-trigger" data-pid="${program.id}">Opt Out</button>`;
+      actionHtml = `
+        <button class="btn-card-ghost btn-opt-out-trigger" data-pid="${program.id}">Opt Out</button>
+        <button class="btn-card-acknowledge btn-acknowledge" data-pid="${program.id}">Acknowledge</button>`;
     }
   } else {
     if (dec === 'in') {
-      actionHtml = `<button class="btn-card-include is-included btn-elective-toggle" data-pid="${program.id}">✓ Included</button>`;
+      actionHtml = `
+        <button class="btn-card-include is-included btn-include" data-pid="${program.id}">✓ Included</button>
+        <button class="btn-card-exclude btn-exclude" data-pid="${program.id}" title="Don't include">✕</button>`;
+    } else if (dec === 'out') {
+      actionHtml = `<button class="btn-card-include btn-include" data-pid="${program.id}">Include</button>`;
     } else {
-      actionHtml = `<button class="btn-card-include btn-elective-toggle" data-pid="${program.id}">Include</button>`;
+      actionHtml = `
+        <button class="btn-card-include btn-include" data-pid="${program.id}">Include</button>
+        <button class="btn-card-exclude btn-exclude" data-pid="${program.id}">Don't Include</button>`;
     }
   }
 
+  const excludedOverlay = (!isRequired && dec === 'out')
+    ? `<div class="excluded-overlay">Not Including</div>` : '';
+
   el.innerHTML = `
+    ${excludedOverlay}
     <div class="prog-card-top">
       <div class="prog-card-name">${program.name}</div>
       <div class="prog-card-action">${actionHtml}</div>
@@ -194,15 +233,19 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     <div class="prog-card-details">
       <span class="prog-card-cost">${formatCost(program.cost)}</span>
       <span class="prog-card-gl">GL ${program.glCode}</span>
+      ${resourceLink}
     </div>
     ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
     ${priorChip}
   `;
 
   el.addEventListener('click', e => {
-    if (e.target.closest('.btn-opt-out-trigger')) openOptOutModal(program.id);
-    if (e.target.closest('.btn-undo-optout'))     undoOptOut(program.id);
-    if (e.target.closest('.btn-elective-toggle')) handleElectiveToggle(program.id);
+    if (e.target.closest('.btn-opt-out-trigger'))  openOptOutModal(program.id);
+    if (e.target.closest('.btn-undo-optout'))      undoOptOut(program.id);
+    if (e.target.closest('.btn-acknowledge'))      handleAcknowledge(program.id);
+    if (e.target.closest('.btn-undo-acknowledge')) handleUndoAcknowledge(program.id);
+    if (e.target.closest('.btn-include'))          handleElectiveInclude(program.id);
+    if (e.target.closest('.btn-exclude'))          handleElectiveExclude(program.id);
   });
 
   return el;
@@ -215,15 +258,37 @@ function refreshCard(programId) {
   if (!old) return;
   const newCard = buildProgramCard(program, S.decisions[programId], S.priorDecisions[programId], program.required);
   old.replaceWith(newCard);
+  updateColumnCounts();
 }
 
-// ── Elective toggle ──────────────────────────────────────────────────────────
-async function handleElectiveToggle(programId) {
+// ── Elective actions ──────────────────────────────────────────────────────────
+async function handleElectiveInclude(programId) {
+  await setDecision(programId, 'in');
+}
+
+async function handleElectiveExclude(programId) {
+  await setDecision(programId, 'out');
+}
+
+// ── Acknowledge actions ───────────────────────────────────────────────────────
+async function handleAcknowledge(programId) {
+  await setDecision(programId, 'acknowledged');
+}
+
+async function handleUndoAcknowledge(programId) {
+  const existing = S.decisions[programId];
+  if (!existing) return;
+  try { await deleteDecision(existing.itemId); } catch (e) { console.error(e); }
+  delete S.decisions[programId];
+  refreshCard(programId);
+  updateColumnCounts();
+}
+
+// ── Shared decision saver ────────────────────────────────────────────────────
+async function setDecision(programId, newDec) {
   const program  = S.programs.find(p => p.id === programId);
   if (!program) return;
   const existing = S.decisions[programId];
-  const newDec   = existing?.decision === 'in' ? 'out' : 'in';
-
   try {
     const itemId = await saveDecision(S.property, program, newDec, S.budgetYear, {
       itemId: existing?.itemId,
@@ -233,6 +298,7 @@ async function handleElectiveToggle(programId) {
     console.error('Failed to save decision', e);
   }
   refreshCard(programId);
+  updateColumnCounts();
 }
 
 function openOptOutModal(programId) {
