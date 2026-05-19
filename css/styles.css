@@ -836,7 +836,115 @@ body {
   font-style: italic;
 }
 
-/* ─── Budget $ Input Row ─── */
+/* ─── Cost Interaction Block ─── */
+.cost-interaction {
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cost-parsed-rate {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+/* Qty calculator row: rate × [input] units = $total */
+.qty-calc-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.qty-sep {
+  font-size: 13px;
+  color: var(--text3);
+  font-weight: 600;
+}
+
+.qty-field {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  padding: 3px 8px 3px 4px;
+  transition: border-color 0.15s;
+}
+.qty-field:focus-within { border-color: var(--copper); }
+
+.qty-input {
+  width: 52px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  font-family: inherit;
+  outline: none;
+  text-align: center;
+}
+.qty-input::placeholder { color: var(--text3); font-weight: 400; }
+
+.qty-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+  white-space: nowrap;
+}
+
+.qty-equals {
+  font-size: 13px;
+  color: var(--text2);
+  white-space: nowrap;
+}
+.qty-equals strong { color: var(--navy); font-size: 14px; }
+
+/* ─── Tiered / Package Options ─── */
+.tier-options {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.tier-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+.tier-option:hover { border-color: #c8cdd8; background: #fafafa; }
+.tier-option.is-selected {
+  border-color: var(--copper);
+  background: var(--copper-light);
+}
+
+.tier-radio { accent-color: var(--copper); cursor: pointer; }
+
+.tier-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+  flex: 1;
+}
+
+.tier-rate {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--copper);
+  white-space: nowrap;
+}
+
+/* ─── Manual Budget Input (fallback) ─── */
 .budget-input-row {
   display: flex;
   align-items: center;

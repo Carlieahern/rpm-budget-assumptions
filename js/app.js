@@ -13,7 +13,9 @@ const S = {
   programs:        [],    // filtered by system
   decisions:       {},    // programId → { itemId, decision, optOutApproval, ... }
   priorDecisions:  {},
-  budgetAmounts:   {},    // programId → dollar amount entered by PM
+  quantities:      {},    // programId → quantity entered (per-unit, per-elevator, etc.)
+  selectedTiers:   {},    // programId → selected tier index for tiered costs
+  budgetAmounts:   {},    // programId → manual dollar amount (fallback for complex costs)
   currentOptOutId: null,
   viewingPrior:    false,
 };
@@ -91,12 +93,10 @@ async function launchMain() {
     S.decisions      = decisions;
     S.priorDecisions = priorDecisions;
 
-    // Load saved budget amounts
-    try {
-      S.budgetAmounts = JSON.parse(localStorage.getItem(
-        `rpm_budget_${S.property}_${S.budgetYear}`
-      )) || {};
-    } catch { S.budgetAmounts = {}; }
+    // Load saved input values
+    try { S.quantities    = JSON.parse(localStorage.getItem(`rpm_qty_${S.property}_${S.budgetYear}`))   || {}; } catch { S.quantities    = {}; }
+    try { S.selectedTiers = JSON.parse(localStorage.getItem(`rpm_tiers_${S.property}_${S.budgetYear}`)) || {}; } catch { S.selectedTiers = {}; }
+    try { S.budgetAmounts = JSON.parse(localStorage.getItem(`rpm_budget_${S.property}_${S.budgetYear}`)) || {}; } catch { S.budgetAmounts = {}; }
 
     renderMainScreen();
     showScreen('screen-main');
@@ -107,9 +107,75 @@ async function launchMain() {
   }
 }
 
-// ── Budget total ──────────────────────────────────────────────────────────────
+// ── Cost basis intelligence ───────────────────────────────────────────────────
+// Analyses the costBasis + costRaw fields and returns a structured descriptor.
+function parseCostBasisInfo(program) {
+  const basis = (program.costBasis || '').trim();
+  const raw   = (program.costRaw   || '').trim();
+  const b     = basis.toLowerCase();
+  const r     = raw.toLowerCase();
+
+  // Primary rate: first $ amount found in raw text, else program.cost
+  const firstDollar = raw.match(/\$\s*([\d,]+\.?\d*)/);
+  const rate = firstDollar
+    ? parseFloat(firstDollar[1].replace(/,/g, ''))
+    : (program.cost || 0);
+
+  // ── Tiered / Package options ──────────────────────────────────────────
+  const tierRx = /((?:Tier|Package|Plan|Level|Option)\s+\w+):\s*\$?([\d,]+\.?\d*)/gi;
+  const tierMatches = [...raw.matchAll(tierRx)];
+  if (tierMatches.length >= 2) {
+    const tiers    = tierMatches.map(m => ({ label: m[1].trim(), rate: parseFloat(m[2].replace(/,/g, '')) }));
+    const isPerUnit = b.includes('unit') || r.includes('/unit') || r.includes('per unit');
+    const period    = (b.includes('month') || r.includes('/month') || r.includes('per month')) ? 'month' : 'year';
+    return { type: 'tiered', tiers, isPerUnit, period, rate: tiers[0].rate };
+  }
+
+  // ── Per Unit ──────────────────────────────────────────────────────────
+  if (b.includes('unit')) {
+    const period = (b.includes('month') || r.includes('month')) ? 'month' : 'year';
+    return { type: 'per-unit', label: 'Unit', plural: 'Units', period, rate };
+  }
+
+  // ── Flat fee ──────────────────────────────────────────────────────────
+  if (b.includes('flat') || (b.includes('annual') && !b.includes('per')) ||
+      (!b.includes('per') && !r.match(/per\s+\w/i))) {
+    return { type: 'flat', rate };
+  }
+
+  // ── Per [Thing] ───────────────────────────────────────────────────────
+  const perBasis = basis.match(/per\s+(.+)/i);
+  const perRaw   = raw.match(/per\s+(\w+)/i);
+  const perMatch = perBasis || perRaw;
+  if (perMatch) {
+    const thing  = perMatch[1].replace(/\/.*/,'').trim(); // strip e.g. "/month"
+    if (!thing.toLowerCase().includes('unit')) {
+      const cap    = thing.charAt(0).toUpperCase() + thing.slice(1).toLowerCase();
+      const plural = cap.endsWith('s') ? cap : cap + 's';
+      const period = (b.includes('month') || r.includes('month')) ? 'month' : 'year';
+      return { type: 'per-quantity', label: cap, plural, period, rate };
+    }
+  }
+
+  // ── Manual fallback ───────────────────────────────────────────────────
+  return { type: 'manual', rate };
+}
+
 function resolvedCost(program) {
-  return S.budgetAmounts[program.id] || 0;
+  const info = parseCostBasisInfo(program);
+  const qty  = S.quantities[program.id] || 0;
+  switch (info.type) {
+    case 'flat':         return info.rate;
+    case 'per-unit':
+    case 'per-quantity': return info.period === 'month' ? info.rate * qty * 12 : info.rate * qty;
+    case 'tiered': {
+      const tierIdx  = S.selectedTiers[program.id] ?? 0;
+      const tierRate = info.tiers?.[tierIdx]?.rate || 0;
+      if (info.isPerUnit) return info.period === 'month' ? tierRate * qty * 12 : tierRate * qty;
+      return tierRate;
+    }
+    default: return S.budgetAmounts[program.id] || 0;
+  }
 }
 
 function updateBudgetTotal() {
@@ -264,22 +330,77 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   const excludedOverlay = (!isRequired && dec === 'out')
     ? `<div class="excluded-overlay">Not Including</div>` : '';
 
-  // Cost display — show raw Monday text + Budget $ input
-  const savedAmt   = S.budgetAmounts[program.id];
-  const prePopAmt  = savedAmt !== undefined ? savedAmt : '';
-  const costRawHtml = (program.costRaw)
+  // ── Smart cost interaction ────────────────────────────────────────────────
+  const info     = parseCostBasisInfo(program);
+  const qty      = S.quantities[program.id] || 0;
+  const tierIdx  = S.selectedTiers[program.id] ?? 0;
+  const total    = resolvedCost(program);
+  const totalStr = total > 0 ? formatCost(total) + '/yr' : '';
+
+  // Raw Monday description — always shown for context
+  const costRawHtml = program.costRaw
     ? `<div class="cost-raw-text">💬 ${program.costRaw}</div>`
     : '';
-  const basisTag = program.costBasis
-    ? `<span class="cost-basis-tag">${program.costBasis}</span>`
-    : '';
-  const budgetInputHtml = `
-    <div class="budget-input-row">
-      <span class="budget-input-label">Budget&nbsp;$</span>
-      <input class="budget-input" data-pid="${program.id}" type="number" min="0" step="1"
-             placeholder="Enter amount" value="${prePopAmt}">
-      ${basisTag}
-    </div>`;
+
+  let costInteractionHtml = '';
+
+  if (info.type === 'flat') {
+    costInteractionHtml = `
+      <div class="cost-interaction">
+        <span class="cost-parsed-rate">${formatCost(info.rate)}</span>
+        <span class="cost-basis-tag">Flat</span>
+      </div>`;
+
+  } else if (info.type === 'per-unit' || info.type === 'per-quantity') {
+    const period = info.period === 'month' ? '/mo' : '/yr';
+    costInteractionHtml = `
+      <div class="cost-interaction">
+        <div class="qty-calc-row">
+          <span class="cost-parsed-rate">${formatCost(info.rate)}<span class="cost-basis-tag">/${info.label.toLowerCase()}${period}</span></span>
+          <span class="qty-sep">×</span>
+          <div class="qty-field">
+            <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
+            <span class="qty-label">${info.plural}</span>
+          </div>
+          ${qty > 0 ? `<span class="qty-equals">= <strong>${totalStr}</strong></span>` : ''}
+        </div>
+      </div>`;
+
+  } else if (info.type === 'tiered') {
+    const tiersHtml = (info.tiers || []).map((t, i) => `
+      <label class="tier-option${i === tierIdx ? ' is-selected' : ''}">
+        <input type="radio" class="tier-radio" name="tier_${program.id}" data-pid="${program.id}" data-tier="${i}"${i === tierIdx ? ' checked' : ''}>
+        <span class="tier-label">${t.label}</span>
+        <span class="tier-rate">${formatCost(t.rate)}${info.isPerUnit ? (info.period === 'month' ? '/unit/mo' : '/unit/yr') : '/yr'}</span>
+      </label>`).join('');
+    const qtySection = info.isPerUnit ? `
+      <div class="qty-calc-row">
+        <span class="qty-sep">×</span>
+        <div class="qty-field">
+          <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
+          <span class="qty-label">Units</span>
+        </div>
+        ${qty > 0 ? `<span class="qty-equals">= <strong>${totalStr}</strong></span>` : ''}
+      </div>` : (total > 0 ? `<div class="qty-calc-row"><span class="qty-equals"><strong>${totalStr}</strong></span></div>` : '');
+    costInteractionHtml = `
+      <div class="cost-interaction tiered">
+        <div class="tier-options">${tiersHtml}</div>
+        ${qtySection}
+      </div>`;
+
+  } else {
+    // Manual fallback for complex/unrecognised costs
+    const savedAmt  = S.budgetAmounts[program.id];
+    costInteractionHtml = `
+      <div class="cost-interaction manual">
+        <div class="budget-input-row">
+          <span class="budget-input-label">Budget&nbsp;$</span>
+          <input class="budget-input" data-pid="${program.id}" type="number" min="0" step="1"
+                 placeholder="Enter amount" value="${savedAmt !== undefined ? savedAmt : ''}">
+          ${program.costBasis ? `<span class="cost-basis-tag">${program.costBasis}</span>` : ''}
+        </div>
+      </div>`;
+  }
 
   const priorCostHtml = program.priorYearCost
     ? `<span class="prog-card-prior-cost">Prior year: ${formatCost(program.priorYearCost)}</span>`
@@ -306,7 +427,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       <div class="prog-card-action">${actionHtml}</div>
     </div>
     ${costRawHtml}
-    ${budgetInputHtml}
+    ${costInteractionHtml}
     <div class="prog-card-meta-row">
       <span class="prog-card-gl">GL ${program.glCode}</span>
       ${billingHtml}
@@ -345,21 +466,51 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     });
   }
 
-  // Budget $ input — save amount and update total
+  // ── Quantity input (per-unit / per-quantity / tiered with units) ─────────────
+  const qtyInput = el.querySelector('.qty-input');
+  if (qtyInput) {
+    qtyInput.addEventListener('input', e => {
+      e.stopPropagation();
+      S.quantities[program.id] = parseInt(e.target.value) || 0;
+      localStorage.setItem(`rpm_qty_${S.property}_${S.budgetYear}`, JSON.stringify(S.quantities));
+      updateBudgetTotal();
+      const t      = resolvedCost(program);
+      const eqEl   = el.querySelector('.qty-equals');
+      const hasQty = S.quantities[program.id] > 0;
+      if (eqEl) {
+        eqEl.innerHTML = hasQty ? `= <strong>${formatCost(t)}/yr</strong>` : '';
+      } else if (hasQty) {
+        const field = el.querySelector('.qty-field');
+        if (field) { const s = document.createElement('span'); s.className = 'qty-equals'; s.innerHTML = `= <strong>${formatCost(t)}/yr</strong>`; field.after(s); }
+      }
+    });
+  }
+
+  // ── Tier radio buttons ────────────────────────────────────────────────────
+  el.querySelectorAll('.tier-radio').forEach(radio => {
+    radio.addEventListener('change', e => {
+      e.stopPropagation();
+      S.selectedTiers[program.id] = parseInt(e.target.dataset.tier);
+      localStorage.setItem(`rpm_tiers_${S.property}_${S.budgetYear}`, JSON.stringify(S.selectedTiers));
+      updateBudgetTotal();
+      el.querySelectorAll('.tier-option').forEach((opt, i) =>
+        opt.classList.toggle('is-selected', i === S.selectedTiers[program.id])
+      );
+      const t = resolvedCost(program);
+      const eqEl = el.querySelector('.qty-equals');
+      if (eqEl) eqEl.innerHTML = t > 0 ? `= <strong>${formatCost(t)}/yr</strong>` : '';
+    });
+  });
+
+  // ── Manual budget input (complex / fallback costs) ────────────────────────
   const budgetInput = el.querySelector('.budget-input');
   if (budgetInput) {
     budgetInput.addEventListener('input', e => {
       e.stopPropagation();
       const val = parseFloat(e.target.value);
-      if (!isNaN(val) && val >= 0) {
-        S.budgetAmounts[program.id] = val;
-      } else {
-        delete S.budgetAmounts[program.id];
-      }
-      localStorage.setItem(
-        `rpm_budget_${S.property}_${S.budgetYear}`,
-        JSON.stringify(S.budgetAmounts)
-      );
+      if (!isNaN(val) && val >= 0) { S.budgetAmounts[program.id] = val; }
+      else { delete S.budgetAmounts[program.id]; }
+      localStorage.setItem(`rpm_budget_${S.property}_${S.budgetYear}`, JSON.stringify(S.budgetAmounts));
       updateBudgetTotal();
     });
   }
@@ -523,7 +674,11 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
   try {
     await resetDecisions(S.property, S.budgetYear);
     S.decisions      = {};
+    S.quantities     = {};
+    S.selectedTiers  = {};
     S.budgetAmounts  = {};
+    localStorage.removeItem(`rpm_qty_${S.property}_${S.budgetYear}`);
+    localStorage.removeItem(`rpm_tiers_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_budget_${S.property}_${S.budgetYear}`);
     renderMainScreen();
     showScreen('screen-main');
