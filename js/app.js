@@ -9,6 +9,7 @@ const S = {
   budgetYear:      CONFIG.budgetYear,
   property:        null,
   systemType:      null,
+  unitCount:       0,
   allPrograms:     [],
   programs:        [],    // filtered by system
   decisions:       {},    // programId → { itemId, decision, optOutApproval, ... }
@@ -43,8 +44,6 @@ async function loadPropertyScreen() {
       '<option value="">Error loading properties — check config</option>';
   }
 
-  // Show tutorial on first visit — wait for screen transition + any async errors to settle
-  setTimeout(maybeShowTutorial, 600);
 }
 
 // ── Entry flow ───────────────────────────────────────────────────────────────
@@ -108,6 +107,38 @@ async function launchMain() {
   }
 }
 
+// ── Unit count & budget total ─────────────────────────────────────────────────
+document.getElementById('unit-count').addEventListener('input', e => {
+  S.unitCount = parseInt(e.target.value) || 0;
+  updateBudgetTotal();
+  // Re-render cards so per-unit costs update
+  renderMainScreen();
+});
+
+function resolvedCost(program) {
+  const basis = (program.costBasis || '').toLowerCase();
+  const n     = S.unitCount || 0;
+  if (n > 0 && basis.includes('unit') && basis.includes('month')) return program.cost * n * 12;
+  if (n > 0 && basis.includes('unit')) return program.cost * n;
+  return program.cost;
+}
+
+function updateBudgetTotal() {
+  let total = 0;
+  S.programs.forEach(p => {
+    const dec = S.decisions[p.id]?.decision;
+    if (p.required) {
+      if (dec !== 'opted-out') total += resolvedCost(p);
+    } else {
+      if (dec === 'in') total += resolvedCost(p);
+    }
+  });
+  const el = document.getElementById('budget-total');
+  if (el) el.textContent = total > 0
+    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(total)
+    : '—';
+}
+
 function renderMainScreen() {
   document.getElementById('hdr-property').textContent = S.property;
   document.getElementById('hdr-system').textContent   = S.systemType;
@@ -118,6 +149,7 @@ function renderMainScreen() {
 
   renderColumn(nonElective, 'non-elective-list', true);
   renderColumn(elective,    'elective-list',     false);
+  updateBudgetTotal();
 }
 
 // ── Two-column grid ───────────────────────────────────────────────────────────
@@ -231,7 +263,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       <div class="prog-card-action">${actionHtml}</div>
     </div>
     <div class="prog-card-details">
-      <span class="prog-card-cost">${formatCost(program.cost)}</span>
+      <span class="prog-card-cost">${formatCost(resolvedCost(program))}</span>
       <span class="prog-card-gl">GL ${program.glCode}</span>
       ${resourceLink}
     </div>
@@ -259,6 +291,7 @@ function refreshCard(programId) {
   const newCard = buildProgramCard(program, S.decisions[programId], S.priorDecisions[programId], program.required);
   old.replaceWith(newCard);
   updateColumnCounts();
+  updateBudgetTotal();
 }
 
 // ── Elective actions ──────────────────────────────────────────────────────────
@@ -423,58 +456,6 @@ document.querySelectorAll('.overlay').forEach(overlay => {
     if (e.target === overlay) overlay.classList.remove('open');
   });
 });
-
-// ── Tutorial ──────────────────────────────────────────────────────────────────
-const TUTORIAL_KEY = 'rpm_tutorial_seen';
-const TOTAL_STEPS  = 6;
-let tutStep = 0;
-
-function showTutorial() {
-  tutStep = 0;
-  updateTutStep();
-  openModal('modal-tutorial');
-}
-
-function updateTutStep() {
-  document.querySelectorAll('.tut-step').forEach((el, i) => {
-    el.classList.toggle('active', i === tutStep);
-  });
-  document.querySelectorAll('.tut-dot').forEach((dot, i) => {
-    dot.classList.toggle('active', i === tutStep);
-  });
-  const nextBtn = document.getElementById('tut-next');
-  const isLast  = tutStep === TOTAL_STEPS - 1;
-  nextBtn.textContent  = isLast ? 'Got it!' : 'Next →';
-  nextBtn.classList.toggle('last', isLast);
-  document.getElementById('tut-skip').style.visibility = isLast ? 'hidden' : 'visible';
-}
-
-document.getElementById('tut-next').addEventListener('click', () => {
-  if (tutStep < TOTAL_STEPS - 1) {
-    tutStep++;
-    updateTutStep();
-  } else {
-    localStorage.setItem(TUTORIAL_KEY, '1');
-    closeModal('modal-tutorial');
-  }
-});
-
-document.getElementById('tut-skip').addEventListener('click', () => {
-  localStorage.setItem(TUTORIAL_KEY, '1');
-  closeModal('modal-tutorial');
-});
-
-// "How to Use" in menu
-document.getElementById('mi-refresh-data').insertAdjacentHTML('beforebegin', '');
-
-document.getElementById('mi-how-to-use').addEventListener('click', () => {
-  closeModal('modal-menu');
-  showTutorial();
-});
-
-function maybeShowTutorial() {
-  if (!localStorage.getItem(TUTORIAL_KEY)) showTutorial();
-}
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 boot();
