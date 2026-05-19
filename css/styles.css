@@ -481,35 +481,102 @@ body {
 }
 
 /* ─── Department Groups ─── */
+/* ─── Column Header Counts ─── */
+.col-hdr-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.col-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--copper);
+  white-space: nowrap;
+}
+
+/* ─── Department Groups ─── */
 .dept-group {
   margin-bottom: 28px;
 }
 
 .dept-group-hdr {
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--text3);
-  padding: 0 0 8px;
-  border-bottom: 1px solid var(--border);
+  letter-spacing: 0.08em;
+  padding: 8px 12px;
+  border-radius: 8px;
   margin-bottom: 10px;
 }
 
+.dept-hdr-count {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.7;
+  background: rgba(255,255,255,0.5);
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+
+/* Department color themes */
+.dept-hdr-technology  { background: #e3f2fd; color: var(--g-technology);  border-left: 4px solid var(--g-technology); }
+.dept-hdr-marketing   { background: #fce4ec; color: var(--g-marketing);   border-left: 4px solid var(--g-marketing); }
+.dept-hdr-accounting  { background: #e8eaf6; color: var(--g-accounting);  border-left: 4px solid var(--g-accounting); }
+.dept-hdr-operations  { background: #fff3e0; color: var(--g-operations);  border-left: 4px solid var(--g-operations); }
+.dept-hdr-hr          { background: #f3e5f5; color: var(--g-hr);          border-left: 4px solid var(--g-hr); }
+.dept-hdr-legal       { background: #efebe9; color: var(--g-legal);       border-left: 4px solid var(--g-legal); }
+.dept-hdr-revenue     { background: #e0f2f1; color: var(--g-revenue);     border-left: 4px solid var(--g-revenue); }
+.dept-hdr-training    { background: #e8f5e9; color: var(--g-training);    border-left: 4px solid var(--g-training); }
+.dept-hdr-default     { background: #eceff1; color: var(--g-default);     border-left: 4px solid var(--g-default); }
+
 /* ─── Program Cards ─── */
 .prog-card {
+  position: relative;
   background: #fff;
   border: 1.5px solid var(--border);
   border-radius: 10px;
   padding: 14px 16px;
   margin-bottom: 10px;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.2s;
+  overflow: hidden;
 }
 .prog-card:hover { border-color: #c8cdd8; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 
-.prog-card.is-opted-out  { opacity: 0.6; background: #fafafa; }
-.prog-card.is-followup   { border-color: #f59e0b; background: #fffbeb; }
-.prog-card.is-included   { border-color: var(--copper); background: var(--copper-light); }
+.prog-card.is-opted-out    { opacity: 0.55; background: #fafafa; }
+.prog-card.is-followup     { border-color: #f59e0b; background: #fffbeb; }
+.prog-card.is-acknowledged { border-color: #22c55e; background: #f0fdf4; }
+.prog-card.is-included     { border-color: var(--copper); background: var(--copper-light); }
+.prog-card.is-excluded     {
+  opacity: 0.45;
+  background: #f5f5f5;
+  border-color: #d1d5db;
+  pointer-events: none;  /* greys out — clicks disabled */
+}
+.prog-card.is-excluded .prog-card-action {
+  pointer-events: all;   /* but allow the Include button to still work */
+}
+
+/* "Not Including" overlay banner */
+.excluded-overlay {
+  position: absolute;
+  top: 10px;
+  right: -22px;
+  background: #6b7280;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 32px;
+  transform: rotate(15deg);
+  pointer-events: none;
+}
 
 .prog-card-top {
   display: flex;
@@ -527,13 +594,19 @@ body {
   flex: 1;
 }
 
-.prog-card-action { flex-shrink: 0; }
+.prog-card-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
 
 .prog-card-details {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-bottom: 4px;
+  flex-wrap: wrap;
 }
 
 .prog-card-cost {
@@ -549,6 +622,16 @@ body {
   border-radius: 4px;
   padding: 1px 6px;
 }
+
+.prog-card-resource {
+  font-size: 11px;
+  color: var(--copper);
+  text-decoration: none;
+  font-weight: 500;
+  margin-left: auto;
+}
+.prog-card-resource:hover { text-decoration: underline; }
+.prog-card-resource-placeholder { opacity: 0.5; cursor: default; }
 
 .prog-card-desc {
   font-size: 12px;
@@ -569,6 +652,7 @@ body {
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
   white-space: nowrap;
+  font-family: inherit;
 }
 .btn-card-ghost:hover { border-color: var(--copper); color: var(--copper); }
 
@@ -583,21 +667,53 @@ body {
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
   white-space: nowrap;
+  font-family: inherit;
 }
 .btn-card-include:hover        { background: var(--copper); color: #fff; }
 .btn-card-include.is-included  { background: var(--copper); color: #fff; }
 .btn-card-include.is-included:hover { background: var(--copper2); }
 
+.btn-card-exclude {
+  background: none;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.btn-card-exclude:hover { border-color: #9ca3af; background: #f3f4f6; color: #374151; }
+
+.btn-card-acknowledge {
+  background: none;
+  border: 1.5px solid #22c55e;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #16a34a;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.btn-card-acknowledge:hover { background: #22c55e; color: #fff; }
+
 .card-status-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   font-size: 11px;
   font-weight: 600;
   border-radius: 4px;
   padding: 2px 7px;
-  margin-right: 6px;
 }
-.status-opted-out { background: #fee2e2; color: #b91c1c; }
-.status-followup  { background: #fef3c7; color: #92400e; }
+.status-opted-out    { background: #fee2e2; color: #b91c1c; }
+.status-followup     { background: #fef3c7; color: #92400e; }
+.status-acknowledged { background: #dcfce7; color: #16a34a; }
 
 /* ─── Summary ─── */
 #screen-summary { background: var(--bg); }
