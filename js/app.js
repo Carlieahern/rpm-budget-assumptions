@@ -88,8 +88,13 @@ async function launchMain() {
       loadPriorYearDecisions(S.property, S.budgetYear),
     ]);
 
-    S.allPrograms    = programs;
-    S.programs       = filterBySystem(programs, S.systemType);
+    S.allPrograms = programs;
+    // Resolve the correct cost + GL for the selected system
+    S.programs = filterBySystem(programs, S.systemType).map(p => ({
+      ...p,
+      cost:   p.costs[S.systemType]   ?? 0,
+      glCode: p.glCodes[S.systemType] ?? '—',
+    }));
     S.decisions      = decisions;
     S.priorDecisions = priorDecisions;
 
