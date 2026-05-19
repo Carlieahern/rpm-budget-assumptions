@@ -780,6 +780,109 @@ body {
 .status-followup     { background: #fef3c7; color: #92400e; }
 .status-acknowledged { background: #dcfce7; color: #16a34a; }
 
+/* ─── Card Cost Row ─── */
+.prog-card-cost-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.cost-basis-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  background: var(--bg);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 3px;
+  vertical-align: middle;
+  text-transform: lowercase;
+}
+
+.cost-calc {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text2);
+}
+.cost-calc strong {
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.cost-calc-hint {
+  font-size: 11px;
+  color: var(--text3);
+  font-style: italic;
+}
+
+.qty-input {
+  width: 56px;
+  padding: 2px 6px;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--navy);
+  background: white;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.qty-input:focus { border-color: var(--copper); }
+
+.qty-label {
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.prog-card-prior-cost {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text3);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* ─── Card Meta Row ─── */
+.prog-card-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.prog-card-billing {
+  font-size: 11px;
+  color: var(--text3);
+  background: var(--bg);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.prog-card-owner {
+  font-size: 11px;
+  color: var(--text3);
+}
+
+/* ─── Prior Year Chip ─── */
+.prior-year-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-top: 6px;
+}
+.prior-year-chip.was-in  { background: #f0fdf4; color: #16a34a; }
+.prior-year-chip.was-out { background: #fef2f2; color: #b91c1c; }
+
 /* ─── Summary ─── */
 #screen-summary { background: var(--bg); }
 

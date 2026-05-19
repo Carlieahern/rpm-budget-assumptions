@@ -10,6 +10,7 @@ const S = {
   property:        null,
   systemType:      null,
   unitCount:       0,
+  quantities:      {},    // programId → qty (for Per Device, Per Elevator, etc.)
   allPrograms:     [],
   programs:        [],    // filtered by system
   decisions:       {},    // programId → { itemId, decision, optOutApproval, ... }
@@ -91,12 +92,12 @@ async function launchMain() {
     S.decisions      = decisions;
     S.priorDecisions = priorDecisions;
 
-    // Rebuild pending set from saved decisions
-    S.pendingIds = new Set(
-      Object.entries(S.decisions)
-        .filter(([, d]) => d.decision === 'pending')
-        .map(([id]) => id)
-    );
+    // Load saved per-program quantities
+    try {
+      S.quantities = JSON.parse(localStorage.getItem(
+        `rpm_qty_${S.property}_${S.budgetYear}`
+      )) || {};
+    } catch { S.quantities = {}; }
 
     renderMainScreen();
     showScreen('screen-main');
@@ -115,12 +116,29 @@ document.getElementById('unit-count').addEventListener('input', e => {
   renderMainScreen();
 });
 
+// Returns 'unit-year' | 'unit-month' | 'per-other' | 'flat'
+function costBasisType(program) {
+  const b = (program.costBasis || '').toLowerCase();
+  if (b.includes('unit') && b.includes('month')) return 'unit-month';
+  if (b.includes('unit'))                         return 'unit-year';
+  // Any "Per X" that isn't unit-based
+  if (/per\s+\w/i.test(program.costBasis || '') && !b.includes('unit')) return 'per-other';
+  return 'flat';
+}
+
+// Extract the "X" from "Per X" cost basis
+function perOtherLabel(program) {
+  const m = (program.costBasis || '').match(/per\s+(.+)/i);
+  return m ? m[1].trim() : 'item';
+}
+
 function resolvedCost(program) {
-  const basis = (program.costBasis || '').toLowerCase();
-  const n     = S.unitCount || 0;
-  if (n > 0 && basis.includes('unit') && basis.includes('month')) return program.cost * n * 12;
-  if (n > 0 && basis.includes('unit')) return program.cost * n;
-  return program.cost;
+  const type = costBasisType(program);
+  const rate = program.cost || 0;
+  if (type === 'unit-month') return rate * (S.unitCount || 0) * 12;
+  if (type === 'unit-year')  return rate * (S.unitCount || 0);
+  if (type === 'per-other')  return rate * (S.quantities[program.id] || 0);
+  return rate; // flat
 }
 
 function updateBudgetTotal() {
@@ -256,15 +274,60 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   const excludedOverlay = (!isRequired && dec === 'out')
     ? `<div class="excluded-overlay">Not Including</div>` : '';
 
+  // Build cost display based on basis type
+  const basisType = costBasisType(program);
+  const thingName = perOtherLabel(program);
+  const qty       = S.quantities[program.id] || 0;
+  const total     = resolvedCost(program);
+  const rateStr   = formatCost(program.cost);
+  const totalStr  = total > 0 ? formatCost(total) : '—';
+
+  let costHtml;
+  if (basisType === 'unit-year' || basisType === 'unit-month') {
+    const period = basisType === 'unit-month' ? '/unit/mo' : '/unit/yr';
+    costHtml = `
+      <span class="prog-card-cost">${rateStr}<span class="cost-basis-tag">${period}</span></span>
+      ${S.unitCount > 0
+        ? `<span class="cost-calc">× ${S.unitCount} units = <strong>${totalStr}</strong></span>`
+        : `<span class="cost-calc-hint">Enter units above ↑</span>`}`;
+  } else if (basisType === 'per-other') {
+    costHtml = `
+      <span class="prog-card-cost">${rateStr}<span class="cost-basis-tag">/${thingName.toLowerCase()}</span></span>
+      <span class="cost-calc">×
+        <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
+        <span class="qty-label">${thingName}</span>
+        ${qty > 0 ? `= <strong>${totalStr}</strong>` : ''}
+      </span>`;
+  } else {
+    costHtml = `<span class="prog-card-cost">${rateStr}</span>`;
+  }
+
+  const priorCostHtml = program.priorYearCost
+    ? `<span class="prog-card-prior-cost">Prior year: ${formatCost(program.priorYearCost)}</span>`
+    : '';
+
+  const ownerHtml = program.programOwner
+    ? `<span class="prog-card-owner">Owner: ${program.programOwner}</span>`
+    : '';
+
+  const billingHtml = program.billingFreq
+    ? `<span class="prog-card-billing">${program.billingFreq}</span>`
+    : '';
+
   el.innerHTML = `
     ${excludedOverlay}
     <div class="prog-card-top">
       <div class="prog-card-name">${program.name}</div>
       <div class="prog-card-action">${actionHtml}</div>
     </div>
-    <div class="prog-card-details">
-      <span class="prog-card-cost">${formatCost(resolvedCost(program))}</span>
+    <div class="prog-card-cost-row">
+      ${costHtml}
+      ${priorCostHtml}
+    </div>
+    <div class="prog-card-meta-row">
       <span class="prog-card-gl">GL ${program.glCode}</span>
+      ${billingHtml}
+      ${ownerHtml}
       ${resourceLink}
     </div>
     ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
@@ -279,6 +342,34 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     if (e.target.closest('.btn-include'))          handleElectiveInclude(program.id);
     if (e.target.closest('.btn-exclude'))          handleElectiveExclude(program.id);
   });
+
+  // Per-program quantity input
+  const qtyInput = el.querySelector('.qty-input');
+  if (qtyInput) {
+    qtyInput.addEventListener('input', e => {
+      e.stopPropagation();
+      S.quantities[program.id] = parseInt(e.target.value) || 0;
+      localStorage.setItem(
+        `rpm_qty_${S.property}_${S.budgetYear}`,
+        JSON.stringify(S.quantities)
+      );
+      updateBudgetTotal();
+      // Update the cost calculation display without full re-render
+      const calcEl = el.querySelector('.cost-calc');
+      if (calcEl) {
+        const n = S.quantities[program.id] || 0;
+        const t = resolvedCost(program);
+        calcEl.innerHTML = `× <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${n || ''}"> <span class="qty-label">${thingName}</span> ${n > 0 ? `= <strong>${formatCost(t)}</strong>` : ''}`;
+        // Re-attach listener on new input
+        const newInput = calcEl.querySelector('.qty-input');
+        if (newInput) newInput.addEventListener('input', qtyInput.oninput = e => {
+          S.quantities[program.id] = parseInt(e.target.value) || 0;
+          localStorage.setItem(`rpm_qty_${S.property}_${S.budgetYear}`, JSON.stringify(S.quantities));
+          updateBudgetTotal();
+        });
+      }
+    });
+  }
 
   return el;
 }
@@ -438,8 +529,8 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
   showScreen('screen-loading');
   try {
     await resetDecisions(S.property, S.budgetYear);
-    S.decisions = {};
-    S.pendingIds.clear();
+    S.decisions  = {};
+    S.quantities = {};
     renderMainScreen();
     showScreen('screen-main');
   } catch (e) {

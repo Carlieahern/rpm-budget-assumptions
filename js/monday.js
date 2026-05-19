@@ -116,10 +116,16 @@ export async function fetchPrograms(forceRefresh = false) {
     const electiveRaw = colMap[columns.elective]?.text || '';
     const isRequired  = /non.?elective/i.test(electiveRaw);
 
+    // Department column drives grouping; fall back to board group title
+    const department = colMap[columns.department]?.text || item.group.title || 'General';
+
+    // General cost rate (used when system-specific cost is blank)
+    const generalCost = parseCost(colMap[columns.cost]);
+
     const costs = {
-      Yardi:       parseCost(colMap[columns.yardiCost]),
-      OneSite:     parseCost(colMap[columns.onesiteCost]),
-      PaceOneSite: parseCost(colMap[columns.paceCost]),
+      Yardi:       parseCost(colMap[columns.yardiCost])    || generalCost,
+      OneSite:     parseCost(colMap[columns.onesiteCost])  || generalCost,
+      PaceOneSite: parseCost(colMap[columns.paceCost])     || generalCost,
     };
 
     const glCodes = {
@@ -128,17 +134,23 @@ export async function fetchPrograms(forceRefresh = false) {
       PaceOneSite: colMap[columns.paceGL]?.text     || '—',
     };
 
+    const owner = colMap[columns.programOwner]?.text
+      || colMap[columns.submittedBy]?.text
+      || '';
+
     return {
-      id:          item.id,
-      name:        item.name,
-      group:       item.group.title,
-      groupId:     item.group.id,
-      costs,       // resolved per-system in app.js
-      glCodes,     // resolved per-system in app.js
-      description: colMap[columns.description]?.text || '',
-      required:    isRequired,
-      costBasis:   colMap[columns.costBasis]?.text  || '',
-      billingFreq: colMap[columns.billingFreq]?.text || '',
+      id:            item.id,
+      name:          item.name,
+      group:         department,
+      groupId:       item.group.id,
+      costs,
+      glCodes,
+      description:   colMap[columns.description]?.text   || '',
+      required:      isRequired,
+      costBasis:     colMap[columns.costBasis]?.text     || '',
+      billingFreq:   colMap[columns.billingFreq]?.text   || '',
+      programOwner:  owner,
+      priorYearCost: parseCost(colMap[columns.priorYearCost]),
     };
   });
 
