@@ -8,7 +8,7 @@
   <title>RPM Budget Assumptions</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=5">
+  <link rel="stylesheet" href="css/styles.css?v=7">
 </head>
 <body>
 <div id="app">
@@ -59,84 +59,38 @@
   <!-- ── Main App ── -->
   <div id="screen-main" class="screen screen-main">
 
-    <header class="app-bar">
-      <div class="app-bar-left">
-        <div class="rpm-dot">RPM</div>
-        <div class="app-bar-info">
-          <div class="app-bar-property" id="hdr-property">—</div>
-          <div class="app-bar-system" id="hdr-system">—</div>
+    <header class="main-hdr">
+      <div class="main-hdr-left">
+        <div class="main-hdr-prop" id="hdr-property">—</div>
+        <div class="main-hdr-meta">
+          <span id="hdr-system">—</span>
+          <span class="meta-sep">·</span>
+          <span id="hdr-year"></span>
         </div>
       </div>
-      <div class="app-bar-right">
-        <div class="year-pill" id="hdr-year"></div>
+      <div class="main-hdr-right">
+        <button class="btn-summary-link" id="btn-view-summary">View Summary</button>
         <button class="icon-btn" id="btn-menu" aria-label="Menu">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
         </button>
+        <img src="RPMLivingLogo__Copper.jpg" alt="RPM Living" class="rpm-logo-img rpm-logo-sm">
       </div>
     </header>
 
-    <nav class="tab-bar">
-      <button class="tab active" data-tab="required">
-        Required
-        <span class="tab-pip" id="pip-required">0</span>
-      </button>
-      <button class="tab" data-tab="nonrequired">
-        Non-Required
-        <span class="tab-pip" id="pip-nonrequired">0</span>
-      </button>
-    </nav>
-
-    <!-- Panel: Required -->
-    <div class="panel active" id="panel-required">
-      <div class="panel-intro">
-        <p>These programs are <strong>required</strong> for your system. They're budgeted by default. Opting out requires division president approval.</p>
-      </div>
-      <div class="req-grid" id="required-grid"></div>
-      <div class="panel-cta">
-        <button class="btn-primary" id="btn-go-swipe">Review Non-Required Programs →</button>
-      </div>
-    </div>
-
-    <!-- Panel: Non-Required (Swipe Deck) -->
-    <div class="panel" id="panel-nonrequired">
-
-      <!-- Pending tray -->
-      <div class="pending-tray hidden" id="pending-tray">
-        <button class="pending-header" id="pending-tray-toggle">
-          <span class="pending-label-text">Pending Review</span>
-          <span class="pending-badge" id="pending-badge">0</span>
-          <svg class="tray-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-        <div class="pending-chips" id="pending-chips"></div>
-      </div>
-
-      <!-- Deck -->
-      <div class="deck-wrap" id="deck-wrap">
-        <div class="direction-labels">
-          <div class="dir-label dir-left" id="dir-skip">
-            <span class="dir-icon">✕</span>
-            <span>Skip</span>
-          </div>
-          <div class="dir-label dir-right" id="dir-include">
-            <span class="dir-icon">✓</span>
-            <span>Include</span>
-          </div>
+    <div class="programs-grid">
+      <div class="programs-col">
+        <div class="col-hdr">
+          <h2 class="col-title">Non-Elective</h2>
+          <p class="col-sub">Budgeted by default. Opting out requires division president approval.</p>
         </div>
-        <div class="card-stack" id="card-stack"></div>
-        <div class="deck-hints">
-          <span>← Skip</span>
-          <span class="hint-up">↑ Undecided</span>
-          <span>Include →</span>
-        </div>
-        <div class="deck-progress" id="deck-progress"></div>
+        <div id="non-elective-list"></div>
       </div>
-
-      <!-- All done -->
-      <div class="deck-done hidden" id="deck-done">
-        <div class="done-icon">✓</div>
-        <h3>All Reviewed!</h3>
-        <p>You've made decisions on all non-required programs.</p>
-        <button class="btn-primary" id="btn-view-summary">View Budget Summary</button>
+      <div class="programs-col">
+        <div class="col-hdr">
+          <h2 class="col-title">Elective</h2>
+          <p class="col-sub">Select which programs to include in your budget.</p>
+        </div>
+        <div id="elective-list"></div>
       </div>
     </div>
 
@@ -384,6 +338,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=5"></script>
+<script type="module" src="js/app.js?v=7"></script>
 </body>
 </html>
