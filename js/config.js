@@ -7,7 +7,7 @@ const CONFIG = {
   useMockData: true,
 
   // ── Budget cycle ──
-  budgetYear: 2026,
+  budgetYear: 2027,
 
   // ── Monday.com board IDs (numeric strings) ──
   monday: {
