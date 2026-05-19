@@ -4,7 +4,7 @@
 
 const CONFIG = {
   // ── Set to true to use dummy data (no API keys needed) ──
-  useMockData: true,
+  useMockData: false,
 
   // ── Budget cycle ──
   budgetYear: 2027,
