@@ -1,9 +1,7 @@
 import CONFIG from './config.js';
 import { fetchProperties, fetchPrograms, filterBySystem, clearMondayCache } from './monday.js';
 import { loadDecisions, saveDecision, deleteDecision, resetDecisions, loadPriorYearDecisions } from './sharepoint.js';
-import { SwipeCard } from './swipe.js';
-import { showScreen, openModal, closeModal, groupStyle,
-         buildRequiredCard, buildSwipeCard, buildPendingChip,
+import { showScreen, openModal, closeModal, groupStyle, formatCost,
          renderSummary, populatePropertySelect } from './ui.js';
 
 // ── App State ───────────────────────────────────────────────────────────────
@@ -15,12 +13,8 @@ const S = {
   programs:        [],    // filtered by system
   decisions:       {},    // programId → { itemId, decision, optOutApproval, ... }
   priorDecisions:  {},
-  pendingIds:      new Set(),
-  swipeQueue:      [],    // non-required programs not yet decided
-  swipeIndex:      0,
   currentOptOutId: null,
   viewingPrior:    false,
-  activeSwiper:    null,
 };
 
 // ── Bootstrap ───────────────────────────────────────────────────────────────
@@ -115,35 +109,130 @@ async function launchMain() {
 }
 
 function renderMainScreen() {
-  // Header
   document.getElementById('hdr-property').textContent = S.property;
   document.getElementById('hdr-system').textContent   = S.systemType;
   document.getElementById('hdr-year').textContent     = `FY ${S.budgetYear}`;
 
-  const req    = S.programs.filter(p => p.required);
-  const nonReq = S.programs.filter(p => !p.required);
+  const nonElective = S.programs.filter(p => p.required);
+  const elective    = S.programs.filter(p => !p.required);
 
-  document.getElementById('pip-required').textContent    = req.length;
-  document.getElementById('pip-nonrequired').textContent = nonReq.length;
-
-  renderRequiredTab(req);
-  renderSwipeDeck(nonReq);
+  renderColumn(nonElective, 'non-elective-list', true);
+  renderColumn(elective,    'elective-list',     false);
 }
 
-// ── Required Tab ──────────────────────────────────────────────────────────────
-function renderRequiredTab(programs) {
-  const grid = document.getElementById('required-grid');
-  grid.innerHTML = '';
+// ── Two-column grid ───────────────────────────────────────────────────────────
+function renderColumn(programs, containerId, isRequired) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+
+  // Group by department
+  const groups = {};
   programs.forEach(p => {
-    const card = buildRequiredCard(p, S.decisions[p.id], S.priorDecisions[p.id]);
-    card.addEventListener('click', e => {
-      const trigger = e.target.closest('.btn-opt-out-trigger');
-      const undo    = e.target.closest('.btn-undo-optout');
-      if (trigger) openOptOutModal(p.id);
-      if (undo)    undoOptOut(p.id);
-    });
-    grid.appendChild(card);
+    if (!groups[p.group]) groups[p.group] = [];
+    groups[p.group].push(p);
   });
+
+  Object.entries(groups).forEach(([dept, deptPrograms]) => {
+    const groupEl = document.createElement('div');
+    groupEl.className = 'dept-group';
+    groupEl.innerHTML = `<div class="dept-group-hdr">${dept}</div>`;
+
+    deptPrograms.forEach(p => {
+      const card = buildProgramCard(p, S.decisions[p.id], S.priorDecisions[p.id], isRequired);
+      groupEl.appendChild(card);
+    });
+
+    container.appendChild(groupEl);
+  });
+}
+
+function buildProgramCard(program, decision, priorDecision, isRequired) {
+  const gs = groupStyle(program.group);
+  const el = document.createElement('div');
+  el.className = 'prog-card';
+  el.dataset.programId = program.id;
+
+  const dec = decision?.decision;
+  if (dec === 'opted-out')      el.classList.add('is-opted-out');
+  if (dec === 'needs-followup') el.classList.add('is-followup');
+  if (dec === 'in')             el.classList.add('is-included');
+
+  const priorChip = priorDecision
+    ? `<div class="prior-year-chip was-${priorDecision.decision === 'opted-out' || priorDecision.decision === 'out' ? 'out' : 'in'}">
+         ${priorDecision.decision === 'out' ? '✕ Skipped last year'
+           : priorDecision.decision === 'opted-out' ? '↩ Opted out last year'
+           : '✓ Included last year'}
+       </div>`
+    : '';
+
+  let actionHtml;
+  if (isRequired) {
+    if (dec === 'opted-out') {
+      actionHtml = `
+        <span class="card-status-badge status-opted-out">Opted Out${decision.optOutApproval ? ' ✓' : ''}</span>
+        <button class="btn-card-ghost btn-undo-optout" data-pid="${program.id}">Undo</button>`;
+    } else if (dec === 'needs-followup') {
+      actionHtml = `
+        <span class="card-status-badge status-followup">⚑ Follow-up Needed</span>
+        <button class="btn-card-ghost btn-opt-out-trigger" data-pid="${program.id}">Opt Out</button>`;
+    } else {
+      actionHtml = `<button class="btn-card-ghost btn-opt-out-trigger" data-pid="${program.id}">Opt Out</button>`;
+    }
+  } else {
+    if (dec === 'in') {
+      actionHtml = `<button class="btn-card-include is-included btn-elective-toggle" data-pid="${program.id}">✓ Included</button>`;
+    } else {
+      actionHtml = `<button class="btn-card-include btn-elective-toggle" data-pid="${program.id}">Include</button>`;
+    }
+  }
+
+  el.innerHTML = `
+    <div class="prog-card-top">
+      <div class="prog-card-name">${program.name}</div>
+      <div class="prog-card-action">${actionHtml}</div>
+    </div>
+    <div class="prog-card-details">
+      <span class="prog-card-cost">${formatCost(program.cost)}</span>
+      <span class="prog-card-gl">GL ${program.glCode}</span>
+    </div>
+    ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
+    ${priorChip}
+  `;
+
+  el.addEventListener('click', e => {
+    if (e.target.closest('.btn-opt-out-trigger')) openOptOutModal(program.id);
+    if (e.target.closest('.btn-undo-optout'))     undoOptOut(program.id);
+    if (e.target.closest('.btn-elective-toggle')) handleElectiveToggle(program.id);
+  });
+
+  return el;
+}
+
+function refreshCard(programId) {
+  const program = S.programs.find(p => p.id === programId);
+  if (!program) return;
+  const old = document.querySelector(`.prog-card[data-program-id="${programId}"]`);
+  if (!old) return;
+  const newCard = buildProgramCard(program, S.decisions[programId], S.priorDecisions[programId], program.required);
+  old.replaceWith(newCard);
+}
+
+// ── Elective toggle ──────────────────────────────────────────────────────────
+async function handleElectiveToggle(programId) {
+  const program  = S.programs.find(p => p.id === programId);
+  if (!program) return;
+  const existing = S.decisions[programId];
+  const newDec   = existing?.decision === 'in' ? 'out' : 'in';
+
+  try {
+    const itemId = await saveDecision(S.property, program, newDec, S.budgetYear, {
+      itemId: existing?.itemId,
+    });
+    S.decisions[programId] = { ...(existing || {}), itemId, decision: newDec };
+  } catch (e) {
+    console.error('Failed to save decision', e);
+  }
+  refreshCard(programId);
 }
 
 function openOptOutModal(programId) {
@@ -167,7 +256,7 @@ async function handleOptOut(hasApproval) {
   });
 
   S.decisions[programId] = { ...(existing || {}), itemId, decision, optOutApproval: hasApproval };
-  refreshRequiredCard(programId);
+  refreshCard(programId);
 }
 
 async function undoOptOut(programId) {
@@ -175,178 +264,8 @@ async function undoOptOut(programId) {
   if (!existing) return;
   await deleteDecision(existing.itemId);
   delete S.decisions[programId];
-  refreshRequiredCard(programId);
+  refreshCard(programId);
 }
-
-function refreshRequiredCard(programId) {
-  const program = S.programs.find(p => p.id === programId);
-  if (!program) return;
-  const old = document.querySelector(`.req-card[data-program-id="${programId}"]`);
-  if (!old) return;
-  const newCard = buildRequiredCard(program, S.decisions[programId], S.priorDecisions[programId]);
-  newCard.addEventListener('click', e => {
-    if (e.target.closest('.btn-opt-out-trigger')) openOptOutModal(programId);
-    if (e.target.closest('.btn-undo-optout'))    undoOptOut(programId);
-  });
-  old.replaceWith(newCard);
-}
-
-// ── Swipe Deck ────────────────────────────────────────────────────────────────
-function renderSwipeDeck(programs) {
-  // Queue = programs with no final decision (pending is in queue too, via chips)
-  S.swipeQueue = programs.filter(p => {
-    const d = S.decisions[p.id]?.decision;
-    return !d || d === 'pending'; // unswiped OR previously pending
-  });
-  S.swipeIndex = 0;
-
-  renderPendingTray();
-  renderCardStack();
-  updateDeckProgress();
-}
-
-function renderCardStack() {
-  const stack = document.getElementById('card-stack');
-  if (S.activeSwiper) { S.activeSwiper.destroy(); S.activeSwiper = null; }
-  stack.innerHTML = '';
-
-  const remaining = S.swipeQueue.slice(S.swipeIndex);
-
-  if (remaining.length === 0) {
-    showDeckDone();
-    return;
-  }
-
-  document.getElementById('deck-wrap').style.display = '';
-  document.getElementById('deck-done').classList.add('hidden');
-
-  // Render top 3 cards (deepest first so top card is last/on top in DOM)
-  const visible = remaining.slice(0, 3);
-  visible.slice().reverse().forEach((program, revIdx) => {
-    const depth = visible.length - 1 - revIdx;
-    const card  = buildSwipeCard(program, S.priorDecisions[program.id]);
-    card.dataset.depth = depth;
-    stack.appendChild(card);
-
-    if (depth === 0) {
-      S.activeSwiper = new SwipeCard(card, {
-        onRight: () => onSwipeDecision(program, 'in'),
-        onLeft:  () => onSwipeDecision(program, 'out'),
-        onUp:    () => onSwipeDecision(program, 'pending'),
-        onDrag:  ({ dx }) => updateDirLabels(dx),
-      });
-    }
-  });
-}
-
-function updateDirLabels(dx) {
-  const skipEl    = document.getElementById('dir-skip');
-  const includeEl = document.getElementById('dir-include');
-  skipEl.classList.toggle('visible',    dx < -60);
-  includeEl.classList.toggle('visible', dx > 60);
-}
-
-async function onSwipeDecision(program, decision) {
-  updateDirLabels(0);
-
-  // Save to SharePoint
-  try {
-    const existing = S.decisions[program.id];
-    const itemId = await saveDecision(S.property, program, decision, S.budgetYear, {
-      itemId: existing?.itemId,
-    });
-    S.decisions[program.id] = { ...(existing || {}), itemId, decision };
-  } catch (e) {
-    console.error('Failed to save decision', e);
-  }
-
-  if (decision === 'pending') {
-    S.pendingIds.add(program.id);
-    renderPendingTray();
-    // Move past this card in queue
-    S.swipeIndex++;
-  } else {
-    // Remove from pending if it was there
-    S.pendingIds.delete(program.id);
-    renderPendingTray();
-    S.swipeIndex++;
-  }
-
-  updateDeckProgress();
-  // Brief delay to let fly-out finish before re-rendering stack
-  setTimeout(renderCardStack, 360);
-}
-
-function updateDeckProgress() {
-  const total     = S.swipeQueue.length;
-  const remaining = total - S.swipeIndex;
-  const el = document.getElementById('deck-progress');
-  if (remaining > 0) {
-    el.textContent = `${total - remaining + 1} of ${total}`;
-  } else {
-    el.textContent = '';
-  }
-}
-
-function showDeckDone() {
-  document.getElementById('deck-wrap').style.display = 'none';
-  document.getElementById('deck-done').classList.remove('hidden');
-}
-
-// ── Pending tray ──────────────────────────────────────────────────────────────
-function renderPendingTray() {
-  const tray  = document.getElementById('pending-tray');
-  const chips = document.getElementById('pending-chips');
-  const badge = document.getElementById('pending-badge');
-
-  if (S.pendingIds.size === 0) {
-    tray.classList.add('hidden');
-    return;
-  }
-
-  tray.classList.remove('hidden');
-  badge.textContent = S.pendingIds.size;
-  chips.innerHTML = '';
-
-  S.pendingIds.forEach(id => {
-    const program = S.programs.find(p => p.id === id);
-    if (!program) return;
-    const chip = buildPendingChip(program);
-    chip.addEventListener('click', () => returnPendingToTop(id));
-    chips.appendChild(chip);
-  });
-}
-
-function returnPendingToTop(programId) {
-  // Remove from pending and re-insert at front of swipe queue
-  S.pendingIds.delete(programId);
-  const idx = S.swipeQueue.findIndex(p => p.id === programId);
-  if (idx !== -1) S.swipeQueue.splice(idx, 1);
-  const program = S.programs.find(p => p.id === programId);
-  if (program) S.swipeQueue.splice(S.swipeIndex, 0, program);
-  delete S.decisions[programId]; // treat as fresh
-  renderPendingTray();
-  renderCardStack();
-  updateDeckProgress();
-}
-
-document.getElementById('pending-tray-toggle').addEventListener('click', () => {
-  document.getElementById('pending-tray').classList.toggle('open');
-});
-
-// ── Tabs ──────────────────────────────────────────────────────────────────────
-document.querySelectorAll('.tab').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById(`panel-${btn.dataset.tab}`).classList.add('active');
-  });
-});
-
-document.getElementById('btn-go-swipe').addEventListener('click', () => {
-  document.querySelector('[data-tab="nonrequired"]').click();
-});
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 document.getElementById('btn-view-summary').addEventListener('click', openSummary);
