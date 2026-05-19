@@ -8,7 +8,7 @@
   <title>RPM Budget Assumptions</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=8">
+  <link rel="stylesheet" href="css/styles.css?v=9">
 </head>
 <body>
 <div id="app">
@@ -66,6 +66,16 @@
           <span id="hdr-system">—</span>
           <span class="meta-sep">·</span>
           <span id="hdr-year"></span>
+        </div>
+      </div>
+      <div class="main-hdr-center">
+        <div class="units-field">
+          <label class="units-label" for="unit-count">Units</label>
+          <input class="units-input" id="unit-count" type="number" min="0" placeholder="0">
+        </div>
+        <div class="budget-total-box">
+          <span class="budget-total-label">Est. Budget</span>
+          <span class="budget-total-value" id="budget-total">—</span>
         </div>
       </div>
       <div class="main-hdr-right">
@@ -186,164 +196,6 @@
   </div>
 </div>
 
-<!-- ── Tutorial Overlay ── -->
-<div class="overlay" id="modal-tutorial">
-  <div class="tutorial-wrap">
-
-    <!-- Step 1: Welcome -->
-    <div class="tut-step active" data-step="0">
-      <div class="tut-demo tut-demo-welcome">
-        <div class="tut-rpm-mark"><span>R</span><span>P</span><span>M</span></div>
-        <div class="tut-welcome-cards">
-          <div class="tut-mini-card tut-mc-back2"></div>
-          <div class="tut-mini-card tut-mc-back1"></div>
-          <div class="tut-mini-card tut-mc-top">
-            <div class="tut-mc-accent" style="background:var(--g-technology)"></div>
-            <div class="tut-mc-name">Knock CRM</div>
-            <div class="tut-mc-cost">$9,600 / yr</div>
-          </div>
-        </div>
-      </div>
-      <div class="tut-bubble">
-        <h3>Welcome to Budget Assumptions</h3>
-        <p>You'll review technology programs one at a time and decide what's in your property's budget this cycle.</p>
-        <p>It only takes a few minutes. Let's walk you through it.</p>
-      </div>
-    </div>
-
-    <!-- Step 2: Swipe Right -->
-    <div class="tut-step" data-step="1">
-      <div class="tut-demo">
-        <div class="tut-swipe-scene">
-          <div class="tut-mini-card tut-mc-back2"></div>
-          <div class="tut-mini-card tut-mc-back1"></div>
-          <div class="tut-mini-card tut-mc-top tut-anim-right">
-            <div class="tut-mc-accent" style="background:var(--g-marketing)"></div>
-            <div class="tut-mc-overlay tut-overlay-right">INCLUDE ✓</div>
-            <div class="tut-mc-name">LeaseLabs</div>
-            <div class="tut-mc-cost">$18,000 / yr</div>
-          </div>
-          <div class="tut-dir-arrow tut-arrow-right">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          </div>
-        </div>
-      </div>
-      <div class="tut-bubble tut-bubble-green">
-        <div class="tut-bubble-icon" style="background:#f0fdf4;color:var(--green)">✓</div>
-        <h3>Swipe Right to Include</h3>
-        <p>This program is a good fit — you want it in your budget. Swipe the card to the right.</p>
-      </div>
-    </div>
-
-    <!-- Step 3: Swipe Left -->
-    <div class="tut-step" data-step="2">
-      <div class="tut-demo">
-        <div class="tut-swipe-scene">
-          <div class="tut-mini-card tut-mc-back2"></div>
-          <div class="tut-mini-card tut-mc-back1"></div>
-          <div class="tut-mini-card tut-mc-top tut-anim-left">
-            <div class="tut-mc-accent" style="background:var(--g-operations)"></div>
-            <div class="tut-mc-overlay tut-overlay-left">SKIP ✕</div>
-            <div class="tut-mc-name">ButterflyMX</div>
-            <div class="tut-mc-cost">$4,800 / yr</div>
-          </div>
-          <div class="tut-dir-arrow tut-arrow-left">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-          </div>
-        </div>
-      </div>
-      <div class="tut-bubble tut-bubble-red">
-        <div class="tut-bubble-icon" style="background:#fef2f2;color:var(--red)">✕</div>
-        <h3>Swipe Left to Skip</h3>
-        <p>Not the right fit for your property this year. Swipe left to pass on it.</p>
-      </div>
-    </div>
-
-    <!-- Step 4: Swipe Up -->
-    <div class="tut-step" data-step="3">
-      <div class="tut-demo">
-        <div class="tut-swipe-scene">
-          <div class="tut-mini-card tut-mc-back2"></div>
-          <div class="tut-mini-card tut-mc-back1"></div>
-          <div class="tut-mini-card tut-mc-top tut-anim-up">
-            <div class="tut-mc-accent" style="background:var(--g-hr)"></div>
-            <div class="tut-mc-overlay tut-overlay-up">PENDING ↑</div>
-            <div class="tut-mc-name">Engrain</div>
-            <div class="tut-mc-cost">$6,000 / yr</div>
-          </div>
-          <div class="tut-pending-tray-demo">
-            <span>Pending Review</span>
-            <span class="tut-pending-dot">1</span>
-          </div>
-        </div>
-      </div>
-      <div class="tut-bubble tut-bubble-blue">
-        <div class="tut-bubble-icon" style="background:#eff6ff;color:#3b82f6">?</div>
-        <h3>Swipe Up if You're Not Sure</h3>
-        <p>Need to check with someone first? Swipe up to park it in your <strong>Pending</strong> tray. You can come back to it any time.</p>
-      </div>
-    </div>
-
-    <!-- Step 5: Required Programs -->
-    <div class="tut-step" data-step="4">
-      <div class="tut-demo tut-demo-required">
-        <div class="tut-req-card">
-          <div class="tut-mc-accent" style="background:var(--g-technology)"></div>
-          <div class="tut-req-body">
-            <div class="tut-req-badge">Required</div>
-            <div class="tut-mc-name" style="font-size:15px">Yardi Voyager</div>
-            <div class="tut-mc-cost" style="font-size:13px">$24,000 / yr</div>
-          </div>
-          <div class="tut-req-foot">
-            <button class="tut-optout-btn tut-optout-pulse">Opt Out</button>
-          </div>
-        </div>
-        <div class="tut-req-note">Required programs are always included.</div>
-      </div>
-      <div class="tut-bubble tut-bubble-amber">
-        <div class="tut-bubble-icon" style="background:#fff7ed;color:var(--orange)">⚑</div>
-        <h3>Required Programs</h3>
-        <p>Some programs are <strong>required</strong> for all properties on your system — they're budgeted by default.</p>
-        <p>If you have division president approval to opt out, tap the small <strong>Opt Out</strong> button on that card.</p>
-      </div>
-    </div>
-
-    <!-- Step 6: Ready -->
-    <div class="tut-step" data-step="5">
-      <div class="tut-demo tut-demo-ready">
-        <div class="tut-ready-icon">🎉</div>
-        <div class="tut-swipe-hint-row">
-          <div class="tut-hint-chip tut-hint-left">← Skip</div>
-          <div class="tut-hint-chip tut-hint-up">↑ Pending</div>
-          <div class="tut-hint-chip tut-hint-right">Include →</div>
-        </div>
-      </div>
-      <div class="tut-bubble">
-        <h3>You're All Set!</h3>
-        <p>Your decisions save automatically as you go. You can always come back and change anything.</p>
-        <p style="font-size:13px;color:var(--text3)">Tip: tap <strong>⋮</strong> in the top corner to compare with last year's decisions.</p>
-      </div>
-    </div>
-
-    <!-- Nav -->
-    <div class="tut-nav">
-      <div class="tut-dots" id="tut-dots">
-        <span class="tut-dot active"></span>
-        <span class="tut-dot"></span>
-        <span class="tut-dot"></span>
-        <span class="tut-dot"></span>
-        <span class="tut-dot"></span>
-        <span class="tut-dot"></span>
-      </div>
-      <div class="tut-nav-btns">
-        <button class="tut-skip-btn" id="tut-skip">Skip</button>
-        <button class="tut-next-btn" id="tut-next">Next →</button>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<script type="module" src="js/app.js?v=8"></script>
+<script type="module" src="js/app.js?v=9"></script>
 </body>
 </html>
