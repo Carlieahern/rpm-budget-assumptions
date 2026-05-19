@@ -128,6 +128,17 @@ body {
   margin-bottom: 6px;
 }
 
+/* Small header variant */
+.rpm-mark-sm {
+  width: 44px;
+  height: 38px;
+  letter-spacing: -0.5px;
+}
+.rpm-mark-sm .rpm-mark-R { font-size: 38px; }
+.rpm-mark-sm .rpm-mark-P { font-size: 19px; padding-bottom: 1px; }
+.rpm-mark-sm .rpm-mark-M { font-size: 16px; }
+.rpm-mark-sm .rpm-mark-bar { height: 4px; margin-bottom: 2px; }
+
 .loading-track {
   width: 100px;
   height: 3px;
@@ -151,7 +162,7 @@ body {
 
 /* ─── Setup ─── */
 #screen-setup {
-  background: var(--bg);
+  background: #ffffff;
 }
 
 .setup-top {
