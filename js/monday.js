@@ -100,36 +100,42 @@ export async function fetchPrograms(forceRefresh = false) {
 
   const board = data.boards[0];
 
+  const parseCost = val => {
+    if (!val?.text) return 0;
+    const n = parseFloat(val.text.replace(/[^0-9.]/g, ''));
+    return isNaN(n) ? 0 : n;
+  };
+
   const result = board.items_page.items.map(item => {
     const colMap = {};
     item.column_values.forEach(cv => { colMap[cv.id] = cv; });
 
-    const costVal = colMap[columns.cost];
-    const cost = costVal?.number ?? parseFloat(costVal?.text?.replace(/[^0-9.]/g, '')) ?? 0;
+    const electiveRaw = colMap[columns.elective]?.text || '';
+    const isRequired  = /non.?elective/i.test(electiveRaw);
 
-    const requiredVal = colMap[columns.required];
-    const isRequired = requiredVal?.checked === true
-      || requiredVal?.text?.toLowerCase() === 'yes'
-      || requiredVal?.label?.toLowerCase() === 'required';
+    const costs = {
+      Yardi:       parseCost(colMap[columns.yardiCost]),
+      OneSite:     parseCost(colMap[columns.onesiteCost]),
+      PaceOneSite: parseCost(colMap[columns.paceCost]),
+    };
 
-    const systemVal = colMap[columns.systemType];
-    const systemRaw = systemVal?.label || systemVal?.text || '';
-    // Normalize to one of: Yardi | OneSite | PaceOneSite | All
-    let systemType = 'All';
-    if (/yardi/i.test(systemRaw))            systemType = 'Yardi';
-    else if (/pace/i.test(systemRaw))        systemType = 'PaceOneSite';
-    else if (/onesite/i.test(systemRaw))     systemType = 'OneSite';
+    const glCodes = {
+      Yardi:       colMap[columns.yardiGL]?.text   || '—',
+      OneSite:     colMap[columns.onesiteGL]?.text  || '—',
+      PaceOneSite: colMap[columns.paceGL]?.text     || '—',
+    };
 
     return {
       id:          item.id,
       name:        item.name,
       group:       item.group.title,
       groupId:     item.group.id,
-      cost,
-      glCode:      colMap[columns.glCode]?.text || '—',
+      costs,       // resolved per-system in app.js
+      glCodes,     // resolved per-system in app.js
       description: colMap[columns.description]?.text || '',
       required:    isRequired,
-      systemType,  // 'Yardi' | 'OneSite' | 'PaceOneSite' | 'All'
+      costBasis:   colMap[columns.costBasis]?.text  || '',
+      billingFreq: colMap[columns.billingFreq]?.text || '',
     };
   });
 
@@ -138,13 +144,12 @@ export async function fetchPrograms(forceRefresh = false) {
 }
 
 // ── Filter programs by selected system type ──
-// A program applies if its systemType is 'All' or matches the selected system.
-// PaceOneSite properties see both OneSite and PaceOneSite programs.
+// A program applies if it has a non-zero cost for the selected system.
+// If ALL system costs are 0, show for every system (applies universally).
 export function filterBySystem(programs, selectedSystem) {
   return programs.filter(p => {
-    if (p.systemType === 'All') return true;
-    if (p.systemType === selectedSystem) return true;
-    if (selectedSystem === 'PaceOneSite' && p.systemType === 'OneSite') return true;
-    return false;
+    const hasAnyCost = Object.values(p.costs).some(c => c > 0);
+    if (!hasAnyCost) return true;           // no costs set — show everywhere
+    return p.costs[selectedSystem] > 0;
   });
 }
