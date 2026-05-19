@@ -8,8 +8,8 @@ const CONFIG = {
 
   // ── Monday.com board IDs (numeric strings) ──
   monday: {
-    propertyBoardId: 'YOUR_PROPERTY_BOARD_ID',    // Budget Due Date Tracker board
-    programsBoardId: 'YOUR_PROGRAMS_BOARD_ID',     // Cost Center Assumptions board
+    propertyBoardId: '9029568429',    // Budget Due Date Tracker board
+    programsBoardId: '18405693984',     // Cost Center Assumptions board
 
     // Column IDs from the programs board
     // Find them in Monday's board settings → "Columns" or via the API explorer
