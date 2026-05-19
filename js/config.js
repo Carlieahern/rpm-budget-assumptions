@@ -12,13 +12,17 @@ const CONFIG = {
     programsBoardId: '18405693984',     // Cost Center Assumptions board
 
     // Column IDs from the programs board
-    // Find them in Monday's board settings → "Columns" or via the API explorer
     columns: {
-      cost:        'numbers',     // replace with actual column ID
-      glCode:      'text',        // replace with actual column ID
-      description: 'long_text',   // replace with actual column ID
-      required:    'checkbox',    // replace with actual column ID
-      systemType:  'status',      // replace — labels: Yardi, OneSite, PaceOneSite
+      elective:    'text_mm1va2vk',   // "Elective/Non-Elective" — Non-Elective = required
+      description: 'text_mm1tdbd3',   // Program Details/Notes
+      yardiCost:   'text_mm1t269y',
+      yardiGL:     'text_mm1thsv9',
+      onesiteCost: 'text_mm1t4ka4',
+      onesiteGL:   'text_mm1t7tb7',
+      paceCost:    'text_mm1tj0j6',
+      paceGL:      'text_mm1txpbx',
+      costBasis:   'text_mm1vy4f4',
+      billingFreq: 'text_mm1vnhd4',
     },
   },
 
