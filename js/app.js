@@ -117,7 +117,7 @@ function updateBudgetTotal() {
   S.programs.forEach(p => {
     const dec = S.decisions[p.id]?.decision;
     if (p.required) {
-      if (dec !== 'opted-out') total += resolvedCost(p);
+      if (dec !== 'opted-out' && dec !== 'not-applicable') total += resolvedCost(p);
     } else {
       if (dec === 'in') total += resolvedCost(p);
     }
@@ -186,15 +186,20 @@ function renderDeptRows() {
 }
 
 function updateColumnCounts() {
-  const req    = S.programs.filter(p => p.required);
-  const elec   = S.programs.filter(p => !p.required);
-  const ackCount  = req.filter(p  => S.decisions[p.id]?.decision === 'acknowledged').length;
-  const incCount  = elec.filter(p => S.decisions[p.id]?.decision === 'in').length;
+  // Exclude N/A programs from non-elective counts
+  const req        = S.programs.filter(p =>  p.required && S.decisions[p.id]?.decision !== 'not-applicable');
+  const elec       = S.programs.filter(p => !p.required);
+  const ackCount   = req.filter(p  => S.decisions[p.id]?.decision === 'acknowledged').length;
+  const incCount   = elec.filter(p => S.decisions[p.id]?.decision === 'in').length;
+  const naCount    = S.programs.filter(p => p.required && S.decisions[p.id]?.decision === 'not-applicable').length;
 
   const nonElCount = document.getElementById('col-count-nonelective');
   const elecCount  = document.getElementById('col-count-elective');
-  if (nonElCount) nonElCount.textContent = `${ackCount} of ${req.length} Acknowledged`;
-  if (elecCount)  elecCount.textContent  = `${incCount} of ${elec.length} Included`;
+  if (nonElCount) {
+    const naNote = naCount > 0 ? ` · ${naCount} N/A` : '';
+    nonElCount.textContent = `${ackCount} of ${req.length} Acknowledged${naNote}`;
+  }
+  if (elecCount)  elecCount.textContent = `${incCount} of ${elec.length} Included`;
 }
 
 function buildProgramCard(program, decision, priorDecision, isRequired) {
@@ -206,6 +211,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   if (dec === 'opted-out')      el.classList.add('is-opted-out');
   if (dec === 'needs-followup') el.classList.add('is-followup');
   if (dec === 'acknowledged')   el.classList.add('is-acknowledged');
+  if (dec === 'not-applicable') el.classList.add('is-not-applicable');
   if (dec === 'in')             el.classList.add('is-included');
   if (dec === 'out')            el.classList.add('is-excluded');
 
@@ -221,7 +227,9 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
 
   let actionHtml;
   if (isRequired) {
-    if (dec === 'opted-out') {
+    if (dec === 'not-applicable') {
+      actionHtml = `<span class="card-status-badge status-not-applicable">Does Not Apply</span>`;
+    } else if (dec === 'opted-out') {
       actionHtml = `
         <span class="card-status-badge status-opted-out">Opted Out${decision.optOutApproval ? ' ✓' : ''}</span>
         <button class="btn-card-ghost btn-undo-optout" data-pid="${program.id}">Undo</button>`;
@@ -285,6 +293,12 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     ? `<span class="prog-card-billing">${program.billingFreq}</span>`
     : '';
 
+  const dnaHtml = isRequired ? `
+    <label class="dna-row">
+      <input type="checkbox" class="dna-check" data-pid="${program.id}"${dec === 'not-applicable' ? ' checked' : ''}>
+      <span class="dna-text">Does Not Apply to This Property</span>
+    </label>` : '';
+
   el.innerHTML = `
     ${excludedOverlay}
     <div class="prog-card-top">
@@ -302,6 +316,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     </div>
     ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
     ${priorChip}
+    ${dnaHtml}
   `;
 
   el.addEventListener('click', e => {
@@ -312,6 +327,23 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     if (e.target.closest('.btn-include'))          handleElectiveInclude(program.id);
     if (e.target.closest('.btn-exclude'))          handleElectiveExclude(program.id);
   });
+
+  // Does Not Apply checkbox
+  const dnaCheck = el.querySelector('.dna-check');
+  if (dnaCheck) {
+    dnaCheck.addEventListener('change', async e => {
+      e.stopPropagation();
+      if (e.target.checked) {
+        await setDecision(program.id, 'not-applicable');
+      } else {
+        const existing = S.decisions[program.id];
+        if (existing) { try { await deleteDecision(existing.itemId); } catch {} }
+        delete S.decisions[program.id];
+        refreshCard(program.id);
+        updateColumnCounts();
+      }
+    });
+  }
 
   // Budget $ input — save amount and update total
   const budgetInput = el.querySelector('.budget-input');

@@ -653,6 +653,22 @@ body {
   pointer-events: all;   /* but allow the Include button to still work */
 }
 
+.prog-card.is-not-applicable {
+  opacity: 0.5;
+  background: #f9fafb;
+  border-color: #e5e7eb;
+}
+.prog-card.is-not-applicable .budget-input-row,
+.prog-card.is-not-applicable .cost-raw-text,
+.prog-card.is-not-applicable .prog-card-meta-row {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.prog-card.is-not-applicable .dna-row {
+  opacity: 1;
+  pointer-events: all;
+}
+
 /* "Not Including" overlay banner */
 .excluded-overlay {
   position: absolute;
@@ -802,9 +818,10 @@ body {
   border-radius: 4px;
   padding: 2px 7px;
 }
-.status-opted-out    { background: #fee2e2; color: #b91c1c; }
-.status-followup     { background: #fef3c7; color: #92400e; }
-.status-acknowledged { background: #dcfce7; color: #16a34a; }
+.status-opted-out      { background: #fee2e2; color: #b91c1c; }
+.status-followup       { background: #fef3c7; color: #92400e; }
+.status-acknowledged   { background: #dcfce7; color: #16a34a; }
+.status-not-applicable { background: #f3f4f6; color: #6b7280; }
 
 /* ─── Raw Cost Text (from Monday) ─── */
 .cost-raw-text {
@@ -942,6 +959,33 @@ body {
   font-size: 11px;
   color: var(--text3);
 }
+
+/* ─── Does Not Apply Checkbox ─── */
+.dna-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  cursor: pointer;
+}
+
+.dna-check {
+  width: 15px;
+  height: 15px;
+  accent-color: #6b7280;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.dna-text {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text3);
+  user-select: none;
+}
+.dna-row:hover .dna-text { color: var(--text2); }
 
 /* ─── Prior Year Chip ─── */
 .prior-year-chip {
