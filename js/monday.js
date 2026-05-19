@@ -1,4 +1,5 @@
 import CONFIG from './config.js';
+import { MOCK_PROPERTIES, MOCK_PROGRAMS } from './mockData.js';
 
 // All Monday.com calls are proxied through /api/monday to keep the API key server-side.
 
@@ -48,6 +49,7 @@ async function query(gqlQuery, variables = {}) {
 
 // ── Fetch property names from the Budget Due Date Tracker board ──
 export async function fetchProperties(forceRefresh = false) {
+  if (CONFIG.useMockData) return MOCK_PROPERTIES;
   if (!forceRefresh) {
     const cached = cacheGet('properties');
     if (cached) return cached;
@@ -70,6 +72,7 @@ export async function fetchProperties(forceRefresh = false) {
 
 // ── Fetch all programs from the cost center assumptions board ──
 export async function fetchPrograms(forceRefresh = false) {
+  if (CONFIG.useMockData) return MOCK_PROGRAMS;
   if (!forceRefresh) {
     const cached = cacheGet('programs');
     if (cached) return cached;
