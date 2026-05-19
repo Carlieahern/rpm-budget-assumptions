@@ -3,6 +3,9 @@
 // none of this exposes credentials to the browser.
 
 const CONFIG = {
+  // ── Set to true to use dummy data (no API keys needed) ──
+  useMockData: true,
+
   // ── Budget cycle ──
   budgetYear: 2026,
 
