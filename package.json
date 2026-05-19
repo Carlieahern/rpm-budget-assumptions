@@ -1,0 +1,11 @@
+{
+  "name": "rpm-budget-assumptions",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RPM Living — Budget Assumptions presentation and decision tool",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "dev": "npx serve . -p 3000 --no-clipboard",
+    "lint": "echo 'No lint configured yet'"
+  }
+}
