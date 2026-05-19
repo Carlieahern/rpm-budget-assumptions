@@ -509,50 +509,47 @@ body {
 }
 .btn-summary-link:hover { background: var(--copper); color: #fff; }
 
-/* ─── Two-Column Grid ─── */
-.programs-grid {
+/* ─── Programs Outer Wrapper ─── */
+.programs-outer {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Sticky Column Headers ─── */
+.col-headers-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0;
-  flex: 1;
-  overflow: hidden;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+  border-bottom: 2px solid var(--copper);
+  flex-shrink: 0;
 }
 
-.programs-col {
-  overflow-y: auto;
-  padding: 24px 28px 40px;
+.col-hdr-cell {
+  padding: 14px 24px 12px;
+}
+.col-hdr-cell:first-child {
   border-right: 1px solid var(--border);
 }
-.programs-col:last-child { border-right: none; }
 
-.col-hdr {
-  margin-bottom: 20px;
-  padding-bottom: 14px;
-  border-bottom: 2px solid var(--copper);
-}
-
-.col-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--navy);
-  margin: 0 0 4px;
-}
-
-.col-sub {
-  font-size: 12px;
-  color: var(--text2);
-  margin: 0;
-  line-height: 1.5;
-}
-
-/* ─── Department Groups ─── */
-/* ─── Column Header Counts ─── */
 .col-hdr-top {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
+}
+
+.col-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0;
 }
 
 .col-count {
@@ -562,22 +559,51 @@ body {
   white-space: nowrap;
 }
 
-/* ─── Department Groups ─── */
-.dept-group {
-  margin-bottom: 28px;
+.col-sub {
+  font-size: 11px;
+  color: var(--text2);
+  margin: 0;
+  line-height: 1.4;
 }
 
-.dept-group-hdr {
+/* ─── Department Rows ─── */
+#programs-body {
+  flex: 1;
+  padding-bottom: 40px;
+}
+
+.dept-row {
+  border-bottom: 1px solid var(--border);
+}
+
+.dept-row-hdr {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 8px 12px;
-  border-radius: 8px;
-  margin-bottom: 10px;
+  padding: 7px 24px;
+}
+
+.dept-row-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.dept-col {
+  padding: 16px 24px 20px;
+}
+.dept-col-left {
+  border-right: 1px solid var(--border);
+}
+
+.dept-col-empty {
+  font-size: 12px;
+  color: var(--text3);
+  font-style: italic;
+  padding: 4px 0;
 }
 
 .dept-hdr-count {

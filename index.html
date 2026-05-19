@@ -8,7 +8,7 @@
   <title>RPM Budget Assumptions</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=11">
+  <link rel="stylesheet" href="css/styles.css?v=12">
 </head>
 <body>
 <div id="app">
@@ -83,27 +83,26 @@
       </div>
     </header>
 
-    <div class="programs-grid">
-      <div class="programs-col">
-        <div class="col-hdr">
+    <div class="programs-outer">
+      <!-- Sticky column headers -->
+      <div class="col-headers-row">
+        <div class="col-hdr-cell">
           <div class="col-hdr-top">
             <h2 class="col-title">Non-Elective</h2>
             <span class="col-count" id="col-count-nonelective">0 of 0 Acknowledged</span>
           </div>
           <p class="col-sub">Budgeted by default. Opting out requires division president approval.</p>
         </div>
-        <div id="non-elective-list"></div>
-      </div>
-      <div class="programs-col">
-        <div class="col-hdr">
+        <div class="col-hdr-cell">
           <div class="col-hdr-top">
             <h2 class="col-title">Elective</h2>
             <span class="col-count" id="col-count-elective">0 of 0 Included</span>
           </div>
           <p class="col-sub">Select which programs to include in your budget.</p>
         </div>
-        <div id="elective-list"></div>
       </div>
+      <!-- Department rows rendered by JS -->
+      <div id="programs-body"></div>
     </div>
 
   </div>
@@ -192,6 +191,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=11"></script>
+<script type="module" src="js/app.js?v=12"></script>
 </body>
 </html>

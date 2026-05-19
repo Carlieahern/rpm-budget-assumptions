@@ -132,43 +132,54 @@ function renderMainScreen() {
   document.getElementById('hdr-property').textContent = S.property;
   document.getElementById('hdr-system').textContent   = S.systemType;
   document.getElementById('hdr-year').textContent     = `FY ${S.budgetYear}`;
-
-  const nonElective = S.programs.filter(p => p.required);
-  const elective    = S.programs.filter(p => !p.required);
-
-  renderColumn(nonElective, 'non-elective-list', true);
-  renderColumn(elective,    'elective-list',     false);
+  renderDeptRows();
   updateBudgetTotal();
 }
 
-// ── Two-column grid ───────────────────────────────────────────────────────────
-function renderColumn(programs, containerId, isRequired) {
-  const container = document.getElementById(containerId);
-  container.innerHTML = '';
+// ── Department rows (aligned two-column layout) ───────────────────────────────
+function renderDeptRows() {
+  const body = document.getElementById('programs-body');
+  body.innerHTML = '';
 
-  // Group by department
-  const groups = {};
-  programs.forEach(p => {
-    if (!groups[p.group]) groups[p.group] = [];
-    groups[p.group].push(p);
+  // Collect departments in the order they first appear
+  const deptOrder = [];
+  const seen = new Set();
+  S.programs.forEach(p => {
+    if (!seen.has(p.group)) { seen.add(p.group); deptOrder.push(p.group); }
   });
 
-  Object.entries(groups).forEach(([dept, deptPrograms]) => {
+  deptOrder.forEach(dept => {
+    const nonElective = S.programs.filter(p => p.group === dept &&  p.required);
+    const elective    = S.programs.filter(p => p.group === dept && !p.required);
+    if (!nonElective.length && !elective.length) return;
+
     const gs = groupStyle(dept);
-    const groupEl = document.createElement('div');
-    groupEl.className = 'dept-group';
+    const rowEl = document.createElement('div');
+    rowEl.className = 'dept-row';
+    rowEl.innerHTML = `
+      <div class="dept-row-hdr dept-hdr-${gs.key}">
+        <span>${dept}</span>
+        <span class="dept-hdr-count">${nonElective.length + elective.length}</span>
+      </div>
+      <div class="dept-row-body">
+        <div class="dept-col dept-col-left"></div>
+        <div class="dept-col dept-col-right"></div>
+      </div>
+    `;
+    body.appendChild(rowEl);
 
-    const hdr = document.createElement('div');
-    hdr.className = `dept-group-hdr dept-hdr-${gs.key}`;
-    hdr.innerHTML = `<span class="dept-hdr-label">${dept}</span><span class="dept-hdr-count">${deptPrograms.length}</span>`;
-    groupEl.appendChild(hdr);
+    const leftCol  = rowEl.querySelector('.dept-col-left');
+    const rightCol = rowEl.querySelector('.dept-col-right');
 
-    deptPrograms.forEach(p => {
-      const card = buildProgramCard(p, S.decisions[p.id], S.priorDecisions[p.id], isRequired);
-      groupEl.appendChild(card);
-    });
+    nonElective.forEach(p => leftCol.appendChild(
+      buildProgramCard(p, S.decisions[p.id], S.priorDecisions[p.id], true)
+    ));
+    elective.forEach(p => rightCol.appendChild(
+      buildProgramCard(p, S.decisions[p.id], S.priorDecisions[p.id], false)
+    ));
 
-    container.appendChild(groupEl);
+    if (!nonElective.length) leftCol.innerHTML  = '<p class="dept-col-empty">No required programs</p>';
+    if (!elective.length)    rightCol.innerHTML = '<p class="dept-col-empty">No elective programs</p>';
   });
 
   updateColumnCounts();
