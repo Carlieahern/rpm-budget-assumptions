@@ -13,7 +13,7 @@ export const MOCK_PROGRAMS = [
   // ── Technology (required) ──
   {
     id: 'p1', name: 'Entrata Property Management', group: 'Technology', groupId: 'g1',
-    costs: { Yardi: 14400, OneSite: 12000, PaceOneSite: 12000 },
+    costs: { Yardi: 120, OneSite: 100, PaceOneSite: 100 },
     glCodes: { Yardi: '7210', OneSite: '7210', PaceOneSite: '7210' },
     description: 'Core property management platform license.',
     resourceUrl: '#', required: true, costBasis: 'Per Unit/Year', billingFreq: 'Monthly',
@@ -35,7 +35,7 @@ export const MOCK_PROGRAMS = [
   // ── Technology (non-required) ──
   {
     id: 'p4', name: 'SmartRent Smart Home', group: 'Technology', groupId: 'g1',
-    costs: { Yardi: 9600, OneSite: 9600, PaceOneSite: 9600 },
+    costs: { Yardi: 80, OneSite: 80, PaceOneSite: 80 },
     glCodes: { Yardi: '7220', OneSite: '7220', PaceOneSite: '7220' },
     description: 'Smart lock and thermostat management platform.',
     resourceUrl: '#', required: false, costBasis: 'Per Unit/Month', billingFreq: 'Monthly',
@@ -99,14 +99,14 @@ export const MOCK_PROGRAMS = [
   // ── Operations (non-required) ──
   {
     id: 'p12', name: 'Lessen Maintenance Platform', group: 'Operations', groupId: 'g4',
-    costs: { Yardi: 6000, OneSite: 6000, PaceOneSite: 6000 },
+    costs: { Yardi: 50, OneSite: 50, PaceOneSite: 50 },
     glCodes: { Yardi: '7310', OneSite: '7310', PaceOneSite: '7310' },
     description: 'Work order management and vendor dispatch platform.',
     resourceUrl: '#', required: false, costBasis: 'Per Unit/Year', billingFreq: 'Monthly',
   },
   {
     id: 'p13', name: 'Package Locker System', group: 'Operations', groupId: 'g4',
-    costs: { Yardi: 4200, OneSite: 4200, PaceOneSite: 4200 },
+    costs: { Yardi: 35, OneSite: 35, PaceOneSite: 35 },
     glCodes: { Yardi: '7311', OneSite: '7311', PaceOneSite: '7311' },
     description: 'Smart package locker annual software and monitoring fee.',
     resourceUrl: '#', required: false, costBasis: 'Flat Annual', billingFreq: 'Monthly',
