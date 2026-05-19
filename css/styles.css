@@ -86,6 +86,11 @@ body {
 
 /* ── RPM Logo Mark ── */
 /* Replicates the R-PM-bar stacked mark from brand assets */
+/* Real logo image */
+.rpm-logo-img { display: block; object-fit: contain; }
+.rpm-logo-lg  { width: 120px; height: auto; }
+.rpm-logo-sm  { width: 48px;  height: auto; }
+
 .rpm-mark {
   display: grid;
   grid-template-columns: 1fr 0.52fr;
