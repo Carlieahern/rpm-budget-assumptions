@@ -22,67 +22,74 @@
   </div>
 
 
-<!-- ── Setup: Property + System ── -->
-  <div id="screen-setup" class="screen screen-pad">
+<!-- ── Setup ── -->
+  <div id="screen-setup" class="screen screen-setup">
     <div class="setup-top">
       <img src="RPMLivingLogo__Copper.jpg" alt="RPM Living" class="rpm-logo-img rpm-logo-sm">
       <div class="cycle-chip" id="setup-cycle-chip"></div>
     </div>
 
-    <!-- Step 1: Property -->
-    <div class="setup-step" id="step-property">
-      <p class="step-num">Step 1 of 3</p>
-      <h2>Select Your Property</h2>
-      <p class="step-hint">Choose the property you're budgeting for this cycle.</p>
-      <div class="select-wrap">
-        <select id="property-select" class="field-select">
-          <option value="">Loading properties…</option>
-        </select>
-        <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+    <div class="setup-body">
+
+      <!-- Top row: Property + Mode side by side -->
+      <div class="setup-top-row" id="setup-top-row">
+
+        <!-- Property -->
+        <div class="setup-section">
+          <div class="setup-section-label">Property</div>
+          <div class="select-wrap">
+            <select id="property-select" class="field-select">
+              <option value="">Loading properties…</option>
+            </select>
+            <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div class="unit-count-row hidden" id="unit-count-row">
+            <label class="unit-count-label" for="unit-count-input">Unit count</label>
+            <div class="unit-count-field">
+              <input type="number" id="unit-count-input" class="unit-count-input" min="1" step="1" placeholder="e.g. 248">
+              <span class="unit-count-suffix">units</span>
+            </div>
+            <p class="unit-count-hint">Pre-fills per-unit calculations. Adjustable per card.</p>
+          </div>
+        </div>
+
+        <!-- View Mode -->
+        <div class="setup-section">
+          <div class="setup-section-label">View Mode</div>
+          <div class="mode-grid">
+            <button class="mode-tile selected" data-mode="interactive">
+              <div class="mode-tile-icon">✏️</div>
+              <div class="mode-tile-title">Interactive</div>
+              <div class="mode-tile-desc">Build your budget — acknowledge costs, select programs, and track totals.</div>
+            </button>
+            <button class="mode-tile" data-mode="info">
+              <div class="mode-tile-icon">📋</div>
+              <div class="mode-tile-title">Info Only</div>
+              <div class="mode-tile-desc">Browse program details and costs as a reference.</div>
+            </button>
+          </div>
+        </div>
+
       </div>
 
-      <!-- Unit count — appears after property is selected -->
-      <div class="unit-count-row hidden" id="unit-count-row">
-        <label class="unit-count-label" for="unit-count-input">How many units does this property have?</label>
-        <p class="unit-count-hint">This will pre-fill all per-unit cost calculations. You can still adjust individual programs.</p>
-        <div class="unit-count-field">
-          <input type="number" id="unit-count-input" class="unit-count-input" min="1" step="1" placeholder="e.g. 248">
-          <span class="unit-count-suffix">units</span>
+      <!-- System — always visible, clicking launches -->
+      <div class="setup-section setup-section-system">
+        <div class="setup-section-label">
+          Property Management System
+          <span class="setup-required">Select one to launch</span>
+        </div>
+        <div class="system-grid">
+          <button class="system-tile" data-system="Yardi">Yardi</button>
+          <button class="system-tile" data-system="OneSite">OneSite</button>
+          <button class="system-tile" data-system="PaceOneSite">Pace + OneSite</button>
         </div>
       </div>
 
-      <button id="btn-property-next" class="btn-primary" disabled>Continue →</button>
-    </div>
-
-    <!-- Step 2: View Mode -->
-    <div class="setup-step hidden" id="step-mode">
-      <p class="step-num">Step 2 of 3</p>
-      <h2>How would you like to view this?</h2>
-      <p class="step-hint">Choose how you want to work with the program list.</p>
-      <div class="mode-grid">
-        <button class="mode-tile" data-mode="interactive">
-          <div class="mode-tile-icon">✏️</div>
-          <div class="mode-tile-title">Interactive</div>
-          <div class="mode-tile-desc">Build your budget — acknowledge costs, select elective programs, enter quantities, and track your totals.</div>
-        </button>
-        <button class="mode-tile" data-mode="info">
-          <div class="mode-tile-icon">📋</div>
-          <div class="mode-tile-title">Information Only</div>
-          <div class="mode-tile-desc">Browse all program details and costs as a reference — no selections or inputs required.</div>
-        </button>
+      <!-- Skip link -->
+      <div class="setup-skip">
+        <button id="btn-skip" class="btn-skip">Skip property selection — just browse by system</button>
       </div>
-    </div>
 
-    <!-- Step 3: System -->
-    <div class="setup-step hidden" id="step-system">
-      <p class="step-num">Step 3 of 3</p>
-      <h2>Property Management System</h2>
-      <p class="step-hint">Select your system so we filter programs correctly.</p>
-      <div class="system-grid">
-        <button class="system-tile" data-system="Yardi">Yardi</button>
-        <button class="system-tile" data-system="OneSite">OneSite</button>
-        <button class="system-tile" data-system="PaceOneSite">Pace + OneSite</button>
-      </div>
     </div>
   </div>
 

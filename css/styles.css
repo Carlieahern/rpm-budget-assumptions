@@ -166,16 +166,87 @@ body {
 
 
 /* ─── Setup ─── */
-#screen-setup {
+.screen-setup {
   background: #ffffff;
+  padding: 28px 32px 40px;
+  overflow-y: auto;
 }
 
 .setup-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 40px;
+  margin-bottom: 36px;
 }
+
+.setup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 860px;
+}
+
+.setup-top-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+.setup-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.setup-section-system {
+  /* system tiles go full width below the split row */
+}
+
+.setup-section-label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--navy);
+  letter-spacing: -0.3px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.setup-required {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--copper);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* System grid full width on setup screen */
+.setup-section-system .system-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.setup-skip {
+  padding-top: 4px;
+}
+
+.btn-skip {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text3);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s;
+}
+.btn-skip:hover { color: var(--text2); }
 
 .rpm-wordmark {
   font-size: 18px;
@@ -195,32 +266,7 @@ body {
   letter-spacing: 0.3px;
 }
 
-.setup-step { transition: opacity 0.2s; }
-.setup-step.hidden { display: none; }
-
-.step-num {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text3);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 12px;
-}
-
-.setup-step h2 {
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--navy);
-  margin-bottom: 8px;
-  letter-spacing: -0.5px;
-}
-
-.step-hint {
-  font-size: 14px;
-  color: var(--text2);
-  margin-bottom: 28px;
-  line-height: 1.5;
-}
+/* (step classes removed — setup is now single screen) */
 
 /* ─── Select ─── */
 .select-wrap {

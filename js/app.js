@@ -37,9 +37,20 @@ async function boot() {
 async function loadPropertyScreen() {
   showScreen('screen-setup');
   document.getElementById('setup-cycle-chip').textContent = `FY ${S.budgetYear}`;
-  document.getElementById('step-property').classList.remove('hidden');
-  document.getElementById('step-mode').classList.add('hidden');
-  document.getElementById('step-system').classList.add('hidden');
+
+  // Reset selections
+  document.getElementById('property-select').value = '';
+  document.getElementById('unit-count-row').classList.add('hidden');
+  document.querySelectorAll('.system-tile').forEach(b => b.classList.remove('selected'));
+
+  // Mode defaults to interactive
+  document.querySelectorAll('.mode-tile').forEach(b => b.classList.remove('selected'));
+  document.querySelector('.mode-tile[data-mode="interactive"]').classList.add('selected');
+  S.mode = 'interactive';
+
+  // Show full top row (un-skip if previously skipped)
+  const topRow = document.getElementById('setup-top-row');
+  if (topRow) topRow.style.display = '';
 
   try {
     const props = await fetchProperties();
@@ -49,20 +60,16 @@ async function loadPropertyScreen() {
     document.getElementById('property-select').innerHTML =
       '<option value="">Error loading properties — check config</option>';
   }
-
 }
 
-// ── Entry flow ───────────────────────────────────────────────────────────────
-// Property selection — show unit count field when a property is chosen
+// ── Setup interactions ────────────────────────────────────────────────────────
+
+// Property dropdown — show unit count when a property is chosen
 document.getElementById('property-select').addEventListener('change', e => {
-  const btn     = document.getElementById('btn-property-next');
-  const row     = document.getElementById('unit-count-row');
-  const input   = document.getElementById('unit-count-input');
-  const hasVal  = !!e.target.value;
-  btn.disabled  = !hasVal;
-  if (hasVal) {
+  const row   = document.getElementById('unit-count-row');
+  const input = document.getElementById('unit-count-input');
+  if (e.target.value) {
     row.classList.remove('hidden');
-    // Load saved unit count for this property
     const saved = parseInt(localStorage.getItem(`rpm_units_${e.target.value}`)) || 0;
     input.value = saved || '';
   } else {
@@ -70,42 +77,39 @@ document.getElementById('property-select').addEventListener('change', e => {
   }
 });
 
-// Save unit count as the PM types it
+// Save unit count as typed
 document.getElementById('unit-count-input').addEventListener('input', e => {
   const prop = document.getElementById('property-select').value;
   const val  = parseInt(e.target.value) || 0;
   if (prop) localStorage.setItem(`rpm_units_${prop}`, val);
 });
 
-document.getElementById('btn-property-next').addEventListener('click', () => {
-  S.property = document.getElementById('property-select').value;
-  if (!S.property) return;
-  document.getElementById('step-property').classList.add('hidden');
-  document.getElementById('step-mode').classList.remove('hidden');
-});
-
-// Mode selection → advance to system step
+// Mode tiles — select but stay on screen
 document.querySelectorAll('.mode-tile').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.mode-tile').forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
     S.mode = btn.dataset.mode;
-    // Brief delay so the selected state is visible before advancing
-    setTimeout(() => {
-      document.getElementById('step-mode').classList.add('hidden');
-      document.getElementById('step-system').classList.remove('hidden');
-    }, 220);
   });
 });
 
-// System type selection
+// System tile — launches immediately (only required field)
 document.querySelectorAll('.system-tile').forEach(btn => {
   btn.addEventListener('click', async () => {
     document.querySelectorAll('.system-tile').forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
+    S.property   = document.getElementById('property-select').value || null;
     S.systemType = btn.dataset.system;
     await launchMain();
   });
+});
+
+// Skip — hides property + mode, lets them just pick a system
+document.getElementById('btn-skip').addEventListener('click', () => {
+  const topRow = document.getElementById('setup-top-row');
+  if (topRow) topRow.style.display = 'none';
+  S.property = null;
+  S.mode     = 'interactive';
 });
 
 // ── Launch main app ───────────────────────────────────────────────────────────
