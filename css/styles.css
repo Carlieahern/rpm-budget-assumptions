@@ -321,6 +321,64 @@ body {
   pointer-events: none;
 }
 
+/* ─── Mode Tiles (Step 2) ─── */
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.mode-tile {
+  padding: 22px 18px;
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.mode-tile:hover { border-color: var(--copper); background: var(--copper-light); }
+.mode-tile.selected { border-color: var(--copper); background: var(--copper-light); }
+
+.mode-tile-icon {
+  font-size: 28px;
+  margin-bottom: 10px;
+}
+
+.mode-tile-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: 6px;
+}
+
+.mode-tile.selected .mode-tile-title { color: var(--copper2); }
+
+.mode-tile-desc {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.5;
+}
+
+/* Mode badge in header */
+.mode-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 20px;
+  display: none;
+}
+.mode-badge.mode-info {
+  display: inline-block;
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.5);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
 /* ─── System Tiles ─── */
 .system-grid {
   display: grid;
@@ -950,6 +1008,69 @@ body {
 .status-followup       { background: rgba(245,158,11,0.25); color: #fcd34d; }
 .status-acknowledged   { background: rgba(34,197,94,0.25);  color: #86efac; }
 .status-not-applicable { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.6); }
+
+/* ─── Info Mode Card ─── */
+.prog-card-info {
+  background: var(--copper);
+  opacity: 1;
+}
+
+.info-cost-block {
+  margin-bottom: 10px;
+}
+
+.info-cost-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.5px;
+  line-height: 1.3;
+}
+
+.info-cost-period {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.6);
+  letter-spacing: 0;
+}
+
+.info-cost-manual {
+  font-size: 13px;
+  color: rgba(255,255,255,0.7);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.info-tier-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+.info-tier-row:last-child { border-bottom: none; }
+
+.info-tier-label {
+  font-size: 13px;
+  color: rgba(255,255,255,0.8);
+  font-weight: 500;
+  flex: 1;
+}
+
+.info-tier-rate {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.info-setup-fee {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+  font-style: italic;
+  flex-basis: 100%;
+  margin-top: 2px;
+}
 
 /* ─── Raw Cost Text ─── */
 .cost-raw-text {

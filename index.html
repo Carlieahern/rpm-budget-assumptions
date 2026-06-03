@@ -31,7 +31,7 @@
 
     <!-- Step 1: Property -->
     <div class="setup-step" id="step-property">
-      <p class="step-num">Step 1 of 2</p>
+      <p class="step-num">Step 1 of 3</p>
       <h2>Select Your Property</h2>
       <p class="step-hint">Choose the property you're budgeting for this cycle.</p>
       <div class="select-wrap">
@@ -54,9 +54,28 @@
       <button id="btn-property-next" class="btn-primary" disabled>Continue →</button>
     </div>
 
-    <!-- Step 2: System -->
+    <!-- Step 2: View Mode -->
+    <div class="setup-step hidden" id="step-mode">
+      <p class="step-num">Step 2 of 3</p>
+      <h2>How would you like to view this?</h2>
+      <p class="step-hint">Choose how you want to work with the program list.</p>
+      <div class="mode-grid">
+        <button class="mode-tile" data-mode="interactive">
+          <div class="mode-tile-icon">✏️</div>
+          <div class="mode-tile-title">Interactive</div>
+          <div class="mode-tile-desc">Build your budget — acknowledge costs, select elective programs, enter quantities, and track your totals.</div>
+        </button>
+        <button class="mode-tile" data-mode="info">
+          <div class="mode-tile-icon">📋</div>
+          <div class="mode-tile-title">Information Only</div>
+          <div class="mode-tile-desc">Browse all program details and costs as a reference — no selections or inputs required.</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 3: System -->
     <div class="setup-step hidden" id="step-system">
-      <p class="step-num">Step 2 of 2</p>
+      <p class="step-num">Step 3 of 3</p>
       <h2>Property Management System</h2>
       <p class="step-hint">Select your system so we filter programs correctly.</p>
       <div class="system-grid">
@@ -81,6 +100,7 @@
           <button class="unit-count-badge" id="btn-edit-units" title="Edit unit count">
             <span id="hdr-unit-count">— units</span>
           </button>
+          <span class="mode-badge" id="hdr-mode-badge"></span>
         </div>
       </div>
       <div class="main-hdr-right">

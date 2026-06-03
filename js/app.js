@@ -10,6 +10,7 @@ const S = {
   budgetYear:      CONFIG.budgetYear,
   property:        null,
   systemType:      null,
+  mode:            'interactive', // 'interactive' | 'info'
   allPrograms:     [],
   programs:        [],    // filtered by system
   decisions:       {},    // programId → { itemId, decision, optOutApproval, ... }
@@ -37,6 +38,7 @@ async function loadPropertyScreen() {
   showScreen('screen-setup');
   document.getElementById('setup-cycle-chip').textContent = `FY ${S.budgetYear}`;
   document.getElementById('step-property').classList.remove('hidden');
+  document.getElementById('step-mode').classList.add('hidden');
   document.getElementById('step-system').classList.add('hidden');
 
   try {
@@ -79,7 +81,21 @@ document.getElementById('btn-property-next').addEventListener('click', () => {
   S.property = document.getElementById('property-select').value;
   if (!S.property) return;
   document.getElementById('step-property').classList.add('hidden');
-  document.getElementById('step-system').classList.remove('hidden');
+  document.getElementById('step-mode').classList.remove('hidden');
+});
+
+// Mode selection → advance to system step
+document.querySelectorAll('.mode-tile').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-tile').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    S.mode = btn.dataset.mode;
+    // Brief delay so the selected state is visible before advancing
+    setTimeout(() => {
+      document.getElementById('step-mode').classList.add('hidden');
+      document.getElementById('step-system').classList.remove('hidden');
+    }, 220);
+  });
 });
 
 // System type selection
@@ -264,10 +280,24 @@ function updateBudgetTotal() {
 }
 
 function renderMainScreen() {
-  document.getElementById('hdr-property').textContent    = S.property;
-  document.getElementById('hdr-system').textContent      = S.systemType;
-  document.getElementById('hdr-year').textContent        = `FY ${S.budgetYear}`;
-  document.getElementById('hdr-unit-count').textContent  = S.unitCount > 0 ? `${S.unitCount} units` : 'Set units';
+  document.getElementById('hdr-property').textContent   = S.property;
+  document.getElementById('hdr-system').textContent     = S.systemType;
+  document.getElementById('hdr-year').textContent       = `FY ${S.budgetYear}`;
+  document.getElementById('hdr-unit-count').textContent = S.unitCount > 0 ? `${S.unitCount} units` : 'Set units';
+
+  // Mode badge — only visible in info mode
+  const modeBadge = document.getElementById('hdr-mode-badge');
+  if (modeBadge) {
+    modeBadge.textContent = S.mode === 'info' ? 'Info Only' : '';
+    modeBadge.className   = `mode-badge${S.mode === 'info' ? ' mode-info' : ''}`;
+  }
+
+  // Hide side panels + budget total in info mode (no selections = no totals)
+  const sideLeft  = document.querySelector('.side-left');
+  const sideRight = document.querySelector('.side-right');
+  if (sideLeft)  sideLeft.style.visibility  = S.mode === 'info' ? 'hidden' : 'visible';
+  if (sideRight) sideRight.style.visibility = S.mode === 'info' ? 'hidden' : 'visible';
+
   renderDeptRows();
   updateBudgetTotal();
 }
@@ -335,7 +365,58 @@ function updateColumnCounts() {
   if (sideEl) sideEl.textContent = `${incCount} of ${elec.length}`;
 }
 
+// ── Info-mode card (no inputs, no actions — reference only) ──────────────────
+function buildInfoCard(program) {
+  const el = document.createElement('div');
+  el.className = 'prog-card prog-card-info';
+  el.dataset.programId = program.id;
+
+  const info = parseCostBasisInfo(program);
+
+  // Build a clean cost display based on type
+  let costHtml = '';
+  if (info.type === 'flat') {
+    costHtml = `<div class="info-cost-value">${formatCost(info.rate)}<span class="info-cost-period"> / year</span></div>`;
+  } else if (info.type === 'per-unit' || info.type === 'per-quantity') {
+    const per = info.period === 'month' ? '/mo' : '/yr';
+    costHtml = `<div class="info-cost-value">${formatCost(info.rate)}<span class="info-cost-period"> / ${info.label.toLowerCase()}${per}</span></div>`;
+  } else if (info.type === 'flat-per-unit') {
+    costHtml = `
+      <div class="info-cost-value">${formatCost(info.baseFee)}<span class="info-cost-period"> base</span></div>
+      <div class="info-cost-value">+ ${formatCost(info.rate)}<span class="info-cost-period"> / unit / yr</span></div>`;
+  } else if (info.type === 'tiered' && info.tiers?.length) {
+    costHtml = info.tiers.map(t => {
+      const typeLabel = t.type === 'per-unit-month' ? '/unit/mo'
+                      : t.type === 'per-unit-year'  ? '/unit/yr'
+                      : t.type === 'per-item'        ? `/${(program.itemLabel || 'item').toLowerCase()}`
+                      : '/yr';
+      return `<div class="info-tier-row"><span class="info-tier-label">${t.label}</span><span class="info-tier-rate">${formatCost(t.rate)}<span class="info-cost-period">${typeLabel}</span></span></div>`;
+    }).join('');
+  } else {
+    costHtml = program.costRaw
+      ? `<div class="info-cost-manual">${program.costRaw}</div>`
+      : `<div class="info-cost-manual">See program details</div>`;
+  }
+
+  el.innerHTML = `
+    <div class="prog-card-top">
+      <div class="prog-card-name">${program.name}</div>
+    </div>
+    <div class="info-cost-block">${costHtml}</div>
+    ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
+    <div class="prog-card-meta-row">
+      <span class="prog-card-gl">GL ${program.glCode}</span>
+      ${program.billingFreq ? `<span class="prog-card-billing">${program.billingFreq}</span>` : ''}
+      ${program.programOwner ? `<span class="prog-card-owner">${program.programOwner}</span>` : ''}
+      ${program.setupFee ? `<span class="info-setup-fee">Setup: ${program.setupFee}</span>` : ''}
+    </div>
+  `;
+  return el;
+}
+
 function buildProgramCard(program, decision, priorDecision, isRequired) {
+  // In info mode, always use the simplified reference card
+  if (S.mode === 'info') return buildInfoCard(program);
   const el = document.createElement('div');
   el.className = 'prog-card';
   el.dataset.programId = program.id;
