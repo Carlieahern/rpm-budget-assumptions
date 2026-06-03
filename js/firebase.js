@@ -77,6 +77,7 @@ export async function fetchPrograms(forceRefresh = false) {
       costs,
       glCodes,
       billingFreq:   p.billingPeriod || '',
+      billingStart:  p.billingStart  || null,
       programOwner:  p.owner         || '',
       priorYearCost: p.priorYearCost ?? 0,
     };

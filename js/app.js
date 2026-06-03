@@ -245,6 +245,95 @@ function resolvedCost(program) {
   }
 }
 
+// ── Monthly breakdown ─────────────────────────────────────────────────────────
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function parseStartMonth(billingStart) {
+  if (!billingStart) return 0;
+  const s = billingStart.toLowerCase();
+  const map = { january:0, february:1, march:2, april:3, may:4, june:5,
+                july:6, august:7, september:8, october:9, november:10, december:11 };
+  for (const [name, idx] of Object.entries(map)) {
+    if (s.includes(name)) return idx;
+  }
+  return 0;
+}
+
+function getMonthlyBreakdown() {
+  const months = Array(12).fill(0);
+
+  S.programs.forEach(p => {
+    const dec      = S.decisions[p.id]?.decision;
+    const included = p.required
+      ? dec !== 'opted-out' && dec !== 'not-applicable'
+      : dec === 'in';
+    if (!included) return;
+
+    const annual = resolvedCost(p);
+    if (!annual) return;
+
+    const freq  = (p.billingFreq || p.billingPeriod || '').toLowerCase();
+    const start = parseStartMonth(p.billingStart);
+
+    if (freq.includes('monthly')) {
+      const mo = annual / 12;
+      for (let i = 0; i < 12; i++) months[i] += mo;
+    } else if (freq.includes('quarterly')) {
+      const hit = annual / 4;
+      for (let i = 0; i < 4; i++) months[(start + i * 3) % 12] += hit;
+    } else if (freq.includes('bi-annual') || freq.includes('bi-annu')) {
+      const hit = annual / 2;
+      months[start % 12] += hit;
+      months[(start + 6) % 12] += hit;
+    } else if (freq.includes('annual')) {
+      months[start % 12] += annual;
+    }
+    // as-incurred / when-implemented: excluded
+  });
+
+  return months;
+}
+
+let monthlyExpanded = false;
+
+function renderMonthlyBreakdown() {
+  const container = document.getElementById('monthly-breakdown');
+  const hint      = document.getElementById('monthly-expand-hint');
+  if (!container) return;
+
+  if (!monthlyExpanded) {
+    container.innerHTML = '';
+    container.classList.remove('open');
+    if (hint) hint.textContent = '↓ Monthly view';
+    return;
+  }
+
+  if (hint) hint.textContent = '↑ Collapse';
+  const data   = getMonthlyBreakdown();
+  const max    = Math.max(...data, 1);
+  const fmtMo  = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+  container.innerHTML = data.map((val, i) => {
+    const pct  = Math.round((val / max) * 100);
+    const zero = val < 1;
+    return `
+      <div class="mb-row${zero ? ' mb-row-zero' : ''}">
+        <span class="mb-month">${MONTH_NAMES[i]}</span>
+        <div class="mb-bar-track">
+          <div class="mb-bar" style="width:${zero ? 0 : Math.max(pct, 4)}%"></div>
+        </div>
+        <span class="mb-amount">${zero ? '—' : fmtMo.format(val)}</span>
+      </div>`;
+  }).join('');
+
+  container.classList.add('open');
+}
+
+document.getElementById('btn-monthly-expand')?.addEventListener('click', () => {
+  monthlyExpanded = !monthlyExpanded;
+  renderMonthlyBreakdown();
+});
+
 // ── Animated number counter ───────────────────────────────────────────────────
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
@@ -305,6 +394,7 @@ function updateBudgetTotal() {
   });
   animateCost(document.getElementById('budget-total'),  annual);
   animateCost(document.getElementById('monthly-total'), monthly);
+  if (monthlyExpanded) renderMonthlyBreakdown();
 }
 
 function renderMainScreen() {

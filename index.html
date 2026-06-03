@@ -122,11 +122,22 @@
     <!-- ── 3-column layout ── -->
     <div class="main-layout">
 
-      <!-- Left panel: Monthly total -->
+      <!-- Left panel: Monthly breakdown -->
       <div class="side-panel side-left">
         <div class="side-panel-inner">
-          <div class="side-label">Monthly Charges</div>
-          <div class="side-value" id="monthly-total">—</div>
+
+          <!-- Collapsed: total + tap hint -->
+          <button class="side-monthly-toggle" id="btn-monthly-expand" title="View month-by-month">
+            <div class="side-label">Monthly Charges</div>
+            <div class="side-value" id="monthly-total">—</div>
+            <div class="side-expand-hint" id="monthly-expand-hint">↓ Monthly view</div>
+          </button>
+
+          <!-- Expanded: 12-month bar chart -->
+          <div class="monthly-breakdown" id="monthly-breakdown">
+            <!-- rendered by JS -->
+          </div>
+
           <div class="side-divider"></div>
           <div class="side-stat-label">Non-Elective</div>
           <div class="side-stat-value" id="side-nonelective-count">0 of 0</div>

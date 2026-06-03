@@ -700,6 +700,85 @@ body {
   min-height: 36px;
 }
 
+/* ─── Monthly toggle button ─── */
+.side-monthly-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: center;
+  width: 100%;
+  font-family: inherit;
+  transition: opacity 0.15s;
+}
+.side-monthly-toggle:hover { opacity: 0.8; }
+
+.side-expand-hint {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.25);
+  margin-top: 6px;
+  transition: color 0.15s;
+}
+.side-monthly-toggle:hover .side-expand-hint { color: rgba(255,255,255,0.5); }
+
+/* ─── Monthly breakdown panel ─── */
+.monthly-breakdown {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
+  margin-top: 0;
+}
+.monthly-breakdown.open {
+  max-height: 320px;
+  margin-top: 14px;
+}
+
+.mb-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+}
+.mb-row-zero { opacity: 0.3; }
+
+.mb-month {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.05em;
+  width: 24px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.mb-bar-track {
+  flex: 1;
+  height: 5px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.mb-bar {
+  height: 100%;
+  background: var(--copper);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.mb-amount {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.55);
+  white-space: nowrap;
+  width: 52px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
 .side-divider {
   width: 32px;
   height: 1px;
