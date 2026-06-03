@@ -243,6 +243,75 @@ body {
 }
 .field-select:focus { outline: none; border-color: var(--copper); }
 
+/* ─── Unit Count (setup step 1) ─── */
+.unit-count-row {
+  background: var(--copper-light);
+  border: 1.5px solid #F0D4B8;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  transition: opacity 0.2s;
+}
+.unit-count-row.hidden { display: none; }
+
+.unit-count-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+  margin-bottom: 4px;
+}
+
+.unit-count-hint {
+  font-size: 12px;
+  color: var(--text2);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.unit-count-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.unit-count-input {
+  width: 120px;
+  padding: 10px 14px;
+  font-size: 18px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--navy);
+  background: #fff;
+  border: 1.5px solid #F0D4B8;
+  border-radius: 10px;
+  text-align: center;
+  transition: border-color 0.15s;
+}
+.unit-count-input:focus { outline: none; border-color: var(--copper); }
+.unit-count-input::-webkit-inner-spin-button,
+.unit-count-input::-webkit-outer-spin-button { opacity: 0.5; }
+
+.unit-count-suffix {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text2);
+}
+
+/* Unit count badge shown in main header */
+.unit-count-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--copper);
+  background: var(--copper-light);
+  border: 1px solid #F0D4B8;
+  border-radius: 20px;
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.unit-count-badge:hover { background: #F8E0C8; }
+
 .select-arrow {
   position: absolute;
   right: 14px;
@@ -842,6 +911,44 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* ─── Flat + Per Unit ─── */
+.flat-per-unit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fpu-label {
+  font-size: 13px;
+  color: var(--text2);
+  min-width: 120px;
+}
+.fpu-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-left: auto;
+}
+.fpu-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.fpu-total-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.fpu-total-value {
+  font-size: 14px;
+  color: var(--navy);
 }
 
 .cost-parsed-rate {

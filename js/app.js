@@ -1,5 +1,6 @@
 import CONFIG from './config.js';
-import { fetchProperties, fetchPrograms, filterBySystem, clearMondayCache } from './monday.js';
+import { fetchProperties, clearMondayCache } from './monday.js';
+import { fetchPrograms, filterBySystem, clearFirebaseCache } from './firebase.js';
 import { loadDecisions, saveDecision, deleteDecision, resetDecisions, loadPriorYearDecisions } from './sharepoint.js';
 import { showScreen, openModal, closeModal, groupStyle, formatCost,
          renderSummary, populatePropertySelect } from './ui.js';
@@ -13,7 +14,8 @@ const S = {
   programs:        [],    // filtered by system
   decisions:       {},    // programId → { itemId, decision, optOutApproval, ... }
   priorDecisions:  {},
-  quantities:      {},    // programId → quantity entered (per-unit, per-elevator, etc.)
+  unitCount:       0,     // global property unit count, pre-fills all per-unit inputs
+  quantities:      {},    // programId → per-card override quantity
   selectedTiers:   {},    // programId → selected tier index for tiered costs
   budgetAmounts:   {},    // programId → manual dollar amount (fallback for complex costs)
   currentOptOutId: null,
@@ -49,10 +51,28 @@ async function loadPropertyScreen() {
 }
 
 // ── Entry flow ───────────────────────────────────────────────────────────────
-// Property selection
+// Property selection — show unit count field when a property is chosen
 document.getElementById('property-select').addEventListener('change', e => {
-  const btn = document.getElementById('btn-property-next');
-  btn.disabled = !e.target.value;
+  const btn     = document.getElementById('btn-property-next');
+  const row     = document.getElementById('unit-count-row');
+  const input   = document.getElementById('unit-count-input');
+  const hasVal  = !!e.target.value;
+  btn.disabled  = !hasVal;
+  if (hasVal) {
+    row.classList.remove('hidden');
+    // Load saved unit count for this property
+    const saved = parseInt(localStorage.getItem(`rpm_units_${e.target.value}`)) || 0;
+    input.value = saved || '';
+  } else {
+    row.classList.add('hidden');
+  }
+});
+
+// Save unit count as the PM types it
+document.getElementById('unit-count-input').addEventListener('input', e => {
+  const prop = document.getElementById('property-select').value;
+  const val  = parseInt(e.target.value) || 0;
+  if (prop) localStorage.setItem(`rpm_units_${prop}`, val);
 });
 
 document.getElementById('btn-property-next').addEventListener('click', () => {
@@ -94,6 +114,7 @@ async function launchMain() {
     S.priorDecisions = priorDecisions;
 
     // Load saved input values
+    S.unitCount    = parseInt(localStorage.getItem(`rpm_units_${S.property}`)) || 0;
     try { S.quantities    = JSON.parse(localStorage.getItem(`rpm_qty_${S.property}_${S.budgetYear}`))   || {}; } catch { S.quantities    = {}; }
     try { S.selectedTiers = JSON.parse(localStorage.getItem(`rpm_tiers_${S.property}_${S.budgetYear}`)) || {}; } catch { S.selectedTiers = {}; }
     try { S.budgetAmounts = JSON.parse(localStorage.getItem(`rpm_budget_${S.property}_${S.budgetYear}`)) || {}; } catch { S.budgetAmounts = {}; }
@@ -108,73 +129,99 @@ async function launchMain() {
 }
 
 // ── Cost basis intelligence ───────────────────────────────────────────────────
-// Analyses the costBasis + costRaw fields and returns a structured descriptor.
+// Reads clean structured fields from Firebase — no text parsing needed.
 function parseCostBasisInfo(program) {
-  const basis = (program.costBasis || '').trim();
-  const raw   = (program.costRaw   || '').trim();
-  const b     = basis.toLowerCase();
-  const r     = raw.toLowerCase();
+  const basis  = program.costBasis    || 'Manual';
+  const rate   = program.rate         ?? 0;
+  const period = program.billingPeriod === 'monthly' ? 'month' : 'year';
 
-  // Primary rate: first $ amount found in raw text, else program.cost
-  const firstDollar = raw.match(/\$\s*([\d,]+\.?\d*)/);
-  const rate = firstDollar
-    ? parseFloat(firstDollar[1].replace(/,/g, ''))
-    : (program.cost || 0);
+  switch (basis) {
 
-  // ── Tiered / Package options ──────────────────────────────────────────
-  const tierRx = /((?:Tier|Package|Plan|Level|Option)\s+\w+):\s*\$?([\d,]+\.?\d*)/gi;
-  const tierMatches = [...raw.matchAll(tierRx)];
-  if (tierMatches.length >= 2) {
-    const tiers    = tierMatches.map(m => ({ label: m[1].trim(), rate: parseFloat(m[2].replace(/,/g, '')) }));
-    const isPerUnit = b.includes('unit') || r.includes('/unit') || r.includes('per unit');
-    const period    = (b.includes('month') || r.includes('/month') || r.includes('per month')) ? 'month' : 'year';
-    return { type: 'tiered', tiers, isPerUnit, period, rate: tiers[0].rate };
-  }
+    case 'Flat Fee':
+      return { type: 'flat', rate };
 
-  // ── Per Unit ──────────────────────────────────────────────────────────
-  if (b.includes('unit')) {
-    const period = (b.includes('month') || r.includes('month')) ? 'month' : 'year';
-    return { type: 'per-unit', label: 'Unit', plural: 'Units', period, rate };
-  }
-
-  // ── Flat fee ──────────────────────────────────────────────────────────
-  if (b.includes('flat') || (b.includes('annual') && !b.includes('per')) ||
-      (!b.includes('per') && !r.match(/per\s+\w/i))) {
-    return { type: 'flat', rate };
-  }
-
-  // ── Per [Thing] ───────────────────────────────────────────────────────
-  const perBasis = basis.match(/per\s+(.+)/i);
-  const perRaw   = raw.match(/per\s+(\w+)/i);
-  const perMatch = perBasis || perRaw;
-  if (perMatch) {
-    const thing  = perMatch[1].replace(/\/.*/,'').trim(); // strip e.g. "/month"
-    if (!thing.toLowerCase().includes('unit')) {
-      const cap    = thing.charAt(0).toUpperCase() + thing.slice(1).toLowerCase();
-      const plural = cap.endsWith('s') ? cap : cap + 's';
-      const period = (b.includes('month') || r.includes('month')) ? 'month' : 'year';
-      return { type: 'per-quantity', label: cap, plural, period, rate };
+    case 'Per Unit': {
+      return { type: 'per-unit', label: 'Unit', plural: 'Units', period, rate };
     }
-  }
 
-  // ── Manual fallback ───────────────────────────────────────────────────
-  return { type: 'manual', rate };
+    case 'Per Item': {
+      const label  = program.itemLabel || 'Item';
+      const plural = label.endsWith('s') ? label : label + 's';
+      return { type: 'per-quantity', label, plural, period, rate };
+    }
+
+    case 'Tiered': {
+      const opts      = program.options || [];
+      const firstType = opts[0]?.type || 'flat';
+      const isPerUnit = firstType === 'per-unit-month' || firstType === 'per-unit-year';
+      const isPerItem = firstType === 'per-item';
+      const tierPeriod = firstType === 'per-unit-month' ? 'month' : 'year';
+      return {
+        type: 'tiered',
+        tiers: opts.map(o => ({ label: o.label, rate: o.rate })),
+        isPerUnit,
+        isPerItem,
+        itemLabel: program.itemLabel || null,
+        period: isPerUnit ? tierPeriod : period,
+        rate: opts[0]?.rate ?? rate,
+      };
+    }
+
+    case 'Flat + Per Unit': {
+      return {
+        type:    'flat-per-unit',
+        baseFee: program.baseFee ?? 0,
+        rate,
+        period,
+      };
+    }
+
+    default: // 'Manual' or anything unrecognised
+      return { type: 'manual', rate };
+  }
+}
+
+// Returns the effective quantity for a program:
+// uses per-card override if set, otherwise falls back to global unit count for per-unit programs.
+function effectiveQty(program, info) {
+  if (program.id in S.quantities) return S.quantities[program.id];
+  if (info.type === 'per-unit') return S.unitCount;
+  return 0;
 }
 
 function resolvedCost(program) {
-  const info = parseCostBasisInfo(program);
-  const qty  = S.quantities[program.id] || 0;
+  const info    = parseCostBasisInfo(program);
+  const qty     = effectiveQty(program, info);
+  const tierIdx = S.selectedTiers[program.id] ?? 0;
+
   switch (info.type) {
-    case 'flat':         return info.rate;
+    case 'flat':
+      return info.rate;
+
     case 'per-unit':
-    case 'per-quantity': return info.period === 'month' ? info.rate * qty * 12 : info.rate * qty;
+    case 'per-quantity':
+      return info.period === 'month' ? info.rate * qty * 12 : info.rate * qty;
+
+    case 'flat-per-unit': {
+      const perUnitTotal = info.period === 'month'
+        ? info.rate * qty * 12
+        : info.rate * qty;
+      return info.baseFee + perUnitTotal;
+    }
+
     case 'tiered': {
-      const tierIdx  = S.selectedTiers[program.id] ?? 0;
       const tierRate = info.tiers?.[tierIdx]?.rate || 0;
-      if (info.isPerUnit) return info.period === 'month' ? tierRate * qty * 12 : tierRate * qty;
+      if (info.isPerUnit) {
+        return info.period === 'month' ? tierRate * qty * 12 : tierRate * qty;
+      }
+      if (info.isPerItem) {
+        return tierRate * qty;
+      }
       return tierRate;
     }
-    default: return S.budgetAmounts[program.id] || 0;
+
+    default:
+      return S.budgetAmounts[program.id] || 0;
   }
 }
 
@@ -195,9 +242,10 @@ function updateBudgetTotal() {
 }
 
 function renderMainScreen() {
-  document.getElementById('hdr-property').textContent = S.property;
-  document.getElementById('hdr-system').textContent   = S.systemType;
-  document.getElementById('hdr-year').textContent     = `FY ${S.budgetYear}`;
+  document.getElementById('hdr-property').textContent    = S.property;
+  document.getElementById('hdr-system').textContent      = S.systemType;
+  document.getElementById('hdr-year').textContent        = `FY ${S.budgetYear}`;
+  document.getElementById('hdr-unit-count').textContent  = S.unitCount > 0 ? `${S.unitCount} units` : 'Set units';
   renderDeptRows();
   updateBudgetTotal();
 }
@@ -332,7 +380,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
 
   // ── Smart cost interaction ────────────────────────────────────────────────
   const info     = parseCostBasisInfo(program);
-  const qty      = S.quantities[program.id] || 0;
+  const qty      = effectiveQty(program, info);
   const tierIdx  = S.selectedTiers[program.id] ?? 0;
   const total    = resolvedCost(program);
   const totalStr = total > 0 ? formatCost(total) + '/yr' : '';
@@ -388,16 +436,42 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
         ${qtySection}
       </div>`;
 
+  } else if (info.type === 'flat-per-unit') {
+    const period      = info.period === 'month' ? '/mo' : '/yr';
+    const perUnitLine = info.period === 'month'
+      ? `${formatCost(info.rate)}/unit/mo`
+      : `${formatCost(info.rate)}/unit/yr`;
+    const perUnitTotal = info.period === 'month'
+      ? info.rate * qty * 12
+      : info.rate * qty;
+    costInteractionHtml = `
+      <div class="cost-interaction flat-per-unit">
+        <div class="flat-per-unit-row">
+          <span class="fpu-label">Base fee</span>
+          <span class="fpu-value">${formatCost(info.baseFee)}</span>
+        </div>
+        <div class="flat-per-unit-row">
+          <span class="fpu-label">${perUnitLine}</span>
+          <span class="qty-sep">×</span>
+          <div class="qty-field">
+            <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
+            <span class="qty-label">Units</span>
+          </div>
+          ${qty > 0 ? `<span class="fpu-value">${formatCost(perUnitTotal)}</span>` : ''}
+        </div>
+        ${qty > 0 ? `<div class="fpu-total-row"><span class="fpu-total-label">Total</span><span class="fpu-total-value"><strong>${formatCost(info.baseFee + perUnitTotal)}/yr</strong></span></div>` : ''}
+      </div>`;
+
   } else {
-    // Manual fallback for complex/unrecognised costs
-    const savedAmt  = S.budgetAmounts[program.id];
+    // Manual — PM enters dollar amount
+    const savedAmt = S.budgetAmounts[program.id];
     costInteractionHtml = `
       <div class="cost-interaction manual">
         <div class="budget-input-row">
           <span class="budget-input-label">Budget&nbsp;$</span>
           <input class="budget-input" data-pid="${program.id}" type="number" min="0" step="1"
                  placeholder="Enter amount" value="${savedAmt !== undefined ? savedAmt : ''}">
-          ${program.costBasis ? `<span class="cost-basis-tag">${program.costBasis}</span>` : ''}
+          ${program.costRaw ? `<span class="cost-basis-tag" title="${program.costRaw}">ⓘ</span>` : ''}
         </div>
       </div>`;
   }
@@ -601,6 +675,26 @@ async function undoOptOut(programId) {
   refreshCard(programId);
 }
 
+// ── Unit count edit (header badge → modal) ────────────────────────────────────
+document.getElementById('btn-edit-units').addEventListener('click', () => {
+  document.getElementById('units-modal-prop').textContent  = S.property || 'this property';
+  document.getElementById('units-modal-input').value       = S.unitCount || '';
+  openModal('modal-units');
+});
+
+document.getElementById('btn-units-save').addEventListener('click', () => {
+  const val = parseInt(document.getElementById('units-modal-input').value) || 0;
+  S.unitCount = val;
+  localStorage.setItem(`rpm_units_${S.property}`, val);
+  closeModal('modal-units');
+  document.getElementById('hdr-unit-count').textContent = val > 0 ? `${val} units` : 'Set units';
+  // Re-render all cards so per-unit calculations update
+  renderDeptRows();
+  updateBudgetTotal();
+});
+
+document.getElementById('btn-units-cancel').addEventListener('click', () => closeModal('modal-units'));
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 document.getElementById('btn-view-summary').addEventListener('click', openSummary);
 
@@ -639,6 +733,7 @@ document.getElementById('menu-close').addEventListener('click',    () => closeMo
 document.getElementById('mi-refresh-data').addEventListener('click', async () => {
   closeModal('modal-menu');
   clearMondayCache();
+  clearFirebaseCache();
   showScreen('screen-loading');
   await launchMain(); // re-fetches everything fresh
 });
@@ -674,7 +769,7 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
   try {
     await resetDecisions(S.property, S.budgetYear);
     S.decisions      = {};
-    S.quantities     = {};
+    S.quantities     = {};   // per-card overrides cleared; S.unitCount preserved
     S.selectedTiers  = {};
     S.budgetAmounts  = {};
     localStorage.removeItem(`rpm_qty_${S.property}_${S.budgetYear}`);

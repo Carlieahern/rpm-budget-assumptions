@@ -9,7 +9,12 @@ const CONFIG = {
   // ── Budget cycle ──
   budgetYear: 2027,
 
-  // ── Monday.com board IDs (numeric strings) ──
+  // ── Firebase Realtime Database ──
+  firebase: {
+    url: 'https://rpm-site-level-assumptions-default-rtdb.firebaseio.com',
+  },
+
+  // ── Monday.com board IDs (numeric strings) — properties only ──
   monday: {
     propertyBoardId: '9029568429',    // Budget Due Date Tracker board
     programsBoardId: '18405693984',     // Cost Center Assumptions board

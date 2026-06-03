@@ -40,6 +40,17 @@
         </select>
         <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
       </div>
+
+      <!-- Unit count — appears after property is selected -->
+      <div class="unit-count-row hidden" id="unit-count-row">
+        <label class="unit-count-label" for="unit-count-input">How many units does this property have?</label>
+        <p class="unit-count-hint">This will pre-fill all per-unit cost calculations. You can still adjust individual programs.</p>
+        <div class="unit-count-field">
+          <input type="number" id="unit-count-input" class="unit-count-input" min="1" step="1" placeholder="e.g. 248">
+          <span class="unit-count-suffix">units</span>
+        </div>
+      </div>
+
       <button id="btn-property-next" class="btn-primary" disabled>Continue →</button>
     </div>
 
@@ -66,6 +77,10 @@
           <span id="hdr-system">—</span>
           <span class="meta-sep">·</span>
           <span id="hdr-year"></span>
+          <span class="meta-sep">·</span>
+          <button class="unit-count-badge" id="btn-edit-units" title="Edit unit count">
+            <span id="hdr-unit-count">— units</span>
+          </button>
         </div>
       </div>
       <div class="main-hdr-center">
@@ -173,6 +188,22 @@
       </button>
     </div>
     <button class="sheet-close" id="menu-close">Close</button>
+  </div>
+</div>
+
+<!-- ── Modal: Edit Unit Count ── -->
+<div class="overlay" id="modal-units">
+  <div class="sheet">
+    <h3>Property Unit Count</h3>
+    <p>Update the number of units for <strong id="units-modal-prop">this property</strong>. All per-unit calculations will update automatically.</p>
+    <div class="unit-count-field" style="margin: 20px 0 8px;">
+      <input type="number" id="units-modal-input" class="unit-count-input" min="1" step="1" placeholder="e.g. 248">
+      <span class="unit-count-suffix">units</span>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-primary" id="btn-units-save">Update</button>
+      <button class="btn-ghost" id="btn-units-cancel">Cancel</button>
+    </div>
   </div>
 </div>
 
