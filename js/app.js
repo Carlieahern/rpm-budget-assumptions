@@ -264,17 +264,41 @@ function animateCost(el, newVal) {
   requestAnimationFrame(tick);
 }
 
+// Returns the actual monthly charge for a program (only for monthly-billed items).
+// As-incurred, annual, and quarterly items return 0 here — they belong in the annual total only.
+function resolvedMonthlyCost(program) {
+  if (program.billingPeriod !== 'monthly') return 0;
+  const info = parseCostBasisInfo(program);
+  const qty  = effectiveQty(program, info);
+  switch (info.type) {
+    case 'flat':         return info.rate;
+    case 'per-unit':
+    case 'per-quantity': return info.rate * qty;
+    case 'flat-per-unit': return info.baseFee + info.rate * qty;
+    case 'tiered': {
+      const tierIdx  = S.selectedTiers[program.id] ?? 0;
+      const tierRate = info.tiers?.[tierIdx]?.rate || 0;
+      if (info.isPerUnit) return tierRate * qty;
+      if (info.isPerItem) return tierRate * qty;
+      return tierRate;
+    }
+    default: return 0;
+  }
+}
+
 function updateBudgetTotal() {
   let annual = 0;
+  let monthly = 0;
   S.programs.forEach(p => {
     const dec = S.decisions[p.id]?.decision;
-    if (p.required) {
-      if (dec !== 'opted-out' && dec !== 'not-applicable') annual += resolvedCost(p);
-    } else {
-      if (dec === 'in') annual += resolvedCost(p);
+    const included = p.required
+      ? dec !== 'opted-out' && dec !== 'not-applicable'
+      : dec === 'in';
+    if (included) {
+      annual  += resolvedCost(p);
+      monthly += resolvedMonthlyCost(p);
     }
   });
-  const monthly = annual / 12;
   animateCost(document.getElementById('budget-total'),  annual);
   animateCost(document.getElementById('monthly-total'), monthly);
 }
@@ -490,7 +514,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
 
   // Raw Monday description — always shown for context
   const costRawHtml = program.costRaw
-    ? `<div class="cost-raw-text">💬 ${program.costRaw}</div>`
+    ? `<div class="cost-raw-text">${program.costRaw}</div>`
     : '';
 
   let costInteractionHtml = '';
