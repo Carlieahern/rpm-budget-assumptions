@@ -324,8 +324,11 @@ function renderDeptRows() {
     rowEl.className = 'dept-row';
     rowEl.innerHTML = `
       <div class="dept-row-hdr dept-hdr-${gs.key}">
-        <span>${dept}</span>
-        <span class="dept-hdr-count">${nonElective.length + elective.length}</span>
+        <div class="dept-hdr-left">
+          <div class="dept-hdr-text">${dept}</div>
+          <div class="dept-hdr-bar"></div>
+        </div>
+        <div class="dept-hdr-count">${nonElective.length + elective.length}</div>
       </div>
       <div class="dept-row-body">
         <div class="dept-col dept-col-left"></div>
