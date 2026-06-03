@@ -225,20 +225,42 @@ function resolvedCost(program) {
   }
 }
 
+// ── Animated number counter ───────────────────────────────────────────────────
+const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+function animateCost(el, newVal) {
+  if (!el) return;
+  const oldText = el.textContent.replace(/[^0-9.]/g, '');
+  const oldVal  = parseFloat(oldText) || 0;
+  if (Math.round(oldVal) === Math.round(newVal)) {
+    el.textContent = newVal > 0 ? fmt.format(newVal) : '—';
+    return;
+  }
+  const duration = 450;
+  const start    = performance.now();
+  const tick = (now) => {
+    const p = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - p, 3); // ease-out cubic
+    const cur = oldVal + (newVal - oldVal) * eased;
+    el.textContent = newVal > 0 ? fmt.format(cur) : '—';
+    if (p < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 function updateBudgetTotal() {
-  let total = 0;
+  let annual = 0;
   S.programs.forEach(p => {
     const dec = S.decisions[p.id]?.decision;
     if (p.required) {
-      if (dec !== 'opted-out' && dec !== 'not-applicable') total += resolvedCost(p);
+      if (dec !== 'opted-out' && dec !== 'not-applicable') annual += resolvedCost(p);
     } else {
-      if (dec === 'in') total += resolvedCost(p);
+      if (dec === 'in') annual += resolvedCost(p);
     }
   });
-  const el = document.getElementById('budget-total');
-  if (el) el.textContent = total > 0
-    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(total)
-    : '—';
+  const monthly = annual / 12;
+  animateCost(document.getElementById('budget-total'),  annual);
+  animateCost(document.getElementById('monthly-total'), monthly);
 }
 
 function renderMainScreen() {
@@ -300,20 +322,17 @@ function renderDeptRows() {
 }
 
 function updateColumnCounts() {
-  // Exclude N/A programs from non-elective counts
-  const req        = S.programs.filter(p =>  p.required && S.decisions[p.id]?.decision !== 'not-applicable');
-  const elec       = S.programs.filter(p => !p.required);
-  const ackCount   = req.filter(p  => S.decisions[p.id]?.decision === 'acknowledged').length;
-  const incCount   = elec.filter(p => S.decisions[p.id]?.decision === 'in').length;
-  const naCount    = S.programs.filter(p => p.required && S.decisions[p.id]?.decision === 'not-applicable').length;
+  const req      = S.programs.filter(p =>  p.required && S.decisions[p.id]?.decision !== 'not-applicable');
+  const elec     = S.programs.filter(p => !p.required);
+  const ackCount = req.filter(p  => S.decisions[p.id]?.decision === 'acknowledged').length;
+  const incCount = elec.filter(p => S.decisions[p.id]?.decision === 'in').length;
+  const naCount  = S.programs.filter(p => p.required && S.decisions[p.id]?.decision === 'not-applicable').length;
 
-  const nonElCount = document.getElementById('col-count-nonelective');
-  const elecCount  = document.getElementById('col-count-elective');
-  if (nonElCount) {
-    const naNote = naCount > 0 ? ` · ${naCount} N/A` : '';
-    nonElCount.textContent = `${ackCount} of ${req.length} Acknowledged${naNote}`;
-  }
-  if (elecCount)  elecCount.textContent = `${incCount} of ${elec.length} Included`;
+  // Side panel stat values
+  const sideNE = document.getElementById('side-nonelective-count');
+  const sideEl = document.getElementById('side-elective-count');
+  if (sideNE) sideNE.textContent = `${ackCount} of ${req.length}`;
+  if (sideEl) sideEl.textContent = `${incCount} of ${elec.length}`;
 }
 
 function buildProgramCard(program, decision, priorDecision, isRequired) {

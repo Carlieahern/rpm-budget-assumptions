@@ -83,12 +83,6 @@
           </button>
         </div>
       </div>
-      <div class="main-hdr-center">
-        <div class="budget-total-box">
-          <span class="budget-total-label">Est. Budget</span>
-          <span class="budget-total-value" id="budget-total">—</span>
-        </div>
-      </div>
       <div class="main-hdr-right">
         <button class="btn-summary-link" id="btn-view-summary">View Summary</button>
         <button class="icon-btn" id="btn-menu" aria-label="Menu">
@@ -98,28 +92,49 @@
       </div>
     </header>
 
-    <div class="programs-outer">
-      <!-- Sticky column headers -->
-      <div class="col-headers-row">
-        <div class="col-hdr-cell">
-          <div class="col-hdr-top">
-            <h2 class="col-title">Non-Elective</h2>
-            <span class="col-count" id="col-count-nonelective">0 of 0 Acknowledged</span>
-          </div>
-          <p class="col-sub">Budgeted by default. Opting out requires division president approval.</p>
-        </div>
-        <div class="col-hdr-cell">
-          <div class="col-hdr-top">
-            <h2 class="col-title">Elective</h2>
-            <span class="col-count" id="col-count-elective">0 of 0 Included</span>
-          </div>
-          <p class="col-sub">Select which programs to include in your budget.</p>
+    <!-- ── 3-column layout ── -->
+    <div class="main-layout">
+
+      <!-- Left panel: Monthly total -->
+      <div class="side-panel side-left">
+        <div class="side-panel-inner">
+          <div class="side-label">Monthly Est.</div>
+          <div class="side-value" id="monthly-total">—</div>
+          <div class="side-divider"></div>
+          <div class="side-stat-label">Non-Elective</div>
+          <div class="side-stat-value" id="side-nonelective-count">0 of 0</div>
+          <div class="side-stat-sub">Acknowledged</div>
         </div>
       </div>
-      <!-- Department rows rendered by JS -->
-      <div id="programs-body"></div>
-    </div>
 
+      <!-- Center: scrollable cards -->
+      <div class="center-col">
+        <div class="col-headers-row">
+          <div class="col-hdr-cell">
+            <h2 class="col-title">Non-Elective</h2>
+            <p class="col-sub">Budgeted by default. Opting out requires division president approval.</p>
+          </div>
+          <div class="col-hdr-cell">
+            <h2 class="col-title">Elective</h2>
+            <p class="col-sub">Select which programs to include in your budget.</p>
+          </div>
+        </div>
+        <div id="programs-body"></div>
+      </div>
+
+      <!-- Right panel: Annual total -->
+      <div class="side-panel side-right">
+        <div class="side-panel-inner">
+          <div class="side-label">Annual Est.</div>
+          <div class="side-value" id="budget-total">—</div>
+          <div class="side-divider"></div>
+          <div class="side-stat-label">Elective</div>
+          <div class="side-stat-value" id="side-elective-count">0 of 0</div>
+          <div class="side-stat-sub">Included</div>
+        </div>
+      </div>
+
+    </div>
   </div>
 
   <!-- ── Summary ── -->
