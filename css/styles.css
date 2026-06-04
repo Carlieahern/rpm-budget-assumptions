@@ -2749,6 +2749,34 @@ body {
 
 .input-note { font-size: 12px; font-style: italic; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.4; }
 
+/* ── Inline admin editing ── */
+.admin-badge { display: none; }
+.admin-badge.on {
+  display: inline-flex; align-items: center;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--navy); background: var(--copper); border-radius: 20px; padding: 2px 9px;
+}
+.card-edit-btn {
+  background: rgba(255,255,255,0.92); color: var(--navy2);
+  border: none; border-radius: 999px; padding: 7px 14px;
+  font-family: inherit; font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: background 0.15s;
+}
+.card-edit-btn:hover { background: #fff; }
+.admin-addbar { padding: 14px 24px 0; }
+.admin-addbar-btn {
+  width: 100%; padding: 12px; border: 2px dashed var(--copper);
+  background: var(--copper-light); color: var(--copper2);
+  border-radius: 12px; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.admin-addbar-btn:hover { background: #f8e0c8; }
+.dept-add-btn {
+  width: 100%; margin-top: 8px; padding: 9px; border: 1.5px dashed var(--copper);
+  background: transparent; color: var(--copper2); border-radius: 10px;
+  font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.dept-add-btn:hover { background: var(--copper-light); }
+
 .ae-systems { display: flex; gap: 8px; flex-wrap: wrap; }
 .ae-sys-chip {
   display: inline-flex;

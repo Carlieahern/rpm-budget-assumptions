@@ -19,10 +19,16 @@ const TIER_TYPES = ['flat', 'per-unit-month', 'per-unit-year', 'per-item'];
 const SYSTEMS    = [['Yardi', 'Yardi'], ['OneSite', 'OneSite'], ['PaceOneSite', 'Pace + OneSite']];
 const MONTHS     = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-let adminName = '';
-let rawCache  = {};        // id → raw program object
-let editingId = null;      // null = new program
-let form      = {};        // working copy being edited
+let adminName     = '';
+let rawCache      = {};    // id → raw program object
+let editingId     = null;  // null = new program
+let form          = {};    // working copy being edited
+let afterSave     = null;  // callback run after a save/delete (varies by entry point)
+let loginCallback = null;  // run after a successful login (inline mode)
+let adminAuthed   = false;
+
+export function isAdminAuthed() { return adminAuthed; }
+export function adminUserName()  { return adminName; }
 
 const money = n => isNaN(n) ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n);
 
@@ -40,7 +46,16 @@ export function initAdmin() {
   document.getElementById('admin-pass')?.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
 
   document.getElementById('btn-admin-back')?.addEventListener('click', () => showScreen('screen-setup'));
-  document.getElementById('btn-admin-add')?.addEventListener('click', () => openEditor(null));
+  document.getElementById('btn-admin-add')?.addEventListener('click', () => { afterSave = renderList; openEditor(null); });
+}
+
+// Open the login modal; on success run cb (used for inline dashboard admin mode)
+export function promptAdminLogin(cb) {
+  loginCallback = cb || null;
+  document.getElementById('admin-login-error').textContent = '';
+  document.getElementById('admin-name').value = adminName || '';
+  document.getElementById('admin-pass').value = '';
+  openModal('modal-admin-login');
 }
 
 function tryLogin() {
@@ -55,8 +70,31 @@ function tryLogin() {
     return;
   }
   adminName = name;
+  adminAuthed = true;
   closeModal('modal-admin-login');
-  openAdmin();
+  try { fetchCostBasisTypes().then(t => extraTypes = t || []).catch(() => {}); } catch {}
+  if (loginCallback) { const cb = loginCallback; loginCallback = null; cb(); }
+  else openAdmin();
+}
+
+// ── Inline editing (from the live dashboard) ──────────────────────────────────
+export async function editProgram(id, onDone) {
+  try { rawCache = await fetchRawPrograms(); } catch {}
+  try { if (!extraTypes.length) extraTypes = await fetchCostBasisTypes(); } catch {}
+  afterSave = onDone;
+  openEditor(id);
+}
+
+export async function newProgram(dept, onDone) {
+  try { rawCache = await fetchRawPrograms(); } catch {}
+  try { if (!extraTypes.length) extraTypes = await fetchCostBasisTypes(); } catch {}
+  afterSave = onDone;
+  openEditor(null);
+  if (dept) {
+    form.department = dept;
+    const f = document.getElementById('ae-department');
+    if (f) f.value = dept;
+  }
 }
 
 // ── Program list ─────────────────────────────────────────────────────────────
@@ -102,7 +140,7 @@ async function renderList() {
     </div>`).join('');
 
   list.querySelectorAll('.btn-admin-edit').forEach(btn =>
-    btn.addEventListener('click', () => openEditor(btn.dataset.id)));
+    btn.addEventListener('click', () => { afterSave = renderList; openEditor(btn.dataset.id); }));
 }
 
 // ── Editor ─────────────────────────────────────────────────────────────────────
@@ -504,7 +542,7 @@ async function save() {
   try {
     await saveProgram(id, data);
     closeModal('modal-admin-editor');
-    await renderList();
+    if (afterSave) await afterSave();
   } catch (e) {
     alert('Save failed: ' + e.message);
     btn.disabled = false; btn.textContent = editingId ? 'Save changes' : 'Create program';
@@ -517,7 +555,7 @@ async function removeProgram() {
   try {
     await deleteProgram(editingId);
     closeModal('modal-admin-editor');
-    await renderList();
+    if (afterSave) await afterSave();
   } catch (e) {
     alert('Delete failed: ' + e.message);
   }

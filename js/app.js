@@ -4,7 +4,7 @@ import { fetchPrograms, filterBySystem, clearFirebaseCache } from './firebase.js
 import { loadDecisions, saveDecision, deleteDecision, resetDecisions, loadPriorYearDecisions } from './sharepoint.js';
 import { showScreen, openModal, closeModal, groupStyle, formatCost, formatRate,
          renderSummary, populatePropertySelect } from './ui.js';
-import { initAdmin } from './admin.js';
+import { initAdmin, promptAdminLogin, editProgram, newProgram, isAdminAuthed } from './admin.js';
 
 // ── App State ───────────────────────────────────────────────────────────────
 const S = {
@@ -12,6 +12,7 @@ const S = {
   property:        null,
   systemType:      null,
   mode:            'interactive', // 'interactive' | 'info'
+  admin:           false,         // inline admin editing enabled in the dashboard
   allPrograms:     [],
   programs:        [],    // filtered by system
   decisions:       {},    // programId → { itemId, decision, optOutApproval, ... }
@@ -527,6 +528,11 @@ function renderMainScreen() {
     modeBadge.textContent = S.mode === 'info' ? 'Info Only' : '';
     modeBadge.className   = `mode-badge${S.mode === 'info' ? ' mode-info' : ''}`;
   }
+  const adminBadge = document.getElementById('hdr-admin-badge');
+  if (adminBadge) {
+    adminBadge.textContent = S.admin ? '✎ Admin Mode' : '';
+    adminBadge.className   = `admin-badge${S.admin ? ' on' : ''}`;
+  }
 
   // Hide side panels + budget total in info mode (no selections = no totals)
   const sideLeft  = document.querySelector('.side-left');
@@ -542,6 +548,15 @@ function renderMainScreen() {
 function renderDeptRows() {
   const body = document.getElementById('programs-body');
   body.innerHTML = '';
+
+  // Admin: global "Add Program" bar at the top
+  if (S.admin) {
+    const bar = document.createElement('div');
+    bar.className = 'admin-addbar';
+    bar.innerHTML = `<button class="admin-addbar-btn" type="button">+ Add New Program</button>`;
+    bar.querySelector('button').addEventListener('click', () => newProgram('', refreshDashboard));
+    body.appendChild(bar);
+  }
 
   // Collect departments in the order they first appear
   const deptOrder = [];
@@ -585,6 +600,20 @@ function renderDeptRows() {
 
     if (!nonElective.length) leftCol.innerHTML  = '<p class="dept-col-empty">No required programs</p>';
     if (!elective.length)    rightCol.innerHTML = '<p class="dept-col-empty">No elective programs</p>';
+
+    // Admin: add-to-department buttons under each column
+    if (S.admin) {
+      const mkBtn = (label, elective) => {
+        const b = document.createElement('button');
+        b.className = 'dept-add-btn';
+        b.type = 'button';
+        b.textContent = label;
+        b.addEventListener('click', () => newProgram(dept, refreshDashboard));
+        return b;
+      };
+      leftCol.appendChild(mkBtn('+ Add non-elective'));
+      rightCol.appendChild(mkBtn('+ Add elective'));
+    }
   });
 
   updateColumnCounts();
@@ -681,6 +710,7 @@ function buildInfoCard(program) {
     ${monthsHtml}
     <div class="card-foot">
       <button class="details-toggle" type="button">▾ Details</button>
+      ${S.admin ? `<button class="card-edit-btn" type="button">✎ Edit</button>` : ''}
     </div>
     <div class="card-details-panel">
       ${resourceLink}
@@ -693,6 +723,10 @@ function buildInfoCard(program) {
   el.querySelector('.details-toggle')?.addEventListener('click', e => {
     e.stopPropagation();
     el.classList.toggle('details-open');
+  });
+  el.querySelector('.card-edit-btn')?.addEventListener('click', e => {
+    e.stopPropagation();
+    editProgram(program.id, refreshDashboard);
   });
 
   return el;
@@ -926,6 +960,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     ${bodyHtml}
     <div class="card-foot">
       <button class="details-toggle" type="button">▾ Details</button>
+      ${S.admin ? `<button class="card-edit-btn" type="button">✎ Edit</button>` : ''}
       <div class="prog-card-action">${actionHtml}</div>
     </div>
     <div class="card-details-panel">
@@ -941,6 +976,12 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   el.querySelector('.details-toggle')?.addEventListener('click', e => {
     e.stopPropagation();
     el.classList.toggle('details-open');
+  });
+
+  // Inline admin edit
+  el.querySelector('.card-edit-btn')?.addEventListener('click', e => {
+    e.stopPropagation();
+    editProgram(program.id, refreshDashboard);
   });
 
   el.addEventListener('click', e => {
@@ -1191,6 +1232,40 @@ document.getElementById('btn-units-save').addEventListener('click', () => {
 });
 
 document.getElementById('btn-units-cancel').addEventListener('click', () => closeModal('modal-units'));
+
+// ── Inline admin mode ─────────────────────────────────────────────────────────
+// Re-pull programs from Firebase and re-render the dashboard (after an edit/add).
+async function refreshDashboard() {
+  clearFirebaseCache();
+  try {
+    const programs = await fetchPrograms(true);
+    S.allPrograms = programs;
+    S.programs = filterBySystem(programs, S.systemType).map(p => ({
+      ...p,
+      cost:   p.costs[S.systemType]   ?? 0,
+      glCode: p.glCodes[S.systemType] ?? '—',
+    }));
+    renderMainScreen();
+  } catch (e) { console.error('Refresh failed', e); }
+}
+
+function enterAdminMode() {
+  S.admin = true;
+  document.getElementById('mi-admin-mode-label').textContent = 'Exit Admin Mode';
+  renderMainScreen();
+}
+function exitAdminMode() {
+  S.admin = false;
+  document.getElementById('mi-admin-mode-label').textContent = 'Enter Admin Mode';
+  renderMainScreen();
+}
+
+document.getElementById('mi-admin-mode').addEventListener('click', () => {
+  closeModal('modal-menu');
+  if (S.admin) { exitAdminMode(); return; }
+  if (isAdminAuthed()) { enterAdminMode(); return; }
+  promptAdminLogin(enterAdminMode);
+});
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 document.getElementById('btn-view-summary').addEventListener('click', openSummary);
