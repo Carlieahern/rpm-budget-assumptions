@@ -50,13 +50,15 @@ export async function fetchPrograms(forceRefresh = false) {
       PaceOneSite: p.paceGL     || '—',
     };
 
-    // All programs apply to all systems at the same rate.
-    // Manual programs (rate = null) use 0 — filterBySystem still shows them
-    // because ALL costs are 0 → show everywhere.
+    // Which PMS systems this program applies to (defaults to all three).
+    const systems = (Array.isArray(p.systems) && p.systems.length)
+      ? p.systems
+      : ['Yardi', 'OneSite', 'PaceOneSite'];
+
     const costs = {
-      Yardi:       rate,
-      OneSite:     rate,
-      PaceOneSite: rate,
+      Yardi:       systems.includes('Yardi')       ? rate : 0,
+      OneSite:     systems.includes('OneSite')     ? rate : 0,
+      PaceOneSite: systems.includes('PaceOneSite') ? rate : 0,
     };
 
     return {
@@ -66,6 +68,7 @@ export async function fetchPrograms(forceRefresh = false) {
       required:      p.elective === false,
       costBasis:     p.costBasis     || 'Manual',
       rate:          rate,
+      systems,
       billingPeriod: p.billingPeriod || 'annual',
       itemLabel:     p.itemLabel     || null,
       baseFee:       p.baseFee       ?? null,
@@ -123,8 +126,7 @@ export async function deleteProgram(id) {
 // Programs with a cost only show for systems where it's non-zero.
 export function filterBySystem(programs, selectedSystem) {
   return programs.filter(p => {
-    const hasAnyCost = Object.values(p.costs).some(c => c > 0);
-    if (!hasAnyCost) return true;
-    return p.costs[selectedSystem] > 0;
+    if (Array.isArray(p.systems) && p.systems.length) return p.systems.includes(selectedSystem);
+    return true; // no restriction set → applies to all systems
   });
 }

@@ -2485,6 +2485,18 @@ body {
 }
 .btn-card-ghost:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.8); }
 
+/* Active toggle states (elective three-state) */
+.btn-card-fill.is-on {
+  background: #fff;
+  color: var(--copper2);
+}
+.btn-card-fill.is-on:hover { background: #fff; }
+.btn-card-ghost.is-on-out {
+  background: rgba(0,0,0,0.28);
+  border-color: transparent;
+  color: rgba(255,255,255,0.9);
+}
+
 .card-status-badge {
   display: inline-flex;
   align-items: center;
@@ -2661,6 +2673,22 @@ body {
   background: #fff;
 }
 .ae-field input:focus, .ae-field select:focus, .ae-field textarea:focus { outline: none; border-color: var(--copper); }
+
+.ae-systems { display: flex; gap: 8px; flex-wrap: wrap; }
+.ae-sys-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+.ae-sys-chip.on { border-color: var(--copper); background: var(--copper-light); color: var(--copper2); }
+.ae-sys-chip input { accent-color: var(--copper); }
 
 .ae-tiers { background: #faf8f4; border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 16px; }
 .ae-tiers-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 10px; }

@@ -277,26 +277,41 @@ function parseStartMonth(billingStart) {
 // Returns the list of month indices (0-11) a program's cost actually lands in,
 // after applying billing frequency, the property transition month, and any
 // per-card override the PM has set.
+function monthsForFrequency(freq, start) {
+  if (freq.includes('monthly'))                                    return [0,1,2,3,4,5,6,7,8,9,10,11];
+  if (freq.includes('quarterly'))                                  return [0,1,2,3].map(i => (start + i*3) % 12);
+  if (freq.includes('bi-annual') || freq.includes('bi-annu'))      return [start % 12, (start + 6) % 12];
+  if (freq.includes('annual'))                                     return [start % 12];
+  return [];
+}
+
 function defaultMonthsFor(program) {
-  const freq  = (program.billingFreq || program.billingPeriod || '').toLowerCase();
-  const start = parseStartMonth(program.billingStart);
-  let months;
-  if (freq.includes('monthly'))                                   months = [0,1,2,3,4,5,6,7,8,9,10,11];
-  else if (freq.includes('quarterly'))                            months = [0,1,2,3].map(i => (start + i*3) % 12);
-  else if (freq.includes('bi-annual') || freq.includes('bi-annu')) months = [start % 12, (start + 6) % 12];
-  else if (freq.includes('incurred') || freq.includes('implement')) months = []; // PM picks explicitly
-  else if (freq.includes('annual'))                               months = [start % 12];
-  else                                                            months = [];
-  return months.sort((a, b) => a - b);
+  const freq = (program.billingFreq || program.billingPeriod || '').toLowerCase();
+  if (freq.includes('incurred')) return [];   // PM picks explicitly
+  return monthsForFrequency(freq, parseStartMonth(program.billingStart)).sort((a, b) => a - b);
 }
 
 function activeMonthsFor(program) {
   // Explicit per-card override (also how as-incurred programs are set)
   if (S.incurMonths[program.id]) return S.incurMonths[program.id].slice().sort((a, b) => a - b);
-  let months = defaultMonthsFor(program);
-  // Transition: drop any month before the site came on
-  if (S.transitionMonth != null) months = months.filter(m => m >= S.transitionMonth);
-  return months;
+
+  const freq = (program.billingFreq || program.billingPeriod || '').toLowerCase();
+  if (freq.includes('incurred')) return [];
+
+  // Does this item follow the property's transition (e.g. "When Implemented"),
+  // or is it pinned to a fixed calendar month (e.g. Annual Awards every December)?
+  const followsTransition = /implement|transition|anniversar/i.test(program.billingStart || '');
+  let start = parseStartMonth(program.billingStart);
+  if (followsTransition && S.transitionMonth != null) start = S.transitionMonth;
+
+  let months = monthsForFrequency(freq, start);
+
+  // Fixed calendar months: if a hit falls before the transition, the site
+  // missed it this year — drop it (don't shift it forward).
+  if (!followsTransition && S.transitionMonth != null) {
+    months = months.filter(m => m >= S.transitionMonth);
+  }
+  return months.sort((a, b) => a - b);
 }
 
 // How many billing hits a full year would have — used to prorate.
@@ -638,17 +653,12 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
         <button class="btn-card-fill btn-acknowledge" data-pid="${program.id}">Acknowledge</button>`;
     }
   } else {
-    if (dec === 'in') {
-      actionHtml = `
-        <span class="card-status-badge status-acknowledged">✓ Included</span>
-        <button class="btn-card-ghost btn-exclude" data-pid="${program.id}">Remove</button>`;
-    } else if (dec === 'out') {
-      actionHtml = `<button class="btn-card-fill btn-include" data-pid="${program.id}">Include</button>`;
-    } else {
-      actionHtml = `
-        <button class="btn-card-ghost btn-exclude" data-pid="${program.id}">Exclude</button>
-        <button class="btn-card-fill btn-include" data-pid="${program.id}">Include</button>`;
-    }
+    // Three-state toggle: Include / Remove / (neither = pending)
+    const inSel  = dec === 'in';
+    const outSel = dec === 'out';
+    actionHtml = `
+      <button class="btn-card-ghost btn-exclude${outSel ? ' is-on-out' : ''}" data-pid="${program.id}">${outSel ? '✓ Removed' : 'Remove'}</button>
+      <button class="btn-card-fill btn-include${inSel ? ' is-on' : ''}" data-pid="${program.id}">${inSel ? '✓ Included' : 'Include'}</button>`;
   }
 
   const excludedOverlay = (!isRequired && dec === 'out')
@@ -901,13 +911,25 @@ function refreshCard(programId) {
   updateBudgetTotal();
 }
 
-// ── Elective actions ──────────────────────────────────────────────────────────
+// ── Elective actions (three-state toggle) ─────────────────────────────────────
+async function clearDecision(programId) {
+  const existing = S.decisions[programId];
+  if (existing) { try { await deleteDecision(existing.itemId); } catch {} }
+  delete S.decisions[programId];
+  refreshCard(programId);
+  updateColumnCounts();
+  updateBudgetTotal();
+}
+
 async function handleElectiveInclude(programId) {
-  await setDecision(programId, 'in');
+  // Clicking the active "Included" returns it to pending
+  if (S.decisions[programId]?.decision === 'in') await clearDecision(programId);
+  else await setDecision(programId, 'in');
 }
 
 async function handleElectiveExclude(programId) {
-  await setDecision(programId, 'out');
+  if (S.decisions[programId]?.decision === 'out') await clearDecision(programId);
+  else await setDecision(programId, 'out');
 }
 
 // ── Acknowledge actions ───────────────────────────────────────────────────────

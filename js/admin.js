@@ -10,6 +10,8 @@ const PASSCODE = 'Budgets';
 const COST_BASES = ['Flat Fee', 'Per Unit', 'Per Item', 'Tiered', 'Flat + Per Unit', 'Manual'];
 const BILLING    = ['monthly', 'quarterly', 'bi-annual', 'annual', 'as-incurred', 'one-time'];
 const TIER_TYPES = ['flat', 'per-unit-month', 'per-unit-year', 'per-item'];
+const SYSTEMS    = [['Yardi', 'Yardi'], ['OneSite', 'OneSite'], ['PaceOneSite', 'Pace + OneSite']];
+const MONTHS     = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 let adminName = '';
 let rawCache  = {};        // id → raw program object
@@ -102,6 +104,7 @@ function blankProgram() {
     name: '', department: '', elective: true, costBasis: 'Flat Fee',
     rate: '', itemLabel: '', baseFee: '', options: [],
     billingPeriod: 'monthly', billingStart: 'January',
+    systems: ['Yardi', 'OneSite', 'PaceOneSite'],
     setupFee: '', costRaw: '', description: '', resourceUrl: '',
     yardiGL: '', onesiteGL: '', paceGL: '', owner: '',
   };
@@ -189,9 +192,23 @@ function buildEditor() {
         <input id="ae-baseFee" type="number" step="0.01" min="0" value="${esc(form.baseFee)}" placeholder="0.00">
       </label>` : ''}
 
+      ${form.billingPeriod !== 'monthly' && form.billingPeriod !== 'as-incurred' ? `
       <label class="ae-field">
-        <span>Billing start / anchor</span>
-        <input id="ae-billingStart" type="text" value="${esc(form.billingStart)}" placeholder="e.g. January, When Implemented">
+        <span>Bills in month</span>
+        <select id="ae-billingStart">
+          <option value="When Implemented"${/implement|transition|anniversar/i.test(form.billingStart || '') ? ' selected' : ''}>Follows transition (when implemented)</option>
+          ${MONTHS.map(m => `<option value="${m}"${(form.billingStart || '').toLowerCase().includes(m.toLowerCase()) ? ' selected' : ''}>${m} (fixed — missed if transition is later)</option>`).join('')}
+        </select>
+      </label>` : ''}
+
+      <label class="ae-field ae-wide">
+        <span>Applies to systems</span>
+        <div class="ae-systems">
+          ${SYSTEMS.map(([val, label]) => `
+            <label class="ae-sys-chip${(form.systems || []).includes(val) ? ' on' : ''}">
+              <input type="checkbox" class="ae-sys" value="${val}"${(form.systems || []).includes(val) ? ' checked' : ''}> ${label}
+            </label>`).join('')}
+        </div>
       </label>
 
       <label class="ae-field ae-wide">
@@ -263,8 +280,16 @@ function wireEditor() {
   bind('ae-description', 'description');
 
   document.getElementById('ae-elective').addEventListener('change', e => { form.elective = e.target.value === 'true'; });
-  document.getElementById('ae-billingPeriod').addEventListener('change', e => { form.billingPeriod = e.target.value; updatePreview(); });
+  document.getElementById('ae-billingPeriod').addEventListener('change', e => { form.billingPeriod = e.target.value; buildEditor(); });
   document.getElementById('ae-costBasis').addEventListener('change', e => { form.costBasis = e.target.value; buildEditor(); });
+  document.getElementById('ae-billingStart')?.addEventListener('change', e => { form.billingStart = e.target.value; updatePreview(); });
+
+  // Systems checkboxes
+  document.querySelectorAll('.ae-sys').forEach(cb => cb.addEventListener('change', () => {
+    form.systems = [...document.querySelectorAll('.ae-sys')].filter(x => x.checked).map(x => x.value);
+    document.querySelectorAll('.ae-sys-chip').forEach(ch =>
+      ch.classList.toggle('on', ch.querySelector('.ae-sys').checked));
+  }));
 
   // Tier repeater
   document.getElementById('ae-tier-add')?.addEventListener('click', () => {
@@ -348,6 +373,7 @@ async function save() {
       : [],
     billingPeriod: form.billingPeriod,
     billingStart: form.billingStart || null,
+    systems: (Array.isArray(form.systems) && form.systems.length) ? form.systems : ['Yardi', 'OneSite', 'PaceOneSite'],
     setupFee: form.setupFee || null,
     costRaw: form.costRaw || null,
     description: form.description || null,
