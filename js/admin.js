@@ -107,8 +107,9 @@ async function renderList() {
 function blankProgram() {
   return {
     name: '', department: '', elective: true, costBasis: 'Flat Fee',
-    rate: '', itemLabel: '', baseFee: '', options: [], customFormula: '',
+    rate: '', itemLabel: '', baseFee: '', options: [], additive: false, customFormula: '',
     billingPeriod: 'monthly', billingStart: 'January',
+    defaultMonths: [], monthsFixed: false,
     systems: ['Yardi', 'OneSite', 'PaceOneSite'],
     setupFee: '', priorYearNote: '', costRaw: '', description: '', resourceUrl: '',
     yardiGL: '', onesiteGL: '', paceGL: '', owner: '',
@@ -215,13 +216,20 @@ function buildEditor() {
       </label>` : ''}
 
       ${form.billingPeriod !== 'monthly' && form.billingPeriod !== 'as-incurred' ? `
-      <label class="ae-field">
-        <span>Bills in month</span>
-        <select id="ae-billingStart">
-          <option value="When Implemented"${/implement|transition|anniversar/i.test(form.billingStart || '') ? ' selected' : ''}>Follows transition (when implemented)</option>
-          ${MONTHS.map(m => `<option value="${m}"${(form.billingStart || '').toLowerCase().includes(m.toLowerCase()) ? ' selected' : ''}>${m} (fixed — missed if transition is later)</option>`).join('')}
-        </select>
-      </label>` : ''}
+      <div class="ae-field ae-wide">
+        <span>Default billing months</span>
+        <label class="ae-follows">
+          <input type="checkbox" id="ae-followsTransition"${/implement|transition|anniversar/i.test(form.billingStart || '') ? ' checked' : ''}>
+          Follows transition date (bills at go-live, no fixed month)
+        </label>
+        <div class="ae-month-chips" id="ae-month-chips">
+          ${MONTHS.map((m, i) => `<button type="button" class="ae-mchip${(form.defaultMonths || []).includes(i) ? ' on' : ''}" data-m="${i}">${m.slice(0,3)}</button>`).join('')}
+        </div>
+        <label class="ae-follows">
+          <input type="checkbox" id="ae-monthsFixed"${form.monthsFixed ? ' checked' : ''}>
+          Fixed — PMs can't change these months
+        </label>
+      </div>` : ''}
 
       <label class="ae-field ae-wide">
         <span>Applies to systems</span>
@@ -242,6 +250,10 @@ function buildEditor() {
     ${showTiers ? `
     <div class="ae-tiers">
       <div class="ae-tiers-head"><span>Options / Tiers</span><button class="ae-tier-add" id="ae-tier-add">+ Add option</button></div>
+      <label class="ae-follows" style="margin-bottom:10px;">
+        <input type="checkbox" id="ae-additive"${form.additive ? ' checked' : ''}>
+        PM enters a quantity for each option and they add up (instead of picking one)
+      </label>
       ${(form.options || []).map((o, i) => `
         <div class="ae-tier-row" data-i="${i}">
           <input class="ae-tier-label" data-i="${i}" type="text" value="${esc(o.label)}" placeholder="Label (e.g. Basic)">
@@ -297,7 +309,6 @@ function wireEditor() {
     updatePreview();
   });
   bind('ae-baseFee', 'baseFee');
-  bind('ae-billingStart', 'billingStart');
   bind('ae-costRaw', 'costRaw');
   bind('ae-yardiGL', 'yardiGL');
   bind('ae-onesiteGL', 'onesiteGL');
@@ -324,7 +335,23 @@ function wireEditor() {
     form.costBasis = e.target.value;
     buildEditor();
   });
-  document.getElementById('ae-billingStart')?.addEventListener('change', e => { form.billingStart = e.target.value; updatePreview(); });
+  // Default billing months
+  document.getElementById('ae-followsTransition')?.addEventListener('change', e => {
+    if (e.target.checked) { form.billingStart = 'When Implemented'; form.defaultMonths = []; }
+    else { form.billingStart = ''; }
+    buildEditor();
+  });
+  document.querySelectorAll('.ae-mchip').forEach(chip => chip.addEventListener('click', () => {
+    const m = +chip.dataset.m;
+    const arr = form.defaultMonths || [];
+    const idx = arr.indexOf(m);
+    if (idx >= 0) arr.splice(idx, 1); else arr.push(m);
+    form.defaultMonths = arr;
+    if (arr.length) { form.billingStart = ''; const ft = document.getElementById('ae-followsTransition'); if (ft) ft.checked = false; }
+    chip.classList.toggle('on');
+  }));
+  document.getElementById('ae-monthsFixed')?.addEventListener('change', e => { form.monthsFixed = e.target.checked; });
+  document.getElementById('ae-additive')?.addEventListener('change', e => { form.additive = e.target.checked; });
 
   // Systems checkboxes
   document.querySelectorAll('.ae-sys').forEach(cb => cb.addEventListener('change', () => {
@@ -383,7 +410,9 @@ function updatePreview() {
     }
     case 'Tiered': {
       const first = form.options[0] || {};
-      note = `${form.options.length} option(s). First: ${first.label || '—'} @ ${money(parseFloat(first.rate) || 0)}`;
+      note = form.additive
+        ? `${form.options.length} option(s), PM enters a qty for each and they sum. e.g. ${first.label || '—'} @ ${money(parseFloat(first.rate) || 0)} each`
+        : `Pick one of ${form.options.length} option(s). First: ${first.label || '—'} @ ${money(parseFloat(first.rate) || 0)}`;
       break;
     }
     case 'Manual':
@@ -435,9 +464,12 @@ async function save() {
     options: (form.costBasis === 'Tiered')
       ? form.options.filter(o => o.label).map(o => ({ label: o.label, rate: cleanNum(o.rate) || 0, type: o.type || 'flat' }))
       : [],
+    additive: form.costBasis === 'Tiered' ? !!form.additive : false,
     customFormula: isFormulaType(form.costBasis) ? (form.customFormula || null) : null,
     billingPeriod: form.billingPeriod,
     billingStart: form.billingStart || null,
+    defaultMonths: (Array.isArray(form.defaultMonths) && form.defaultMonths.length) ? form.defaultMonths.slice().sort((a, b) => a - b) : null,
+    monthsFixed: !!form.monthsFixed,
     systems: (Array.isArray(form.systems) && form.systems.length) ? form.systems : ['Yardi', 'OneSite', 'PaceOneSite'],
     setupFee: form.setupFee || null,
     priorYearNote: form.priorYearNote || null,

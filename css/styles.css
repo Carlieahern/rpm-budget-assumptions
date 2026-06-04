@@ -2713,6 +2713,23 @@ body {
 }
 .ae-field input:focus, .ae-field select:focus, .ae-field textarea:focus { outline: none; border-color: var(--copper); }
 
+/* Admin month chips + toggles */
+.ae-follows { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text2); cursor: pointer; }
+.ae-follows input { accent-color: var(--copper); }
+.ae-month-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.ae-mchip {
+  background: #fff; border: 1.5px solid var(--border); border-radius: 16px;
+  padding: 5px 11px; font-size: 12px; font-weight: 600; color: var(--text2);
+  cursor: pointer; font-family: inherit;
+}
+.ae-mchip.on { background: var(--copper); color: #fff; border-color: var(--copper); }
+
+/* Additive tiered rows on the card */
+.addrows { display: flex; flex-direction: column; gap: 8px; }
+.addrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.addrow-label { font-size: 14px; color: #fff; font-weight: 500; }
+.addrow-total { font-size: 14px; font-weight: 700; color: #fff; margin-left: auto; }
+
 .ae-systems { display: flex; gap: 8px; flex-wrap: wrap; }
 .ae-sys-chip {
   display: inline-flex;

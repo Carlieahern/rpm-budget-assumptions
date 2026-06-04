@@ -19,7 +19,8 @@ const S = {
   unitCount:       0,     // global property unit count, pre-fills all per-unit inputs
   transitionMonth: null,  // 0-11 if site transitioned mid-year; null = established (all year)
   quantities:      {},    // programId → per-card override quantity
-  selectedTiers:   {},    // programId → selected tier index for tiered costs
+  selectedTiers:   {},    // programId → selected tier index for tiered costs (pick-one mode)
+  optionQty:       {},    // programId → [qty per option] for additive tiered costs
   budgetAmounts:   {},    // programId → manual dollar amount (fallback for complex costs)
   incurMonths:     {},    // programId → [month indices] for as-incurred programs
   currentOptOutId: null,
@@ -150,6 +151,7 @@ async function launchMain() {
     S.transitionMonth = (savedTrans === null || savedTrans === '') ? null : parseInt(savedTrans);
     try { S.quantities    = JSON.parse(localStorage.getItem(`rpm_qty_${S.property}_${S.budgetYear}`))   || {}; } catch { S.quantities    = {}; }
     try { S.selectedTiers = JSON.parse(localStorage.getItem(`rpm_tiers_${S.property}_${S.budgetYear}`)) || {}; } catch { S.selectedTiers = {}; }
+    try { S.optionQty     = JSON.parse(localStorage.getItem(`rpm_optqty_${S.property}_${S.budgetYear}`)) || {}; } catch { S.optionQty     = {}; }
     try { S.budgetAmounts = JSON.parse(localStorage.getItem(`rpm_budget_${S.property}_${S.budgetYear}`)) || {}; } catch { S.budgetAmounts = {}; }
     try { S.incurMonths   = JSON.parse(localStorage.getItem(`rpm_incur_${S.property}_${S.budgetYear}`))  || {}; } catch { S.incurMonths   = {}; }
 
@@ -212,9 +214,10 @@ function parseCostBasisInfo(program) {
       const tierPeriod = firstType === 'per-unit-month' ? 'month' : 'year';
       return {
         type: 'tiered',
-        tiers: opts.map(o => ({ label: o.label, rate: o.rate })),
+        tiers: opts.map(o => ({ label: o.label, rate: o.rate, type: o.type })),
         isPerUnit,
         isPerItem,
+        additive: !!program.additive,   // true → PM enters a qty per option, costs sum
         itemLabel: program.itemLabel || null,
         period: isPerUnit ? tierPeriod : period,
         rate: opts[0]?.rate ?? rate,
@@ -269,6 +272,11 @@ function resolvedCost(program) {
     }
 
     case 'tiered': {
+      if (info.additive) {
+        const qtys = S.optionQty[program.id] || [];
+        const sum  = (info.tiers || []).reduce((s, t, i) => s + (t.rate || 0) * (qtys[i] || 0), 0);
+        return program.billingPeriod === 'monthly' ? sum * 12 : sum;
+      }
       const tierRate = info.tiers?.[tierIdx]?.rate || 0;
       if (info.isPerUnit) {
         return info.period === 'month' ? tierRate * qty * 12 : tierRate * qty;
@@ -322,22 +330,27 @@ function defaultMonthsFor(program) {
 }
 
 function activeMonthsFor(program) {
-  // Explicit per-card override (also how as-incurred programs are set)
-  if (S.incurMonths[program.id]) return S.incurMonths[program.id].slice().sort((a, b) => a - b);
+  // Per-card override (also how as-incurred programs are set) — only if not locked
+  if (!program.monthsFixed && S.incurMonths[program.id]) {
+    return S.incurMonths[program.id].slice().sort((a, b) => a - b);
+  }
 
   const freq = (program.billingFreq || program.billingPeriod || '').toLowerCase();
   if (freq.includes('incurred')) return [];
 
-  // Does this item follow the property's transition (e.g. "When Implemented"),
-  // or is it pinned to a fixed calendar month (e.g. Annual Awards every December)?
   const followsTransition = /implement|transition|anniversar/i.test(program.billingStart || '');
-  let start = parseStartMonth(program.billingStart);
-  if (followsTransition && S.transitionMonth != null) start = S.transitionMonth;
 
-  let months = monthsForFrequency(freq, start);
+  // Admin-defined default months take precedence over frequency-derived ones
+  let months;
+  if (Array.isArray(program.defaultMonths) && program.defaultMonths.length) {
+    months = program.defaultMonths.slice();
+  } else {
+    let start = parseStartMonth(program.billingStart);
+    if (followsTransition && S.transitionMonth != null) start = S.transitionMonth;
+    months = monthsForFrequency(freq, start);
+  }
 
-  // Fixed calendar months: if a hit falls before the transition, the site
-  // missed it this year — drop it (don't shift it forward).
+  // Fixed calendar months: a hit before the transition was missed — drop it.
   if (!followsTransition && S.transitionMonth != null) {
     months = months.filter(m => m >= S.transitionMonth);
   }
@@ -459,6 +472,10 @@ function resolvedMonthlyCost(program) {
     case 'per-quantity': return info.rate * qty;
     case 'flat-per-unit': return info.baseFee + info.rate * qty;
     case 'tiered': {
+      if (info.additive) {
+        const qtys = S.optionQty[program.id] || [];
+        return (info.tiers || []).reduce((s, t, i) => s + (t.rate || 0) * (qtys[i] || 0), 0);
+      }
       const tierIdx  = S.selectedTiers[program.id] ?? 0;
       const tierRate = info.tiers?.[tierIdx]?.rate || 0;
       if (info.isPerUnit) return tierRate * qty;
@@ -752,7 +769,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   } else if (info.type === 'flat-per-unit') {
     subtitle = `${formatRate(info.baseFee)} base + ${formatRate(info.rate)} / unit`;
   } else if (info.type === 'tiered') {
-    subtitle = info.isPerUnit ? 'Select tier · per unit' : 'Select one';
+    subtitle = info.additive ? 'Enter quantities' : (info.isPerUnit ? 'Select tier · per unit' : 'Select one');
   } else if (info.type === 'custom') {
     subtitle = 'Custom calculation';
   }
@@ -775,23 +792,44 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     const perSuffix = info.isPerUnit
       ? (info.period === 'month' ? '/unit/mo' : '/unit/yr')
       : (program.billingPeriod === 'monthly' ? '/mo' : '/yr');
-    const tiersHtml = (info.tiers || []).map((t, i) => `
-      <label class="tier-option${i === tierIdx ? ' is-selected' : ''}">
-        <input type="radio" class="tier-radio" name="tier_${program.id}" data-pid="${program.id}" data-tier="${i}"${i === tierIdx ? ' checked' : ''}>
-        <span class="tier-label">${t.label} <span class="tier-rate">(${formatRate(t.rate)}${perSuffix})</span></span>
-      </label>`).join('');
-    const qtyField = info.isPerUnit ? `
-      <div class="card-calc">
-        <span class="calc-x">×</span>
-        <div class="qty-field">
-          <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
-        </div>
-        <span class="qty-label">Units</span>
-      </div>` : '';
-    bodyHtml = `
-      <div class="tier-select-label">${info.isPerUnit ? 'Select a tier' : 'Select one'}</div>
-      <div class="tier-options">${tiersHtml}</div>
-      ${qtyField}`;
+
+    if (info.additive) {
+      // Each option gets its own quantity; costs add up
+      const qtys = S.optionQty[program.id] || [];
+      const rows = (info.tiers || []).map((t, i) => {
+        const rowTotal = (t.rate || 0) * (qtys[i] || 0);
+        return `
+        <div class="addrow">
+          <span class="addrow-label">${t.label} <span class="tier-rate">${formatRate(t.rate)}${perSuffix}</span></span>
+          <span class="qty-sep">×</span>
+          <div class="qty-field">
+            <input class="opt-qty-input" data-pid="${program.id}" data-opt="${i}" type="number" min="0" placeholder="0" value="${qtys[i] || ''}">
+          </div>
+          ${qtys[i] ? `<span class="addrow-total">= ${formatCost(rowTotal)}</span>` : ''}
+        </div>`;
+      }).join('');
+      bodyHtml = `
+        <div class="tier-select-label">Enter the quantity you anticipate for each</div>
+        <div class="addrows">${rows}</div>`;
+    } else {
+      const tiersHtml = (info.tiers || []).map((t, i) => `
+        <label class="tier-option${i === tierIdx ? ' is-selected' : ''}">
+          <input type="radio" class="tier-radio" name="tier_${program.id}" data-pid="${program.id}" data-tier="${i}"${i === tierIdx ? ' checked' : ''}>
+          <span class="tier-label">${t.label} <span class="tier-rate">(${formatRate(t.rate)}${perSuffix})</span></span>
+        </label>`).join('');
+      const qtyField = info.isPerUnit ? `
+        <div class="card-calc">
+          <span class="calc-x">×</span>
+          <div class="qty-field">
+            <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
+          </div>
+          <span class="qty-label">Units</span>
+        </div>` : '';
+      bodyHtml = `
+        <div class="tier-select-label">${info.isPerUnit ? 'Select a tier' : 'Select one'}</div>
+        <div class="tier-options">${tiersHtml}</div>
+        ${qtyField}`;
+    }
 
   } else if (info.type === 'flat-per-unit') {
     bodyHtml = `
@@ -830,21 +868,23 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   const freqStr      = (program.billingFreq || program.billingPeriod || '').toLowerCase();
   const isAsIncurred = freqStr.includes('incurred') || freqStr.includes('implement');
   const isRecurring  = /monthly|quarter|annual|bi-/.test(freqStr);
-  const monthChipStrip = (preset) => MONTH_NAMES.map((m, i) =>
-    `<button type="button" class="incur-chip${preset.includes(i) ? ' on' : ''}" data-month="${i}">${m}</button>`
+  const locked       = !!program.monthsFixed;
+  const monthChipStrip = (preset, isLocked) => MONTH_NAMES.map((m, i) =>
+    `<button type="button" class="incur-chip${preset.includes(i) ? ' on' : ''}${isLocked ? ' is-static' : ''}" data-month="${i}"${isLocked ? ' disabled' : ''}>${m}</button>`
   ).join('');
 
   if (isAsIncurred) {
     bodyHtml += `
       <div class="incur-months">
         <div class="incur-label">Expected in which months?</div>
-        <div class="incur-chips">${monthChipStrip(S.incurMonths[program.id] || [])}</div>
+        <div class="incur-chips">${monthChipStrip(S.incurMonths[program.id] || [], false)}</div>
       </div>`;
   } else if (isRecurring) {
+    const note = locked ? ' · 🔒 fixed' : (S.transitionMonth != null ? ' · transition applied' : '');
     bodyHtml += `
       <div class="incur-months">
-        <div class="incur-label">Billing months${S.transitionMonth != null ? ' · transition applied' : ''}</div>
-        <div class="incur-chips">${monthChipStrip(activeMonthsFor(program))}</div>
+        <div class="incur-label">Billing months${note}</div>
+        <div class="incur-chips">${monthChipStrip(activeMonthsFor(program), locked)}</div>
       </div>`;
   }
 
@@ -965,6 +1005,29 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
         opt.classList.toggle('is-selected', i === S.selectedTiers[program.id])
       );
       refreshHero();
+    });
+  });
+
+  // ── Per-option quantity inputs (additive tiered) ──────────────────────────
+  el.querySelectorAll('.opt-qty-input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      e.stopPropagation();
+      const i   = parseInt(e.target.dataset.opt);
+      const arr = S.optionQty[program.id] || [];
+      arr[i] = parseInt(e.target.value) || 0;
+      S.optionQty[program.id] = arr;
+      localStorage.setItem(`rpm_optqty_${S.property}_${S.budgetYear}`, JSON.stringify(S.optionQty));
+      updateBudgetTotal();
+      refreshHero();
+      // update this row's inline total
+      const row = e.target.closest('.addrow');
+      let tot = row?.querySelector('.addrow-total');
+      const info2 = parseCostBasisInfo(program);
+      const rowTotal = (info2.tiers?.[i]?.rate || 0) * (arr[i] || 0);
+      if (arr[i]) {
+        if (!tot) { tot = document.createElement('span'); tot.className = 'addrow-total'; row.appendChild(tot); }
+        tot.textContent = `= ${formatCost(rowTotal)}`;
+      } else if (tot) { tot.remove(); }
     });
   });
 
@@ -1190,10 +1253,12 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
     S.decisions      = {};
     S.quantities     = {};   // per-card overrides cleared; S.unitCount preserved
     S.selectedTiers  = {};
+    S.optionQty      = {};
     S.budgetAmounts  = {};
     S.incurMonths    = {};
     localStorage.removeItem(`rpm_qty_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_tiers_${S.property}_${S.budgetYear}`);
+    localStorage.removeItem(`rpm_optqty_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_budget_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_incur_${S.property}_${S.budgetYear}`);
     renderMainScreen();
