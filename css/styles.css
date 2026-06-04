@@ -576,6 +576,8 @@ body {
   transition: background 0.15s;
 }
 .icon-btn:hover { background: rgba(255,255,255,0.2); }
+.icon-btn.spinning svg { animation: icon-spin 0.8s linear infinite; }
+@keyframes icon-spin { to { transform: rotate(360deg); } }
 
 /* ─── Main Screen & Header ─── */
 .screen-main {

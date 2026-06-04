@@ -483,17 +483,16 @@ function heroSuffix(program) {
 
 function updateBudgetTotal() {
   let annual = 0;
-  let monthly = 0;
   S.programs.forEach(p => {
     const dec = S.decisions[p.id]?.decision;
     const included = p.required
       ? dec !== 'opted-out' && dec !== 'not-applicable'
       : dec === 'in';
     if (included) {
-      annual  += proratedAnnual(p);          // respects transition / active months
-      monthly += resolvedMonthlyCost(p);     // steady monthly run-rate (per active month)
+      annual += proratedAnnual(p);           // respects transition / active months
     }
   });
+  const monthly = annual / 12;               // true average per month — moves with month selection
   animateCost(document.getElementById('budget-total'),  annual);
   animateCost(document.getElementById('monthly-total'), monthly);
   if (monthlyExpanded) renderMonthlyBreakdown();
@@ -1148,6 +1147,14 @@ document.getElementById('mi-refresh-data').addEventListener('click', async () =>
   clearFirebaseCache();
   showScreen('screen-loading');
   await launchMain(); // re-fetches everything fresh
+});
+
+// Quick refresh button in the header — pull latest program edits from Firebase
+document.getElementById('btn-refresh').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-refresh');
+  btn.classList.add('spinning');
+  clearFirebaseCache();
+  try { await launchMain(); } finally { btn.classList.remove('spinning'); }
 });
 
 document.getElementById('mi-change-property').addEventListener('click', () => {
