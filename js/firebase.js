@@ -92,6 +92,32 @@ export async function fetchPrograms(forceRefresh = false) {
   return programs;
 }
 
+// ── Admin: raw read / write to Firebase ────────────────────────────────────────
+// Returns the raw program objects (not the app-shaped version) keyed by id.
+export async function fetchRawPrograms() {
+  const res = await fetch(`${CONFIG.firebase.url}/programs.json`);
+  if (!res.ok) throw new Error(`Firebase error: ${res.status}`);
+  return (await res.json()) || {};
+}
+
+export async function saveProgram(id, data) {
+  const res = await fetch(`${CONFIG.firebase.url}/programs/${id}.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Save failed: ${res.status}`);
+  clearFirebaseCache();
+  return true;
+}
+
+export async function deleteProgram(id) {
+  const res = await fetch(`${CONFIG.firebase.url}/programs/${id}.json`, { method: 'DELETE' });
+  if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+  clearFirebaseCache();
+  return true;
+}
+
 // ── Filter programs by selected system type ────────────────────────────────────
 // Programs with no cost (Manual) are shown for every system.
 // Programs with a cost only show for systems where it's non-zero.

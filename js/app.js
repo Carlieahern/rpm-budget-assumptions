@@ -4,6 +4,7 @@ import { fetchPrograms, filterBySystem, clearFirebaseCache } from './firebase.js
 import { loadDecisions, saveDecision, deleteDecision, resetDecisions, loadPriorYearDecisions } from './sharepoint.js';
 import { showScreen, openModal, closeModal, groupStyle, formatCost, formatRate,
          renderSummary, populatePropertySelect } from './ui.js';
+import { initAdmin } from './admin.js';
 
 // ── App State ───────────────────────────────────────────────────────────────
 const S = {
@@ -1098,4 +1099,5 @@ document.querySelectorAll('.overlay').forEach(overlay => {
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
+initAdmin();
 boot();

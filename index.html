@@ -8,7 +8,7 @@
   <title>RPM Budget Assumptions</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=14">
+  <link rel="stylesheet" href="css/styles.css?v=15">
 </head>
 <body>
 <div id="app">
@@ -111,6 +111,7 @@
       <!-- Skip link -->
       <div class="setup-skip">
         <button id="btn-skip" class="btn-skip">Skip property selection — just browse by system</button>
+        <button id="btn-admin-entry" class="btn-skip btn-admin-entry">Admin</button>
       </div>
 
     </div>
@@ -211,6 +212,42 @@
     <div id="summary-body"></div>
   </div>
 
+  <!-- ── Admin ── -->
+  <div id="screen-admin" class="screen screen-pad admin-screen">
+    <div class="admin-bar">
+      <button class="btn-back" id="btn-admin-back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Exit Admin
+      </button>
+      <h2>Program Admin</h2>
+      <button class="btn-primary admin-add-btn" id="btn-admin-add">+ Add Program</button>
+    </div>
+    <div class="admin-user-note" id="admin-user-note"></div>
+    <div id="admin-list"></div>
+  </div>
+
+</div>
+
+<!-- ── Modal: Admin Login ── -->
+<div class="overlay" id="modal-admin-login">
+  <div class="sheet">
+    <h3>Admin Access</h3>
+    <p>Enter your name and the admin passcode to edit programs.</p>
+    <input class="admin-field" id="admin-name" type="text" placeholder="Your name" autocomplete="off">
+    <input class="admin-field" id="admin-pass" type="password" placeholder="Passcode" autocomplete="off">
+    <div class="admin-login-error" id="admin-login-error"></div>
+    <div class="sheet-actions">
+      <button class="btn-primary" id="btn-admin-login">Enter</button>
+      <button class="btn-ghost" id="btn-admin-login-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Admin Program Editor ── -->
+<div class="overlay" id="modal-admin-editor">
+  <div class="sheet sheet-wide">
+    <div id="admin-editor-body"></div>
+  </div>
 </div>
 
 <!-- ── Modal: Opt Out ── -->
@@ -318,6 +355,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=14"></script>
+<script type="module" src="js/app.js?v=15"></script>
 </body>
 </html>
