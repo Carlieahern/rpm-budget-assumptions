@@ -379,6 +379,17 @@ function resolvedMonthlyCost(program) {
   }
 }
 
+// The big number shown at the top-right of each card.
+// Monthly-billed programs show their monthly figure; everything else shows annual.
+function heroCost(program) {
+  const isMonthly = program.billingPeriod === 'monthly';
+  const v = isMonthly ? resolvedMonthlyCost(program) : resolvedCost(program);
+  return v > 0 ? formatCost(v) : '—';
+}
+function heroSuffix(program) {
+  return program.billingPeriod === 'monthly' ? '/mo' : '/yr';
+}
+
 function updateBudgetTotal() {
   let annual = 0;
   let monthly = 0;
@@ -557,8 +568,8 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     : '';
 
   const resourceLink = program.resourceUrl
-    ? `<a class="prog-card-resource" href="${program.resourceUrl}" target="_blank" rel="noopener">📖 Learn More</a>`
-    : `<a class="prog-card-resource prog-card-resource-placeholder" href="#" onclick="return false;">📖 Learn More</a>`;
+    ? `<a class="card-guide-link" href="${program.resourceUrl}" target="_blank" rel="noopener">Click here for the program guide →</a>`
+    : `<a class="card-guide-link is-placeholder" href="#" onclick="return false;">Program guide coming soon</a>`;
 
   let actionHtml;
   if (isRequired) {
@@ -570,170 +581,154 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
         <button class="btn-card-ghost btn-undo-optout" data-pid="${program.id}">Undo</button>`;
     } else if (dec === 'needs-followup') {
       actionHtml = `
-        <span class="card-status-badge status-followup">⚑ Follow-up Needed</span>
+        <span class="card-status-badge status-followup">⚑ Follow-up</span>
         <button class="btn-card-ghost btn-opt-out-trigger" data-pid="${program.id}">Opt Out</button>`;
     } else if (dec === 'acknowledged') {
       actionHtml = `
         <span class="card-status-badge status-acknowledged">✓ Acknowledged</span>
-        <button class="btn-card-ghost btn-undo-acknowledge" data-pid="${program.id}">Undo</button>
-        <button class="btn-card-ghost btn-opt-out-trigger" data-pid="${program.id}">Opt Out</button>`;
+        <button class="btn-card-ghost btn-undo-acknowledge" data-pid="${program.id}">Undo</button>`;
     } else {
       actionHtml = `
         <button class="btn-card-ghost btn-opt-out-trigger" data-pid="${program.id}">Opt Out</button>
-        <button class="btn-card-acknowledge btn-acknowledge" data-pid="${program.id}">Acknowledge</button>`;
+        <button class="btn-card-fill btn-acknowledge" data-pid="${program.id}">Acknowledge</button>`;
     }
   } else {
     if (dec === 'in') {
       actionHtml = `
-        <button class="btn-card-include is-included btn-include" data-pid="${program.id}">✓ Included</button>
-        <button class="btn-card-exclude btn-exclude" data-pid="${program.id}" title="Don't include">✕</button>`;
+        <span class="card-status-badge status-acknowledged">✓ Included</span>
+        <button class="btn-card-ghost btn-exclude" data-pid="${program.id}">Remove</button>`;
     } else if (dec === 'out') {
-      actionHtml = `<button class="btn-card-include btn-include" data-pid="${program.id}">Include</button>`;
+      actionHtml = `<button class="btn-card-fill btn-include" data-pid="${program.id}">Include</button>`;
     } else {
       actionHtml = `
-        <button class="btn-card-include btn-include" data-pid="${program.id}">Include</button>
-        <button class="btn-card-exclude btn-exclude" data-pid="${program.id}">Don't Include</button>`;
+        <button class="btn-card-ghost btn-exclude" data-pid="${program.id}">Exclude</button>
+        <button class="btn-card-fill btn-include" data-pid="${program.id}">Include</button>`;
     }
   }
 
   const excludedOverlay = (!isRequired && dec === 'out')
     ? `<div class="excluded-overlay">Not Including</div>` : '';
 
-  // ── Smart cost interaction ────────────────────────────────────────────────
-  const info     = parseCostBasisInfo(program);
-  const qty      = effectiveQty(program, info);
-  const tierIdx  = S.selectedTiers[program.id] ?? 0;
-  const total    = resolvedCost(program);
-  const totalStr = total > 0 ? formatCost(total) + '/yr' : '';
+  // ── Cost descriptor ───────────────────────────────────────────────────────
+  const info    = parseCostBasisInfo(program);
+  const qty     = effectiveQty(program, info);
+  const tierIdx = S.selectedTiers[program.id] ?? 0;
 
-  // Raw Monday description — always shown for context
-  const costRawHtml = program.costRaw
-    ? `<div class="cost-raw-text">${program.costRaw}</div>`
-    : '';
+  // Subtitle line under the program name — the rate basis
+  let subtitle = '';
+  if (info.type === 'per-unit' || info.type === 'per-quantity') {
+    subtitle = `${formatCost(info.rate)} / ${info.label.toLowerCase()}`;
+  } else if (info.type === 'flat') {
+    subtitle = 'Flat fee';
+  } else if (info.type === 'flat-per-unit') {
+    subtitle = `${formatCost(info.baseFee)} base + ${formatCost(info.rate)} / unit`;
+  } else if (info.type === 'tiered') {
+    subtitle = info.isPerUnit ? 'Select tier · per unit' : 'Select one';
+  }
 
-  let costInteractionHtml = '';
+  // Card body — interactive cost controls
+  let bodyHtml = '';
 
-  if (info.type === 'flat') {
-    costInteractionHtml = `
-      <div class="cost-interaction">
-        <span class="cost-parsed-rate">${formatCost(info.rate)}</span>
-        <span class="cost-basis-tag">Flat</span>
-      </div>`;
-
-  } else if (info.type === 'per-unit' || info.type === 'per-quantity') {
-    const period = info.period === 'month' ? '/mo' : '/yr';
-    costInteractionHtml = `
-      <div class="cost-interaction">
-        <div class="qty-calc-row">
-          <span class="cost-parsed-rate">${formatCost(info.rate)}<span class="cost-basis-tag">/${info.label.toLowerCase()}${period}</span></span>
-          <span class="qty-sep">×</span>
-          <div class="qty-field">
-            <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
-            <span class="qty-label">${info.plural}</span>
-          </div>
-          ${qty > 0 ? `<span class="qty-equals">= <strong>${totalStr}</strong></span>` : ''}
+  if (info.type === 'per-unit' || info.type === 'per-quantity') {
+    bodyHtml = `
+      <div class="card-calc">
+        <span class="calc-rate">${formatCost(info.rate)}</span>
+        <span class="calc-x">×</span>
+        <div class="qty-field">
+          <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
+          <span class="qty-label">${info.plural}</span>
         </div>
       </div>`;
 
   } else if (info.type === 'tiered') {
+    const perSuffix = info.isPerUnit
+      ? (info.period === 'month' ? '/unit/mo' : '/unit/yr')
+      : (program.billingPeriod === 'monthly' ? '/mo' : '/yr');
     const tiersHtml = (info.tiers || []).map((t, i) => `
       <label class="tier-option${i === tierIdx ? ' is-selected' : ''}">
         <input type="radio" class="tier-radio" name="tier_${program.id}" data-pid="${program.id}" data-tier="${i}"${i === tierIdx ? ' checked' : ''}>
-        <span class="tier-label">${t.label}</span>
-        <span class="tier-rate">${formatCost(t.rate)}${info.isPerUnit ? (info.period === 'month' ? '/unit/mo' : '/unit/yr') : '/yr'}</span>
+        <span class="tier-label">${t.label} <span class="tier-rate">(${formatCost(t.rate)}${perSuffix})</span></span>
       </label>`).join('');
-    const qtySection = info.isPerUnit ? `
-      <div class="qty-calc-row">
-        <span class="qty-sep">×</span>
+    const qtyField = info.isPerUnit ? `
+      <div class="card-calc">
+        <span class="calc-x">×</span>
         <div class="qty-field">
           <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
           <span class="qty-label">Units</span>
         </div>
-        ${qty > 0 ? `<span class="qty-equals">= <strong>${totalStr}</strong></span>` : ''}
-      </div>` : (total > 0 ? `<div class="qty-calc-row"><span class="qty-equals"><strong>${totalStr}</strong></span></div>` : '');
-    costInteractionHtml = `
-      <div class="cost-interaction tiered">
-        <div class="tier-options">${tiersHtml}</div>
-        ${qtySection}
-      </div>`;
+      </div>` : '';
+    bodyHtml = `
+      <div class="tier-select-label">${info.isPerUnit ? 'Select a tier' : 'Select one'}</div>
+      <div class="tier-options">${tiersHtml}</div>
+      ${qtyField}`;
 
   } else if (info.type === 'flat-per-unit') {
-    const period      = info.period === 'month' ? '/mo' : '/yr';
-    const perUnitLine = info.period === 'month'
-      ? `${formatCost(info.rate)}/unit/mo`
-      : `${formatCost(info.rate)}/unit/yr`;
-    const perUnitTotal = info.period === 'month'
-      ? info.rate * qty * 12
-      : info.rate * qty;
-    costInteractionHtml = `
-      <div class="cost-interaction flat-per-unit">
-        <div class="flat-per-unit-row">
-          <span class="fpu-label">Base fee</span>
-          <span class="fpu-value">${formatCost(info.baseFee)}</span>
+    bodyHtml = `
+      <div class="card-calc">
+        <span class="calc-rate">${formatCost(info.baseFee)} base</span>
+        <span class="calc-x">+</span>
+        <span class="calc-rate">${formatCost(info.rate)}/unit</span>
+        <span class="calc-x">×</span>
+        <div class="qty-field">
+          <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
+          <span class="qty-label">Units</span>
         </div>
-        <div class="flat-per-unit-row">
-          <span class="fpu-label">${perUnitLine}</span>
-          <span class="qty-sep">×</span>
-          <div class="qty-field">
-            <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
-            <span class="qty-label">Units</span>
-          </div>
-          ${qty > 0 ? `<span class="fpu-value">${formatCost(perUnitTotal)}</span>` : ''}
-        </div>
-        ${qty > 0 ? `<div class="fpu-total-row"><span class="fpu-total-label">Total</span><span class="fpu-total-value"><strong>${formatCost(info.baseFee + perUnitTotal)}/yr</strong></span></div>` : ''}
       </div>`;
 
-  } else {
-    // Manual — PM enters dollar amount
+  } else if (info.type === 'manual') {
     const savedAmt = S.budgetAmounts[program.id];
-    costInteractionHtml = `
-      <div class="cost-interaction manual">
-        <div class="budget-input-row">
-          <span class="budget-input-label">Budget&nbsp;$</span>
-          <input class="budget-input" data-pid="${program.id}" type="number" min="0" step="1"
-                 placeholder="Enter amount" value="${savedAmt !== undefined ? savedAmt : ''}">
-          ${program.costRaw ? `<span class="cost-basis-tag" title="${program.costRaw}">ⓘ</span>` : ''}
-        </div>
+    bodyHtml = `
+      <div class="card-calc">
+        <span class="budget-input-label">Budget&nbsp;$</span>
+        <input class="budget-input" data-pid="${program.id}" type="number" min="0" step="1"
+               placeholder="Enter amount" value="${savedAmt !== undefined ? savedAmt : ''}">
       </div>`;
   }
 
-  const priorCostHtml = program.priorYearCost
-    ? `<span class="prog-card-prior-cost">Prior year: ${formatCost(program.priorYearCost)}</span>`
-    : '';
-
-  const ownerHtml = program.programOwner
-    ? `<span class="prog-card-owner">Owner: ${program.programOwner}</span>`
-    : '';
-
-  const billingHtml = program.billingFreq
-    ? `<span class="prog-card-billing">${program.billingFreq}</span>`
-    : '';
-
-  const dnaHtml = isRequired ? `
-    <label class="dna-row">
+  const dnaCorner = isRequired ? `
+    <label class="dna-corner" title="Does not apply to this property">
       <input type="checkbox" class="dna-check" data-pid="${program.id}"${dec === 'not-applicable' ? ' checked' : ''}>
-      <span class="dna-text">Does Not Apply to This Property</span>
+      <span>Does not apply<br>to this property</span>
     </label>` : '';
+
+  const heroV = heroCost(program);
 
   el.innerHTML = `
     ${excludedOverlay}
-    <div class="prog-card-top">
-      <div class="prog-card-name">${program.name}</div>
+    <div class="card-head">
+      <div class="card-head-main">
+        <h3 class="prog-card-name">${program.name}</h3>
+        ${program.programOwner ? `<div class="card-owner">${program.programOwner}</div>` : ''}
+        ${subtitle ? `<div class="card-rate-basis">${subtitle}</div>` : ''}
+      </div>
+      <div class="card-head-side">
+        ${dnaCorner}
+        <div class="card-gl">GL: ${program.glCode}</div>
+        ${program.billingFreq ? `<div class="card-billing">${program.billingFreq}</div>` : ''}
+        <div class="card-cost-hero">
+          <span class="cost-hero-num">${heroV}</span><span class="cost-hero-period">${heroSuffix(program)}</span>
+        </div>
+      </div>
+    </div>
+    ${bodyHtml ? '<div class="card-divider"></div>' : ''}
+    ${bodyHtml}
+    <div class="card-foot">
+      <button class="details-toggle" type="button">▾ Details</button>
       <div class="prog-card-action">${actionHtml}</div>
     </div>
-    ${costRawHtml}
-    ${costInteractionHtml}
-    <div class="prog-card-meta-row">
-      <span class="prog-card-gl">GL ${program.glCode}</span>
-      ${billingHtml}
-      ${ownerHtml}
-      ${priorCostHtml}
+    <div class="card-details-panel">
       ${resourceLink}
+      ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
+      ${program.setupFee ? `<div class="card-setup-fee">Setup: ${program.setupFee}</div>` : ''}
+      ${priorChip}
     </div>
-    ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
-    ${priorChip}
-    ${dnaHtml}
   `;
+
+  // Details collapsible
+  el.querySelector('.details-toggle')?.addEventListener('click', e => {
+    e.stopPropagation();
+    el.classList.toggle('details-open');
+  });
 
   el.addEventListener('click', e => {
     if (e.target.closest('.btn-opt-out-trigger'))  openOptOutModal(program.id);
@@ -762,6 +757,11 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   }
 
   // ── Quantity input (per-unit / per-quantity / tiered with units) ─────────────
+  const refreshHero = () => {
+    const heroEl = el.querySelector('.cost-hero-num');
+    if (heroEl) heroEl.textContent = heroCost(program);
+  };
+
   const qtyInput = el.querySelector('.qty-input');
   if (qtyInput) {
     qtyInput.addEventListener('input', e => {
@@ -769,15 +769,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       S.quantities[program.id] = parseInt(e.target.value) || 0;
       localStorage.setItem(`rpm_qty_${S.property}_${S.budgetYear}`, JSON.stringify(S.quantities));
       updateBudgetTotal();
-      const t      = resolvedCost(program);
-      const eqEl   = el.querySelector('.qty-equals');
-      const hasQty = S.quantities[program.id] > 0;
-      if (eqEl) {
-        eqEl.innerHTML = hasQty ? `= <strong>${formatCost(t)}/yr</strong>` : '';
-      } else if (hasQty) {
-        const field = el.querySelector('.qty-field');
-        if (field) { const s = document.createElement('span'); s.className = 'qty-equals'; s.innerHTML = `= <strong>${formatCost(t)}/yr</strong>`; field.after(s); }
-      }
+      refreshHero();
     });
   }
 
@@ -791,9 +783,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       el.querySelectorAll('.tier-option').forEach((opt, i) =>
         opt.classList.toggle('is-selected', i === S.selectedTiers[program.id])
       );
-      const t = resolvedCost(program);
-      const eqEl = el.querySelector('.qty-equals');
-      if (eqEl) eqEl.innerHTML = t > 0 ? `= <strong>${formatCost(t)}/yr</strong>` : '';
+      refreshHero();
     });
   });
 
@@ -807,6 +797,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       else { delete S.budgetAmounts[program.id]; }
       localStorage.setItem(`rpm_budget_${S.property}_${S.budgetYear}`, JSON.stringify(S.budgetAmounts));
       updateBudgetTotal();
+      refreshHero();
     });
   }
 
