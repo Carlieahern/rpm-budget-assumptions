@@ -50,6 +50,29 @@
               <span class="unit-count-suffix">units</span>
             </div>
             <p class="unit-count-hint">Pre-fills per-unit calculations. Adjustable per card.</p>
+
+            <label class="unit-count-label" for="transition-select" style="margin-top:16px;">
+              Transition month <span class="label-soft">— leave blank if established</span>
+            </label>
+            <div class="select-wrap select-wrap-sm">
+              <select id="transition-select" class="field-select">
+                <option value="">Established — bills all year</option>
+                <option value="0">January</option>
+                <option value="1">February</option>
+                <option value="2">March</option>
+                <option value="3">April</option>
+                <option value="4">May</option>
+                <option value="5">June</option>
+                <option value="6">July</option>
+                <option value="7">August</option>
+                <option value="8">September</option>
+                <option value="9">October</option>
+                <option value="10">November</option>
+                <option value="11">December</option>
+              </select>
+              <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <p class="unit-count-hint">If the site transitioned mid-year, recurring costs only count from that month on.</p>
           </div>
         </div>
 
@@ -247,13 +270,33 @@
 <!-- ── Modal: Edit Unit Count ── -->
 <div class="overlay" id="modal-units">
   <div class="sheet">
-    <h3>Property Unit Count</h3>
-    <p>Update the number of units for <strong id="units-modal-prop">this property</strong>. All per-unit calculations will update automatically.</p>
-    <div class="unit-count-field" style="margin: 20px 0 8px;">
+    <h3>Property Details</h3>
+    <p>Update <strong id="units-modal-prop">this property</strong>. Per-unit costs and billing months recalculate automatically.</p>
+    <label class="unit-count-label">Unit count</label>
+    <div class="unit-count-field" style="margin: 6px 0 16px;">
       <input type="number" id="units-modal-input" class="unit-count-input" min="1" step="1" placeholder="e.g. 248">
       <span class="unit-count-suffix">units</span>
     </div>
-    <div class="sheet-actions">
+    <label class="unit-count-label" for="units-modal-transition">Transition month <span class="label-soft">— blank if established</span></label>
+    <div class="select-wrap select-wrap-sm" style="margin-top:6px;">
+      <select id="units-modal-transition" class="field-select">
+        <option value="">Established — bills all year</option>
+        <option value="0">January</option>
+        <option value="1">February</option>
+        <option value="2">March</option>
+        <option value="3">April</option>
+        <option value="4">May</option>
+        <option value="5">June</option>
+        <option value="6">July</option>
+        <option value="7">August</option>
+        <option value="8">September</option>
+        <option value="9">October</option>
+        <option value="10">November</option>
+        <option value="11">December</option>
+      </select>
+      <svg class="select-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="sheet-actions" style="margin-top:20px;">
       <button class="btn-primary" id="btn-units-save">Update</button>
       <button class="btn-ghost" id="btn-units-cancel">Cancel</button>
     </div>

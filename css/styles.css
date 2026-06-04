@@ -2353,8 +2353,13 @@ body {
 }
 .budget-input::placeholder { color: rgba(27,42,74,0.35); font-weight: 500; }
 
-/* ── As-incurred month picker ── */
+/* ── Setup transition select helpers ── */
+.label-soft { font-weight: 400; color: var(--text3); font-size: 0.85em; }
+.select-wrap-sm .field-select { padding: 10px 40px 10px 14px; font-size: 14px; }
+
+/* ── Month picker (as-incurred + per-card billing months) ── */
 .incur-months { margin-top: 4px; }
+.months-detail { margin-top: 12px; }
 .incur-label {
   font-size: 13px;
   font-style: italic;

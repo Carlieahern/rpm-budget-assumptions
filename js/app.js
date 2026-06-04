@@ -16,6 +16,7 @@ const S = {
   decisions:       {},    // programId → { itemId, decision, optOutApproval, ... }
   priorDecisions:  {},
   unitCount:       0,     // global property unit count, pre-fills all per-unit inputs
+  transitionMonth: null,  // 0-11 if site transitioned mid-year; null = established (all year)
   quantities:      {},    // programId → per-card override quantity
   selectedTiers:   {},    // programId → selected tier index for tiered costs
   budgetAmounts:   {},    // programId → manual dollar amount (fallback for complex costs)
@@ -73,6 +74,8 @@ document.getElementById('property-select').addEventListener('change', e => {
     row.classList.remove('hidden');
     const saved = parseInt(localStorage.getItem(`rpm_units_${e.target.value}`)) || 0;
     input.value = saved || '';
+    const savedTrans = localStorage.getItem(`rpm_transition_${e.target.value}`);
+    document.getElementById('transition-select').value = (savedTrans === null) ? '' : savedTrans;
   } else {
     row.classList.add('hidden');
   }
@@ -83,6 +86,12 @@ document.getElementById('unit-count-input').addEventListener('input', e => {
   const prop = document.getElementById('property-select').value;
   const val  = parseInt(e.target.value) || 0;
   if (prop) localStorage.setItem(`rpm_units_${prop}`, val);
+});
+
+// Save transition month on change
+document.getElementById('transition-select').addEventListener('change', e => {
+  const prop = document.getElementById('property-select').value;
+  if (prop) localStorage.setItem(`rpm_transition_${prop}`, e.target.value);
 });
 
 // Mode tiles — select but stay on screen
@@ -136,6 +145,8 @@ async function launchMain() {
 
     // Load saved input values
     S.unitCount    = parseInt(localStorage.getItem(`rpm_units_${S.property}`)) || 0;
+    const savedTrans = localStorage.getItem(`rpm_transition_${S.property}`);
+    S.transitionMonth = (savedTrans === null || savedTrans === '') ? null : parseInt(savedTrans);
     try { S.quantities    = JSON.parse(localStorage.getItem(`rpm_qty_${S.property}_${S.budgetYear}`))   || {}; } catch { S.quantities    = {}; }
     try { S.selectedTiers = JSON.parse(localStorage.getItem(`rpm_tiers_${S.property}_${S.budgetYear}`)) || {}; } catch { S.selectedTiers = {}; }
     try { S.budgetAmounts = JSON.parse(localStorage.getItem(`rpm_budget_${S.property}_${S.budgetYear}`)) || {}; } catch { S.budgetAmounts = {}; }
@@ -261,9 +272,55 @@ function parseStartMonth(billingStart) {
   return 0;
 }
 
+// ── Active months: the one mechanism that drives every total ──────────────────
+// Returns the list of month indices (0-11) a program's cost actually lands in,
+// after applying billing frequency, the property transition month, and any
+// per-card override the PM has set.
+function defaultMonthsFor(program) {
+  const freq  = (program.billingFreq || program.billingPeriod || '').toLowerCase();
+  const start = parseStartMonth(program.billingStart);
+  let months;
+  if (freq.includes('monthly'))                                   months = [0,1,2,3,4,5,6,7,8,9,10,11];
+  else if (freq.includes('quarterly'))                            months = [0,1,2,3].map(i => (start + i*3) % 12);
+  else if (freq.includes('bi-annual') || freq.includes('bi-annu')) months = [start % 12, (start + 6) % 12];
+  else if (freq.includes('incurred') || freq.includes('implement')) months = []; // PM picks explicitly
+  else if (freq.includes('annual'))                               months = [start % 12];
+  else                                                            months = [];
+  return months.sort((a, b) => a - b);
+}
+
+function activeMonthsFor(program) {
+  // Explicit per-card override (also how as-incurred programs are set)
+  if (S.incurMonths[program.id]) return S.incurMonths[program.id].slice().sort((a, b) => a - b);
+  let months = defaultMonthsFor(program);
+  // Transition: drop any month before the site came on
+  if (S.transitionMonth != null) months = months.filter(m => m >= S.transitionMonth);
+  return months;
+}
+
+// How many billing hits a full year would have — used to prorate.
+function naturalMonthCount(program) {
+  const freq = (program.billingFreq || program.billingPeriod || '').toLowerCase();
+  if (freq.includes('monthly'))   return 12;
+  if (freq.includes('quarterly')) return 4;
+  if (freq.includes('bi'))        return 2;
+  if (freq.includes('incurred') || freq.includes('implement')) {
+    return (S.incurMonths[program.id] || []).length || 1;
+  }
+  return 1; // annual / one-time
+}
+
+// Annual cost after proration for active months (transitions, partial years).
+function proratedAnnual(program) {
+  const base = resolvedCost(program);
+  if (!base) return 0;
+  const nat = naturalMonthCount(program);
+  if (nat <= 0) return base;
+  return base * (activeMonthsFor(program).length / nat);
+}
+
 function getMonthlyBreakdown() {
   const months = Array(12).fill(0);
-
   S.programs.forEach(p => {
     const dec      = S.decisions[p.id]?.decision;
     const included = p.required
@@ -271,33 +328,13 @@ function getMonthlyBreakdown() {
       : dec === 'in';
     if (!included) return;
 
-    const annual = resolvedCost(p);
-    if (!annual) return;
-
-    const freq  = (p.billingFreq || p.billingPeriod || '').toLowerCase();
-    const start = parseStartMonth(p.billingStart);
-
-    if (freq.includes('monthly')) {
-      const mo = annual / 12;
-      for (let i = 0; i < 12; i++) months[i] += mo;
-    } else if (freq.includes('quarterly')) {
-      const hit = annual / 4;
-      for (let i = 0; i < 4; i++) months[(start + i * 3) % 12] += hit;
-    } else if (freq.includes('bi-annual') || freq.includes('bi-annu')) {
-      const hit = annual / 2;
-      months[start % 12] += hit;
-      months[(start + 6) % 12] += hit;
-    } else if (freq.includes('incurred') || freq.includes('implement')) {
-      const sel = S.incurMonths[p.id] || [];
-      if (sel.length) {
-        const per = annual / sel.length;
-        sel.forEach(m => months[m] += per);
-      }
-    } else if (freq.includes('annual')) {
-      months[start % 12] += annual;
-    }
+    const base = resolvedCost(p);
+    if (!base) return;
+    const nat = naturalMonthCount(p);
+    if (nat <= 0) return;
+    const per = base / nat;                  // amount per billing hit
+    activeMonthsFor(p).forEach(m => months[m] += per);
   });
-
   return months;
 }
 
@@ -406,8 +443,8 @@ function updateBudgetTotal() {
       ? dec !== 'opted-out' && dec !== 'not-applicable'
       : dec === 'in';
     if (included) {
-      annual  += resolvedCost(p);
-      monthly += resolvedMonthlyCost(p);
+      annual  += proratedAnnual(p);          // respects transition / active months
+      monthly += resolvedMonthlyCost(p);     // steady monthly run-rate (per active month)
     }
   });
   animateCost(document.getElementById('budget-total'),  annual);
@@ -692,19 +729,28 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       </div>`;
   }
 
-  // As-incurred programs: let the PM flag which months they expect the expense
-  const isAsIncurred = (program.billingFreq || program.billingPeriod || '').toLowerCase().includes('incurred');
+  // Month selection — as-incurred programs pick explicitly (shown in body);
+  // every other recurring program gets an adjustable strip inside Details.
+  const freqStr      = (program.billingFreq || program.billingPeriod || '').toLowerCase();
+  const isAsIncurred = freqStr.includes('incurred') || freqStr.includes('implement');
+  const isRecurring  = /monthly|quarter|annual|bi-/.test(freqStr);
+  const monthChipStrip = (preset) => MONTH_NAMES.map((m, i) =>
+    `<button type="button" class="incur-chip${preset.includes(i) ? ' on' : ''}" data-month="${i}">${m}</button>`
+  ).join('');
+
   if (isAsIncurred) {
-    const sel = S.incurMonths[program.id] || [];
-    const chips = MONTH_NAMES.map((m, i) =>
-      `<button type="button" class="incur-chip${sel.includes(i) ? ' on' : ''}" data-month="${i}">${m}</button>`
-    ).join('');
     bodyHtml += `
       <div class="incur-months">
         <div class="incur-label">Expected in which months?</div>
-        <div class="incur-chips">${chips}</div>
+        <div class="incur-chips">${monthChipStrip(S.incurMonths[program.id] || [])}</div>
       </div>`;
   }
+
+  const monthPickerHtml = (isRecurring && !isAsIncurred) ? `
+    <div class="incur-months months-detail">
+      <div class="incur-label">Billing months${S.transitionMonth != null ? ' (transition applied)' : ''}</div>
+      <div class="incur-chips">${monthChipStrip(activeMonthsFor(program))}</div>
+    </div>` : '';
 
   const dnaCorner = isRequired ? `
     <label class="dna-corner" title="Does not apply to this property">
@@ -741,6 +787,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       ${resourceLink}
       ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
       ${program.setupFee ? `<div class="card-setup-fee">Setup: ${program.setupFee}</div>` : ''}
+      ${monthPickerHtml}
       ${priorChip}
     </div>
   `;
@@ -783,12 +830,14 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     if (heroEl) heroEl.textContent = heroCost(program);
   };
 
-  // As-incurred month chips
+  // Month chips (as-incurred body picker + per-card billing-month override)
   el.querySelectorAll('.incur-chip').forEach(chip => {
     chip.addEventListener('click', e => {
       e.stopPropagation();
-      const m   = parseInt(chip.dataset.month);
-      const arr = S.incurMonths[program.id] || [];
+      const m = parseInt(chip.dataset.month);
+      // Seed an override from the current active months the first time it's touched
+      let arr = S.incurMonths[program.id];
+      if (!arr) arr = isAsIncurred ? [] : activeMonthsFor(program).slice();
       const idx = arr.indexOf(m);
       if (idx >= 0) arr.splice(idx, 1); else arr.push(m);
       S.incurMonths[program.id] = arr;
@@ -927,6 +976,7 @@ async function undoOptOut(programId) {
 document.getElementById('btn-edit-units').addEventListener('click', () => {
   document.getElementById('units-modal-prop').textContent  = S.property || 'this property';
   document.getElementById('units-modal-input').value       = S.unitCount || '';
+  document.getElementById('units-modal-transition').value  = S.transitionMonth == null ? '' : String(S.transitionMonth);
   openModal('modal-units');
 });
 
@@ -934,9 +984,14 @@ document.getElementById('btn-units-save').addEventListener('click', () => {
   const val = parseInt(document.getElementById('units-modal-input').value) || 0;
   S.unitCount = val;
   localStorage.setItem(`rpm_units_${S.property}`, val);
+
+  const tVal = document.getElementById('units-modal-transition').value;
+  S.transitionMonth = tVal === '' ? null : parseInt(tVal);
+  localStorage.setItem(`rpm_transition_${S.property}`, tVal);
+
   closeModal('modal-units');
   document.getElementById('hdr-unit-count').textContent = val > 0 ? `${val} units` : 'Set units';
-  // Re-render all cards so per-unit calculations update
+  // Re-render all cards so per-unit + month calculations update
   renderDeptRows();
   updateBudgetTotal();
 });
