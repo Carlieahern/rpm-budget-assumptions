@@ -2589,6 +2589,23 @@ body {
 .prog-card.is-included {
   box-shadow: 0 10px 26px rgba(27,42,74,0.16), inset 0 0 0 2px rgba(255,255,255,0.55);
 }
+
+/* Flagged for follow-up — dark blue thick ring, buttons stay normal */
+.prog-card.is-followup {
+  box-shadow: 0 10px 26px rgba(27,42,74,0.18), inset 0 0 0 3px var(--navy);
+}
+.flag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: var(--navy);
+  border-radius: 999px;
+  padding: 6px 12px;
+}
 .prog-card.is-opted-out,
 .prog-card.is-excluded,
 .prog-card.is-not-applicable {
@@ -2729,6 +2746,8 @@ body {
 .addrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .addrow-label { font-size: 14px; color: #fff; font-weight: 500; }
 .addrow-total { font-size: 14px; font-weight: 700; color: #fff; margin-left: auto; }
+
+.input-note { font-size: 12px; font-style: italic; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.4; }
 
 .ae-systems { display: flex; gap: 8px; flex-wrap: wrap; }
 .ae-sys-chip {

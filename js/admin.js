@@ -8,6 +8,8 @@ import { showScreen, openModal, closeModal } from './ui.js';
 const PASSCODE = 'Budgets';
 
 const STRUCTURED_BASES = ['Flat Fee', 'Per Unit', 'Per Item', 'Tiered', 'Flat + Per Unit', 'Manual'];
+const BASIS_LABELS = { 'Tiered': 'Options / Packages' };   // display label overrides
+const basisLabel = (c) => BASIS_LABELS[c] || c;
 let extraTypes = [];   // admin-added cost-basis type names (formula-driven)
 const ADD_NEW = '➕ Add new type…';
 // True when this cost basis uses a custom formula (Custom Formula or any added type)
@@ -111,7 +113,7 @@ function blankProgram() {
     billingPeriod: 'monthly', billingStart: 'January',
     defaultMonths: [], monthsFixed: false,
     systems: ['Yardi', 'OneSite', 'PaceOneSite'],
-    setupFee: '', priorYearNote: '', costRaw: '', description: '', resourceUrl: '',
+    setupFee: '', priorYearNote: '', inputNote: '', costRaw: '', description: '', resourceUrl: '',
     yardiGL: '', onesiteGL: '', paceGL: '', owner: '',
   };
 }
@@ -179,7 +181,7 @@ function buildEditor() {
       <label class="ae-field">
         <span>Cost basis</span>
         <select id="ae-costBasis">
-          ${basisOptions.map(c => `<option value="${c}"${c === cb ? ' selected' : ''}>${c}</option>`).join('')}
+          ${basisOptions.map(c => `<option value="${c}"${c === cb ? ' selected' : ''}>${basisLabel(c)}</option>`).join('')}
         </select>
       </label>
 
@@ -249,10 +251,13 @@ function buildEditor() {
 
     ${showTiers ? `
     <div class="ae-tiers">
-      <div class="ae-tiers-head"><span>Options / Tiers</span><button class="ae-tier-add" id="ae-tier-add">+ Add option</button></div>
-      <label class="ae-follows" style="margin-bottom:10px;">
-        <input type="checkbox" id="ae-additive"${form.additive ? ' checked' : ''}>
-        PM enters a quantity for each option and they add up (instead of picking one)
+      <div class="ae-tiers-head"><span>Options / Packages</span><button class="ae-tier-add" id="ae-tier-add">+ Add option</button></div>
+      <label class="ae-field" style="margin-bottom:10px;">
+        <span>How can the PM choose?</span>
+        <select id="ae-selectMode">
+          <option value="one"${!form.additive ? ' selected' : ''}>Select just one (pick a single option)</option>
+          <option value="multiple"${form.additive ? ' selected' : ''}>Select one or more (check any, enter how many of each)</option>
+        </select>
       </label>
       ${(form.options || []).map((o, i) => `
         <div class="ae-tier-row" data-i="${i}">
@@ -274,6 +279,7 @@ function buildEditor() {
         <label class="ae-field"><span>Program owner</span><input id="ae-owner" type="text" value="${esc(form.owner)}"></label>
         <label class="ae-field ae-wide"><span>Setup fee (description)</span><input id="ae-setupFee" type="text" value="${esc(form.setupFee)}" placeholder="e.g. $750 flat fee at implementation"></label>
         <label class="ae-field ae-wide"><span>Prior year cost note</span><input id="ae-priorYearNote" type="text" value="${esc(form.priorYearNote)}" placeholder="e.g. Up from $1.50/unit last year"></label>
+        <label class="ae-field ae-wide"><span>Clarification note (shown by the entry box)</span><input id="ae-inputNote" type="text" value="${esc(form.inputNote)}" placeholder="e.g. *Check with your local housing authority"></label>
         <label class="ae-field ae-wide"><span>Program guide URL</span><input id="ae-resourceUrl" type="text" value="${esc(form.resourceUrl)}" placeholder="https://…"></label>
         <label class="ae-field ae-wide"><span>Description</span><textarea id="ae-description" rows="2">${esc(form.description)}</textarea></label>
       </div>
@@ -316,6 +322,7 @@ function wireEditor() {
   bind('ae-owner', 'owner');
   bind('ae-setupFee', 'setupFee');
   bind('ae-priorYearNote', 'priorYearNote');
+  bind('ae-inputNote', 'inputNote');
   bind('ae-resourceUrl', 'resourceUrl');
   bind('ae-description', 'description');
   bind('ae-customFormula', 'customFormula');
@@ -351,7 +358,7 @@ function wireEditor() {
     chip.classList.toggle('on');
   }));
   document.getElementById('ae-monthsFixed')?.addEventListener('change', e => { form.monthsFixed = e.target.checked; });
-  document.getElementById('ae-additive')?.addEventListener('change', e => { form.additive = e.target.checked; });
+  document.getElementById('ae-selectMode')?.addEventListener('change', e => { form.additive = e.target.value === 'multiple'; updatePreview(); });
 
   // Systems checkboxes
   document.querySelectorAll('.ae-sys').forEach(cb => cb.addEventListener('change', () => {
@@ -473,6 +480,7 @@ async function save() {
     systems: (Array.isArray(form.systems) && form.systems.length) ? form.systems : ['Yardi', 'OneSite', 'PaceOneSite'],
     setupFee: form.setupFee || null,
     priorYearNote: form.priorYearNote || null,
+    inputNote: form.inputNote || null,
     costRaw: form.costRaw || null,
     description: form.description || null,
     resourceUrl: form.resourceUrl || null,

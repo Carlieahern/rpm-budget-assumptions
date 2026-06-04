@@ -644,6 +644,7 @@ function buildInfoCard(program) {
   } else if (info.type === 'manual') {
     bodyHtml = `<div class="info-cost-manual">${program.costRaw || 'See program details'}</div>`;
   }
+  if (program.inputNote) bodyHtml += `<div class="input-note">${program.inputNote}</div>`;
 
   // Static billing-month chips (non-interactive)
   const freqStr     = (program.billingFreq || program.billingPeriod || '').toLowerCase();
@@ -732,8 +733,9 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
         <button class="btn-card-ghost btn-undo-optout" data-pid="${program.id}">Undo</button>`;
     } else if (dec === 'needs-followup') {
       actionHtml = `
-        <span class="card-status-badge status-followup">⚑ Follow-up</span>
-        <button class="btn-card-ghost btn-opt-out-trigger" data-pid="${program.id}">Opt Out</button>`;
+        <span class="flag-chip">⚑ Flagged for follow up</span>
+        <button class="btn-card-ghost btn-opt-out-trigger" data-pid="${program.id}">Opt Out</button>
+        <button class="btn-card-fill btn-acknowledge" data-pid="${program.id}">Acknowledge</button>`;
     } else if (dec === 'acknowledged') {
       actionHtml = `
         <span class="card-status-badge status-acknowledged">✓ Acknowledged</span>
@@ -794,22 +796,26 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       : (program.billingPeriod === 'monthly' ? '/mo' : '/yr');
 
     if (info.additive) {
-      // Each option gets its own quantity; costs add up
+      // Multi-select: check any options that apply, enter a quantity for each
       const qtys = S.optionQty[program.id] || [];
       const rows = (info.tiers || []).map((t, i) => {
+        const on = (qtys[i] || 0) > 0;
         const rowTotal = (t.rate || 0) * (qtys[i] || 0);
         return `
         <div class="addrow">
-          <span class="addrow-label">${t.label} <span class="tier-rate">${formatRate(t.rate)}${perSuffix}</span></span>
+          <label class="addrow-check">
+            <input type="checkbox" class="opt-check" data-pid="${program.id}" data-opt="${i}"${on ? ' checked' : ''}>
+            <span class="addrow-label">${t.label} <span class="tier-rate">${formatRate(t.rate)}${perSuffix}</span></span>
+          </label>
           <span class="qty-sep">×</span>
           <div class="qty-field">
-            <input class="opt-qty-input" data-pid="${program.id}" data-opt="${i}" type="number" min="0" placeholder="0" value="${qtys[i] || ''}">
+            <input class="opt-qty-input" data-pid="${program.id}" data-opt="${i}" type="number" min="0" placeholder="0" value="${qtys[i] || ''}"${on ? '' : ' disabled'}>
           </div>
-          ${qtys[i] ? `<span class="addrow-total">= ${formatCost(rowTotal)}</span>` : ''}
+          <span class="addrow-total">${on ? '= ' + formatCost(rowTotal) : ''}</span>
         </div>`;
       }).join('');
       bodyHtml = `
-        <div class="tier-select-label">Enter the quantity you anticipate for each</div>
+        <div class="tier-select-label">Select all that apply, then enter how many of each</div>
         <div class="addrows">${rows}</div>`;
     } else {
       const tiersHtml = (info.tiers || []).map((t, i) => `
@@ -862,6 +868,9 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
                placeholder="Enter amount" value="${savedAmt !== undefined ? savedAmt : ''}">
       </div>`;
   }
+
+  // Optional clarification note shown by the entry box
+  if (program.inputNote) bodyHtml += `<div class="input-note">${program.inputNote}</div>`;
 
   // Month selection — as-incurred programs pick explicitly (shown in body);
   // every other recurring program gets an adjustable strip inside Details.
@@ -1005,6 +1014,20 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
         opt.classList.toggle('is-selected', i === S.selectedTiers[program.id])
       );
       refreshHero();
+    });
+  });
+
+  // ── Multi-select option checkboxes (additive tiered) ──────────────────────
+  el.querySelectorAll('.opt-check').forEach(chk => {
+    chk.addEventListener('change', e => {
+      e.stopPropagation();
+      const i   = parseInt(e.target.dataset.opt);
+      const arr = S.optionQty[program.id] || [];
+      arr[i] = e.target.checked ? (arr[i] > 0 ? arr[i] : 1) : 0;
+      S.optionQty[program.id] = arr;
+      localStorage.setItem(`rpm_optqty_${S.property}_${S.budgetYear}`, JSON.stringify(S.optionQty));
+      updateBudgetTotal();
+      refreshCard(program.id);   // re-render to enable/disable the qty field + totals
     });
   });
 

@@ -88,6 +88,7 @@ export async function fetchPrograms(forceRefresh = false) {
       programOwner:  p.owner         || '',
       priorYearCost: p.priorYearCost ?? 0,
       priorYearNote: p.priorYearNote || null,
+      inputNote:     p.inputNote     || null,
     };
   });
 
