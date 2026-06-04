@@ -140,6 +140,12 @@ function buildEditor() {
   const showTiers   = cb === 'Tiered';
   const showFormula = isFormulaType(cb);
 
+  // Context-aware label so it's obvious where the cost goes
+  const rateLabel = cb === 'Per Unit'        ? 'Rate per unit ($)'
+                  : cb === 'Per Item'        ? `Rate per ${(form.itemLabel || 'item').toLowerCase()} ($)`
+                  : cb === 'Flat + Per Unit' ? 'Per-unit rate ($)'
+                  : 'Amount ($)';
+
   // Cost-basis dropdown: structured types + Custom Formula + admin-added types + "Add new"
   const basisOptions = [...STRUCTURED_BASES, 'Custom Formula', ...extraTypes, ADD_NEW];
 
@@ -183,16 +189,16 @@ function buildEditor() {
         </select>
       </label>
 
-      ${showRate ? `
-      <label class="ae-field">
-        <span>Rate ($)</span>
-        <input id="ae-rate" type="number" step="0.01" min="0" value="${esc(form.rate)}" placeholder="0.00">
-      </label>` : ''}
-
       ${showItem ? `
       <label class="ae-field">
-        <span>Item label (what's counted)</span>
-        <input id="ae-itemLabel" type="text" value="${esc(form.itemLabel)}" placeholder="e.g. Elevator, Device, Account">
+        <span>What's counted?</span>
+        <input id="ae-itemLabel" type="text" value="${esc(form.itemLabel)}" placeholder="e.g. Invoice, Elevator, Device, Account">
+      </label>` : ''}
+
+      ${showRate ? `
+      <label class="ae-field">
+        <span id="ae-rate-label">${rateLabel}</span>
+        <input id="ae-rate" type="number" step="0.01" min="0" value="${esc(form.rate)}" placeholder="e.g. 0.99">
       </label>` : ''}
 
       ${showBase ? `
@@ -284,7 +290,12 @@ function wireEditor() {
   bind('ae-name', 'name');
   bind('ae-department', 'department');
   bind('ae-rate', 'rate');
-  bind('ae-itemLabel', 'itemLabel');
+  document.getElementById('ae-itemLabel')?.addEventListener('input', e => {
+    form.itemLabel = e.target.value;
+    const lbl = document.getElementById('ae-rate-label');
+    if (lbl) lbl.textContent = `Rate per ${(form.itemLabel || 'item').toLowerCase()} ($)`;
+    updatePreview();
+  });
   bind('ae-baseFee', 'baseFee');
   bind('ae-billingStart', 'billingStart');
   bind('ae-costRaw', 'costRaw');
