@@ -165,6 +165,16 @@ async function launchMain() {
   }
 }
 
+// Min/Max note for the Details panel
+function minMaxNote(p) {
+  if (p.minCost == null && p.maxCost == null) return '';
+  const per = p.billingPeriod === 'monthly' ? '/mo' : '/yr';
+  const parts = [];
+  if (p.minCost != null) parts.push(`Min ${formatCost(p.minCost)}${per}`);
+  if (p.maxCost != null) parts.push(`Max ${formatCost(p.maxCost)}${per}`);
+  return `<div class="card-prioryear">${parts.join(' · ')}</div>`;
+}
+
 // ── Safe formula evaluator ────────────────────────────────────────────────────
 // Only digits, math operators, parentheses, and the variables `units` and `qty`
 // are allowed. Anything else → returns 0 (no arbitrary code execution).
@@ -252,9 +262,9 @@ function customResult(program, info) {
   return safeFormula(info.formula, S.unitCount, qty);
 }
 
-function resolvedCost(program) {
+function rawResolvedCost(program) {
   const info    = parseCostBasisInfo(program);
-  const qty     = effectiveQty(program, info);
+  const qty     = effectiveQty(program, info) + (program.baseQty || 0);
   const tierIdx = S.selectedTiers[program.id] ?? 0;
 
   switch (info.type) {
@@ -296,6 +306,18 @@ function resolvedCost(program) {
     default:
       return S.budgetAmounts[program.id] || 0;
   }
+}
+
+// Clamp the annual cost to min/max if set. Min/max are entered per billing period,
+// so monthly programs scale the bounds by 12.
+function resolvedCost(program) {
+  let v = rawResolvedCost(program);
+  const mo  = program.billingPeriod === 'monthly';
+  const min = program.minCost != null ? (mo ? program.minCost * 12 : program.minCost) : null;
+  const max = program.maxCost != null ? (mo ? program.maxCost * 12 : program.maxCost) : null;
+  if (min != null && v < min) v = min;
+  if (max != null && max > 0 && v > max) v = max;
+  return v;
 }
 
 // ── Monthly breakdown ─────────────────────────────────────────────────────────
@@ -463,10 +485,10 @@ function animateCost(el, newVal) {
 
 // Returns the actual monthly charge for a program (only for monthly-billed items).
 // As-incurred, annual, and quarterly items return 0 here — they belong in the annual total only.
-function resolvedMonthlyCost(program) {
+function rawResolvedMonthlyCost(program) {
   if (program.billingPeriod !== 'monthly') return 0;
   const info = parseCostBasisInfo(program);
-  const qty  = effectiveQty(program, info);
+  const qty  = effectiveQty(program, info) + (program.baseQty || 0);
   switch (info.type) {
     case 'flat':         return info.rate;
     case 'per-unit':
@@ -486,6 +508,17 @@ function resolvedMonthlyCost(program) {
     case 'custom': return customResult(program, info);
     default: return 0;
   }
+}
+
+// Clamp monthly to per-period min/max (only for monthly-billed programs).
+function resolvedMonthlyCost(program) {
+  let v = rawResolvedMonthlyCost(program);
+  if (program.billingPeriod === 'monthly') {
+    const { minCost: min, maxCost: max } = program;
+    if (min != null && v < min) v = min;
+    if (max != null && max > 0 && v > max) v = max;
+  }
+  return v;
 }
 
 // The big number shown at the top-right of each card.
@@ -716,6 +749,7 @@ function buildInfoCard(program) {
       ${resourceLink}
       ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
       ${program.setupFee ? `<div class="card-setup-fee">Setup: ${program.setupFee}</div>` : ''}
+      ${minMaxNote(program)}
       ${program.priorYearNote ? `<div class="card-prioryear">Prior year: ${program.priorYearNote}</div>` : ''}
     </div>
   `;
@@ -903,6 +937,10 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       </div>`;
   }
 
+  // Base/default quantity always included
+  if ((program.baseQty || 0) > 0 && ['per-unit', 'per-quantity', 'custom'].includes(info.type)) {
+    bodyHtml += `<div class="input-note">Includes ${program.baseQty} by default — enter any additional above.</div>`;
+  }
   // Optional clarification note shown by the entry box
   if (program.inputNote) bodyHtml += `<div class="input-note">${program.inputNote}</div>`;
 
@@ -967,6 +1005,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       ${resourceLink}
       ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
       ${program.setupFee ? `<div class="card-setup-fee">Setup: ${program.setupFee}</div>` : ''}
+      ${minMaxNote(program)}
       ${program.priorYearNote ? `<div class="card-prioryear">Prior year: ${program.priorYearNote}</div>` : ''}
       ${priorChip}
     </div>

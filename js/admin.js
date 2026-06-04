@@ -147,7 +147,7 @@ async function renderList() {
 function blankProgram() {
   return {
     name: '', department: '', elective: true, costBasis: 'Flat Fee',
-    rate: '', itemLabel: '', baseFee: '', options: [], additive: false, customFormula: '',
+    rate: '', itemLabel: '', baseFee: '', baseQty: '', minCost: '', maxCost: '', options: [], additive: false, customFormula: '',
     billingPeriod: 'monthly', billingStart: 'January',
     defaultMonths: [], monthsFixed: false,
     systems: ['Yardi', 'OneSite', 'PaceOneSite'],
@@ -246,6 +246,22 @@ function buildEditor() {
       <label class="ae-field">
         <span>Base fee ($)</span>
         <input id="ae-baseFee" type="number" step="0.01" min="0" value="${esc(form.baseFee)}" placeholder="0.00">
+      </label>` : ''}
+
+      ${(cb === 'Per Unit' || cb === 'Per Item') ? `
+      <label class="ae-field">
+        <span>Default / included quantity <span class="label-soft">— optional</span></span>
+        <input id="ae-baseQty" type="number" step="1" min="0" value="${esc(form.baseQty)}" placeholder="e.g. 1">
+      </label>` : ''}
+
+      ${(showRate || showFormula) ? `
+      <label class="ae-field">
+        <span>Minimum (${form.billingPeriod === 'monthly' ? '$/mo' : '$/yr'}) <span class="label-soft">— optional</span></span>
+        <input id="ae-minCost" type="number" step="0.01" min="0" value="${esc(form.minCost)}" placeholder="no minimum">
+      </label>
+      <label class="ae-field">
+        <span>Maximum (${form.billingPeriod === 'monthly' ? '$/mo' : '$/yr'}) <span class="label-soft">— optional</span></span>
+        <input id="ae-maxCost" type="number" step="0.01" min="0" value="${esc(form.maxCost)}" placeholder="no maximum">
       </label>` : ''}
 
       ${showFormula ? `
@@ -353,6 +369,9 @@ function wireEditor() {
     updatePreview();
   });
   bind('ae-baseFee', 'baseFee');
+  bind('ae-baseQty', 'baseQty');
+  bind('ae-minCost', 'minCost');
+  bind('ae-maxCost', 'maxCost');
   bind('ae-costRaw', 'costRaw');
   bind('ae-yardiGL', 'yardiGL');
   bind('ae-onesiteGL', 'onesiteGL');
@@ -506,6 +525,9 @@ async function save() {
     rate: cleanNum(form.rate),
     itemLabel: form.itemLabel || null,
     baseFee: cleanNum(form.baseFee),
+    baseQty: cleanNum(form.baseQty) || 0,
+    minCost: cleanNum(form.minCost),
+    maxCost: cleanNum(form.maxCost),
     options: (form.costBasis === 'Tiered')
       ? form.options.filter(o => o.label).map(o => ({ label: o.label, rate: cleanNum(o.rate) || 0, type: o.type || 'flat' }))
       : [],
