@@ -162,12 +162,32 @@ async function launchMain() {
   }
 }
 
+// ── Safe formula evaluator ────────────────────────────────────────────────────
+// Only digits, math operators, parentheses, and the variables `units` and `qty`
+// are allowed. Anything else → returns 0 (no arbitrary code execution).
+function safeFormula(formula, units, qty) {
+  if (!formula) return 0;
+  const cleaned = String(formula).replace(/\bunits\b/g, '(U)').replace(/\bqty\b/g, '(Q)');
+  if (/[^0-9+\-*/().\sUQ]/.test(cleaned)) return 0;       // whitelist only
+  try {
+    const fn = new Function('U', 'Q', `"use strict"; return (${cleaned});`);
+    const v = fn(units || 0, qty || 0);
+    return (typeof v === 'number' && isFinite(v)) ? v : 0;
+  } catch { return 0; }
+}
+
 // ── Cost basis intelligence ───────────────────────────────────────────────────
 // Reads clean structured fields from Firebase — no text parsing needed.
 function parseCostBasisInfo(program) {
   const basis  = program.costBasis    || 'Manual';
   const rate   = program.rate         ?? 0;
   const period = program.billingPeriod === 'monthly' ? 'month' : 'year';
+
+  // A custom formula overrides everything — it powers "Custom Formula" and any
+  // admin-added cost-basis type.
+  if (program.customFormula) {
+    return { type: 'custom', formula: program.customFormula, usesQty: /\bqty\b/.test(program.customFormula), period };
+  }
 
   switch (basis) {
 
@@ -223,6 +243,11 @@ function effectiveQty(program, info) {
   return 0;
 }
 
+function customResult(program, info) {
+  const qty = (program.id in S.quantities) ? S.quantities[program.id] : 0;
+  return safeFormula(info.formula, S.unitCount, qty);
+}
+
 function resolvedCost(program) {
   const info    = parseCostBasisInfo(program);
   const qty     = effectiveQty(program, info);
@@ -252,6 +277,11 @@ function resolvedCost(program) {
         return tierRate * qty;
       }
       return tierRate;
+    }
+
+    case 'custom': {
+      const r = customResult(program, info);
+      return info.period === 'month' ? r * 12 : r;
     }
 
     default:
@@ -435,6 +465,7 @@ function resolvedMonthlyCost(program) {
       if (info.isPerItem) return tierRate * qty;
       return tierRate;
     }
+    case 'custom': return customResult(program, info);
     default: return 0;
   }
 }
@@ -557,52 +588,96 @@ function updateColumnCounts() {
   if (sideEl) sideEl.textContent = `${incCount} of ${elec.length}`;
 }
 
-// ── Info-mode card (no inputs, no actions — reference only) ──────────────────
+// ── Info-mode card — matches the interactive design, read-only ────────────────
 function buildInfoCard(program) {
   const el = document.createElement('div');
   el.className = 'prog-card prog-card-info';
   el.dataset.programId = program.id;
 
-  const info = parseCostBasisInfo(program);
+  const info   = parseCostBasisInfo(program);
+  const mo     = program.billingPeriod === 'monthly';
+  const suffix = mo ? '/mo' : '/yr';
 
-  // Build a clean cost display based on type
-  let costHtml = '';
-  if (info.type === 'flat') {
-    costHtml = `<div class="info-cost-value">${formatCost(info.rate)}<span class="info-cost-period"> / year</span></div>`;
-  } else if (info.type === 'per-unit' || info.type === 'per-quantity') {
-    const per = info.period === 'month' ? '/mo' : '/yr';
-    costHtml = `<div class="info-cost-value">${formatCost(info.rate)}<span class="info-cost-period"> / ${info.label.toLowerCase()}${per}</span></div>`;
-  } else if (info.type === 'flat-per-unit') {
-    costHtml = `
-      <div class="info-cost-value">${formatCost(info.baseFee)}<span class="info-cost-period"> base</span></div>
-      <div class="info-cost-value">+ ${formatCost(info.rate)}<span class="info-cost-period"> / unit / yr</span></div>`;
-  } else if (info.type === 'tiered' && info.tiers?.length) {
-    costHtml = info.tiers.map(t => {
-      const typeLabel = t.type === 'per-unit-month' ? '/unit/mo'
-                      : t.type === 'per-unit-year'  ? '/unit/yr'
-                      : t.type === 'per-item'        ? `/${(program.itemLabel || 'item').toLowerCase()}`
-                      : '/yr';
-      return `<div class="info-tier-row"><span class="info-tier-label">${t.label}</span><span class="info-tier-rate">${formatCost(t.rate)}<span class="info-cost-period">${typeLabel}</span></span></div>`;
-    }).join('');
-  } else {
-    costHtml = program.costRaw
-      ? `<div class="info-cost-manual">${program.costRaw}</div>`
-      : `<div class="info-cost-manual">See program details</div>`;
+  // Subtitle (rate basis)
+  let subtitle = '';
+  if (info.type === 'per-unit' || info.type === 'per-quantity') subtitle = `${formatRate(info.rate)} / ${info.label.toLowerCase()}`;
+  else if (info.type === 'flat')          subtitle = 'Flat fee';
+  else if (info.type === 'flat-per-unit') subtitle = `${formatRate(info.baseFee)} base + ${formatRate(info.rate)} / unit`;
+  else if (info.type === 'tiered')        subtitle = info.isPerUnit ? 'Tiered · per unit' : 'Options';
+
+  // Hero — headline figure (rate-based, no PM input in info mode)
+  let hero = '';
+  if (info.type === 'flat')                                   hero = formatCost(info.rate);
+  else if (info.type === 'per-unit' || info.type === 'per-quantity') hero = formatRate(info.rate);
+  else if (info.type === 'flat-per-unit')                     hero = formatRate(info.rate);
+  else if (info.type === 'tiered' && info.tiers?.length)      hero = 'from ' + formatRate(Math.min(...info.tiers.map(t => t.rate)));
+  else                                                        hero = '—';
+
+  // Body — static cost detail
+  let bodyHtml = '';
+  if (info.type === 'tiered' && info.tiers?.length) {
+    const perSuffix = info.isPerUnit ? (info.period === 'month' ? '/unit/mo' : '/unit/yr')
+                    : (info.tiers[0]?.type === 'per-item' ? `/${(program.itemLabel || 'item').toLowerCase()}` : suffix);
+    bodyHtml = `
+      <div class="tier-select-label">Options</div>
+      <div class="info-tier-list">
+        ${info.tiers.map(t => `<div class="info-tier-row"><span class="tier-label">${t.label}</span><span class="tier-rate">${formatRate(t.rate)}${perSuffix}</span></div>`).join('')}
+      </div>`;
+  } else if (info.type === 'per-item') {
+    bodyHtml = `<div class="info-cost-manual">${formatRate(info.rate)} per ${(program.itemLabel || 'item').toLowerCase()}</div>`;
+  } else if (info.type === 'manual') {
+    bodyHtml = `<div class="info-cost-manual">${program.costRaw || 'See program details'}</div>`;
   }
 
+  // Static billing-month chips (non-interactive)
+  const freqStr     = (program.billingFreq || program.billingPeriod || '').toLowerCase();
+  const isRecurring = /monthly|quarter|annual|bi-/.test(freqStr);
+  let monthsHtml = '';
+  if (isRecurring) {
+    const active = activeMonthsFor(program);
+    monthsHtml = `
+      <div class="incur-months">
+        <div class="incur-label">Billing months</div>
+        <div class="incur-chips">${MONTH_NAMES.map((m, i) => `<span class="incur-chip${active.includes(i) ? ' on' : ''} is-static">${m}</span>`).join('')}</div>
+      </div>`;
+  }
+
+  const resourceLink = program.resourceUrl
+    ? `<a class="card-guide-link" href="${program.resourceUrl}" target="_blank" rel="noopener">Click here for the program guide →</a>`
+    : `<a class="card-guide-link is-placeholder" href="#" onclick="return false;">Program guide coming soon</a>`;
+
   el.innerHTML = `
-    <div class="prog-card-top">
-      <div class="prog-card-name">${program.name}</div>
+    <div class="card-head">
+      <div class="card-head-main">
+        <h3 class="prog-card-name">${program.name}</h3>
+        ${program.programOwner ? `<div class="card-owner">${program.programOwner}</div>` : ''}
+        ${subtitle ? `<div class="card-rate-basis">${subtitle}</div>` : ''}
+      </div>
+      <div class="card-head-side">
+        <div class="card-gl">GL: ${program.glCode}</div>
+        ${program.billingFreq ? `<div class="card-billing">${program.billingFreq}</div>` : ''}
+        <div class="card-cost-hero"><span class="cost-hero-num">${hero}</span><span class="cost-hero-period">${info.type === 'flat' ? suffix : ''}</span></div>
+      </div>
     </div>
-    <div class="info-cost-block">${costHtml}</div>
-    ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
-    <div class="prog-card-meta-row">
-      <span class="prog-card-gl">GL ${program.glCode}</span>
-      ${program.billingFreq ? `<span class="prog-card-billing">${program.billingFreq}</span>` : ''}
-      ${program.programOwner ? `<span class="prog-card-owner">${program.programOwner}</span>` : ''}
-      ${program.setupFee ? `<span class="info-setup-fee">Setup: ${program.setupFee}</span>` : ''}
+    ${(bodyHtml || monthsHtml) ? '<div class="card-divider"></div>' : ''}
+    ${bodyHtml}
+    ${monthsHtml}
+    <div class="card-foot">
+      <button class="details-toggle" type="button">▾ Details</button>
+    </div>
+    <div class="card-details-panel">
+      ${resourceLink}
+      ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
+      ${program.setupFee ? `<div class="card-setup-fee">Setup: ${program.setupFee}</div>` : ''}
+      ${program.priorYearNote ? `<div class="card-prioryear">Prior year: ${program.priorYearNote}</div>` : ''}
     </div>
   `;
+
+  el.querySelector('.details-toggle')?.addEventListener('click', e => {
+    e.stopPropagation();
+    el.classList.toggle('details-open');
+  });
+
   return el;
 }
 
@@ -679,6 +754,8 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     subtitle = `${formatRate(info.baseFee)} base + ${formatRate(info.rate)} / unit`;
   } else if (info.type === 'tiered') {
     subtitle = info.isPerUnit ? 'Select tier · per unit' : 'Select one';
+  } else if (info.type === 'custom') {
+    subtitle = 'Custom calculation';
   }
 
   // Card body — interactive cost controls
@@ -730,6 +807,15 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
         <span class="qty-label">Units</span>
       </div>`;
 
+  } else if (info.type === 'custom') {
+    bodyHtml = info.usesQty ? `
+      <div class="card-calc">
+        <span class="calc-rate">How many?</span>
+        <div class="qty-field">
+          <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
+        </div>
+      </div>` : '';
+
   } else if (info.type === 'manual') {
     const savedAmt = S.budgetAmounts[program.id];
     bodyHtml = `
@@ -755,13 +841,13 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
         <div class="incur-label">Expected in which months?</div>
         <div class="incur-chips">${monthChipStrip(S.incurMonths[program.id] || [])}</div>
       </div>`;
+  } else if (isRecurring) {
+    bodyHtml += `
+      <div class="incur-months">
+        <div class="incur-label">Billing months${S.transitionMonth != null ? ' · transition applied' : ''}</div>
+        <div class="incur-chips">${monthChipStrip(activeMonthsFor(program))}</div>
+      </div>`;
   }
-
-  const monthPickerHtml = (isRecurring && !isAsIncurred) ? `
-    <div class="incur-months months-detail">
-      <div class="incur-label">Billing months${S.transitionMonth != null ? ' (transition applied)' : ''}</div>
-      <div class="incur-chips">${monthChipStrip(activeMonthsFor(program))}</div>
-    </div>` : '';
 
   const dnaCorner = isRequired ? `
     <label class="dna-corner" title="Does not apply to this property">
@@ -798,7 +884,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       ${resourceLink}
       ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
       ${program.setupFee ? `<div class="card-setup-fee">Setup: ${program.setupFee}</div>` : ''}
-      ${monthPickerHtml}
+      ${program.priorYearNote ? `<div class="card-prioryear">Prior year: ${program.priorYearNote}</div>` : ''}
       ${priorChip}
     </div>
   `;

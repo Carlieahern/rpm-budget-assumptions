@@ -8,7 +8,7 @@
   <title>RPM Budget Assumptions</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=16">
+  <link rel="stylesheet" href="css/styles.css?v=17">
 </head>
 <body>
 <div id="app">
@@ -24,6 +24,7 @@
 
 <!-- ── Setup ── -->
   <div id="screen-setup" class="screen screen-setup">
+    <div class="setup-card">
     <div class="setup-top">
       <img src="RPMLivingLogo__Copper.jpg" alt="RPM Living" class="rpm-logo-img rpm-logo-sm">
       <div class="cycle-chip" id="setup-cycle-chip"></div>
@@ -115,13 +116,17 @@
       </div>
 
     </div>
+    </div>
   </div>
 
   <!-- ── Main App ── -->
   <div id="screen-main" class="screen screen-main">
 
     <header class="main-hdr">
-      <div class="main-hdr-left">
+      <div class="main-hdr-side">
+        <img src="RPMLivingLogo__Copper.jpg" alt="RPM Living" class="rpm-logo-img rpm-logo-sm">
+      </div>
+      <div class="main-hdr-center">
         <div class="main-hdr-prop" id="hdr-property">—</div>
         <div class="main-hdr-meta">
           <span id="hdr-system">—</span>
@@ -134,12 +139,11 @@
           <span class="mode-badge" id="hdr-mode-badge"></span>
         </div>
       </div>
-      <div class="main-hdr-right">
+      <div class="main-hdr-side main-hdr-right">
         <button class="btn-summary-link" id="btn-view-summary">View Summary</button>
         <button class="icon-btn" id="btn-menu" aria-label="Menu">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
         </button>
-        <img src="RPMLivingLogo__Copper.jpg" alt="RPM Living" class="rpm-logo-img rpm-logo-sm">
       </div>
     </header>
 
@@ -355,6 +359,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=16"></script>
+<script type="module" src="js/app.js?v=17"></script>
 </body>
 </html>

@@ -67,6 +67,7 @@ export async function fetchPrograms(forceRefresh = false) {
       group:         p.department    || 'General',
       required:      p.elective === false,
       costBasis:     p.costBasis     || 'Manual',
+      customFormula: p.customFormula || null,
       rate:          rate,
       systems,
       billingPeriod: p.billingPeriod || 'annual',
@@ -83,6 +84,7 @@ export async function fetchPrograms(forceRefresh = false) {
       billingStart:  p.billingStart  || null,
       programOwner:  p.owner         || '',
       priorYearCost: p.priorYearCost ?? 0,
+      priorYearNote: p.priorYearNote || null,
     };
   });
 
@@ -119,6 +121,25 @@ export async function deleteProgram(id) {
   if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
   clearFirebaseCache();
   return true;
+}
+
+// Admin-added custom cost-basis type names (shared across all admins).
+export async function fetchCostBasisTypes() {
+  try {
+    const res = await fetch(`${CONFIG.firebase.url}/meta/costBasisTypes.json`);
+    if (!res.ok) return [];
+    return (await res.json()) || [];
+  } catch { return []; }
+}
+
+export async function addCostBasisType(name) {
+  const current = await fetchCostBasisTypes();
+  if (current.includes(name)) return current;
+  const updated = [...current, name];
+  await fetch(`${CONFIG.firebase.url}/meta/costBasisTypes.json`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated),
+  });
+  return updated;
 }
 
 // ── Filter programs by selected system type ────────────────────────────────────

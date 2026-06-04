@@ -2,12 +2,16 @@
 // Light-touch gated editor for the Firebase program catalog.
 // Login = any name + passcode "Budgets". Edits write straight to Firebase.
 
-import { fetchRawPrograms, saveProgram, deleteProgram } from './firebase.js';
+import { fetchRawPrograms, saveProgram, deleteProgram, fetchCostBasisTypes, addCostBasisType } from './firebase.js';
 import { showScreen, openModal, closeModal } from './ui.js';
 
 const PASSCODE = 'Budgets';
 
-const COST_BASES = ['Flat Fee', 'Per Unit', 'Per Item', 'Tiered', 'Flat + Per Unit', 'Manual'];
+const STRUCTURED_BASES = ['Flat Fee', 'Per Unit', 'Per Item', 'Tiered', 'Flat + Per Unit', 'Manual'];
+let extraTypes = [];   // admin-added cost-basis type names (formula-driven)
+const ADD_NEW = '➕ Add new type…';
+// True when this cost basis uses a custom formula (Custom Formula or any added type)
+const isFormulaType = (cb) => cb === 'Custom Formula' || (!STRUCTURED_BASES.includes(cb) && cb !== ADD_NEW);
 const BILLING    = ['monthly', 'quarterly', 'bi-annual', 'annual', 'as-incurred', 'one-time'];
 const TIER_TYPES = ['flat', 'per-unit-month', 'per-unit-year', 'per-item'];
 const SYSTEMS    = [['Yardi', 'Yardi'], ['OneSite', 'OneSite'], ['PaceOneSite', 'Pace + OneSite']];
@@ -57,6 +61,7 @@ function tryLogin() {
 async function openAdmin() {
   showScreen('screen-admin');
   document.getElementById('admin-user-note').textContent = `Signed in as ${adminName} · changes save to Firebase for everyone`;
+  try { extraTypes = await fetchCostBasisTypes(); } catch { extraTypes = []; }
   await renderList();
 }
 
@@ -102,10 +107,10 @@ async function renderList() {
 function blankProgram() {
   return {
     name: '', department: '', elective: true, costBasis: 'Flat Fee',
-    rate: '', itemLabel: '', baseFee: '', options: [],
+    rate: '', itemLabel: '', baseFee: '', options: [], customFormula: '',
     billingPeriod: 'monthly', billingStart: 'January',
     systems: ['Yardi', 'OneSite', 'PaceOneSite'],
-    setupFee: '', costRaw: '', description: '', resourceUrl: '',
+    setupFee: '', priorYearNote: '', costRaw: '', description: '', resourceUrl: '',
     yardiGL: '', onesiteGL: '', paceGL: '', owner: '',
   };
 }
@@ -133,6 +138,10 @@ function buildEditor() {
   const showItem    = cb === 'Per Item';
   const showBase    = cb === 'Flat + Per Unit';
   const showTiers   = cb === 'Tiered';
+  const showFormula = isFormulaType(cb);
+
+  // Cost-basis dropdown: structured types + Custom Formula + admin-added types + "Add new"
+  const basisOptions = [...STRUCTURED_BASES, 'Custom Formula', ...extraTypes, ADD_NEW];
 
   body.innerHTML = `
     <div class="admin-editor-head">
@@ -163,7 +172,7 @@ function buildEditor() {
       <label class="ae-field">
         <span>Cost basis</span>
         <select id="ae-costBasis">
-          ${COST_BASES.map(c => `<option value="${c}"${c === cb ? ' selected' : ''}>${c}</option>`).join('')}
+          ${basisOptions.map(c => `<option value="${c}"${c === cb ? ' selected' : ''}>${c}</option>`).join('')}
         </select>
       </label>
 
@@ -190,6 +199,13 @@ function buildEditor() {
       <label class="ae-field">
         <span>Base fee ($)</span>
         <input id="ae-baseFee" type="number" step="0.01" min="0" value="${esc(form.baseFee)}" placeholder="0.00">
+      </label>` : ''}
+
+      ${showFormula ? `
+      <label class="ae-field ae-wide">
+        <span>Custom formula <span class="label-soft">— use <code>units</code> and <code>qty</code> (e.g. <code>0.45 * units</code> or <code>375 + 3.59 * units</code>)</span></span>
+        <input id="ae-customFormula" type="text" value="${esc(form.customFormula)}" placeholder="e.g. 40 + 12 * (qty - 1)">
+        <span class="ae-formula-note">Allowed: numbers, + − * / ( ), and the words <b>units</b> &amp; <b>qty</b>. Result is the ${form.billingPeriod === 'monthly' ? 'monthly' : 'annual'} amount.</span>
       </label>` : ''}
 
       ${form.billingPeriod !== 'monthly' && form.billingPeriod !== 'as-incurred' ? `
@@ -239,6 +255,7 @@ function buildEditor() {
         <label class="ae-field"><span>Pace GL</span><input id="ae-paceGL" type="text" value="${esc(form.paceGL)}"></label>
         <label class="ae-field"><span>Program owner</span><input id="ae-owner" type="text" value="${esc(form.owner)}"></label>
         <label class="ae-field ae-wide"><span>Setup fee (description)</span><input id="ae-setupFee" type="text" value="${esc(form.setupFee)}" placeholder="e.g. $750 flat fee at implementation"></label>
+        <label class="ae-field ae-wide"><span>Prior year cost note</span><input id="ae-priorYearNote" type="text" value="${esc(form.priorYearNote)}" placeholder="e.g. Up from $1.50/unit last year"></label>
         <label class="ae-field ae-wide"><span>Program guide URL</span><input id="ae-resourceUrl" type="text" value="${esc(form.resourceUrl)}" placeholder="https://…"></label>
         <label class="ae-field ae-wide"><span>Description</span><textarea id="ae-description" rows="2">${esc(form.description)}</textarea></label>
       </div>
@@ -276,12 +293,26 @@ function wireEditor() {
   bind('ae-paceGL', 'paceGL');
   bind('ae-owner', 'owner');
   bind('ae-setupFee', 'setupFee');
+  bind('ae-priorYearNote', 'priorYearNote');
   bind('ae-resourceUrl', 'resourceUrl');
   bind('ae-description', 'description');
+  bind('ae-customFormula', 'customFormula');
 
   document.getElementById('ae-elective').addEventListener('change', e => { form.elective = e.target.value === 'true'; });
   document.getElementById('ae-billingPeriod').addEventListener('change', e => { form.billingPeriod = e.target.value; buildEditor(); });
-  document.getElementById('ae-costBasis').addEventListener('change', e => { form.costBasis = e.target.value; buildEditor(); });
+  document.getElementById('ae-costBasis').addEventListener('change', async e => {
+    if (e.target.value === ADD_NEW) {
+      const name = (prompt('Name the new cost basis type:') || '').trim();
+      if (name && !STRUCTURED_BASES.includes(name) && name !== 'Custom Formula' && !extraTypes.includes(name)) {
+        try { extraTypes = await addCostBasisType(name); } catch {}
+        form.costBasis = name;
+      } // else fall back to current
+      buildEditor();
+      return;
+    }
+    form.costBasis = e.target.value;
+    buildEditor();
+  });
   document.getElementById('ae-billingStart')?.addEventListener('change', e => { form.billingStart = e.target.value; updatePreview(); });
 
   // Systems checkboxes
@@ -344,10 +375,32 @@ function updatePreview() {
       note = `${form.options.length} option(s). First: ${first.label || '—'} @ ${money(parseFloat(first.rate) || 0)}`;
       break;
     }
-    default:
+    case 'Manual':
       note = 'Manual — PM enters the dollar amount.';
+      break;
+    default: {
+      // Custom Formula or an added type
+      if (isFormulaType(form.costBasis)) {
+        const r = evalFormula(form.customFormula, units, 0);
+        if (r === null) { note = '⚠️ Formula invalid — only numbers, + − * / ( ), and units / qty allowed.'; }
+        else { annual = mo ? r * 12 : r; note = `Formula → ${money(r)}${mo ? '/mo → ' + money(annual) + '/yr' : '/yr'} (at ${units} units, qty 0)`; }
+      } else {
+        note = 'Manual — PM enters the dollar amount.';
+      }
+    }
   }
   el.innerHTML = `<span class="ae-preview-label">Preview (at ${units} units)</span> ${note}`;
+}
+
+// Mirror of the app's safe evaluator — returns null on invalid input.
+function evalFormula(formula, units, qty) {
+  if (!formula) return 0;
+  const cleaned = String(formula).replace(/\bunits\b/g, '(U)').replace(/\bqty\b/g, '(Q)');
+  if (/[^0-9+\-*/().\sUQ]/.test(cleaned)) return null;
+  try {
+    const v = new Function('U', 'Q', `"use strict"; return (${cleaned});`)(units || 0, qty || 0);
+    return (typeof v === 'number' && isFinite(v)) ? v : null;
+  } catch { return null; }
 }
 
 // ── Save / delete ────────────────────────────────────────────────────────────
@@ -371,10 +424,12 @@ async function save() {
     options: (form.costBasis === 'Tiered')
       ? form.options.filter(o => o.label).map(o => ({ label: o.label, rate: cleanNum(o.rate) || 0, type: o.type || 'flat' }))
       : [],
+    customFormula: isFormulaType(form.costBasis) ? (form.customFormula || null) : null,
     billingPeriod: form.billingPeriod,
     billingStart: form.billingStart || null,
     systems: (Array.isArray(form.systems) && form.systems.length) ? form.systems : ['Yardi', 'OneSite', 'PaceOneSite'],
     setupFee: form.setupFee || null,
+    priorYearNote: form.priorYearNote || null,
     costRaw: form.costRaw || null,
     description: form.description || null,
     resourceUrl: form.resourceUrl || null,
