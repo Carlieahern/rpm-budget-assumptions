@@ -137,12 +137,7 @@ async function launchMain() {
     ]);
 
     S.allPrograms = programs;
-    // Resolve the correct cost + GL for the selected system
-    S.programs = filterBySystem(programs, S.systemType).map(p => ({
-      ...p,
-      cost:   p.costs[S.systemType]   ?? 0,
-      glCode: p.glCodes[S.systemType] ?? '—',
-    }));
+    applyVisiblePrograms();
     S.decisions      = decisions;
     S.priorDecisions = priorDecisions;
 
@@ -1272,29 +1267,37 @@ document.getElementById('btn-units-save').addEventListener('click', () => {
 
 document.getElementById('btn-units-cancel').addEventListener('click', () => closeModal('modal-units'));
 
+// Build S.programs from S.allPrograms. Admin mode shows ALL programs (every
+// system) so you never have to switch views to edit; PMs see only their system.
+function applyVisiblePrograms() {
+  const src = S.admin ? S.allPrograms : filterBySystem(S.allPrograms, S.systemType);
+  S.programs = src.map(p => ({
+    ...p,
+    cost:   p.costs[S.systemType]   ?? 0,
+    glCode: p.glCodes[S.systemType] ?? '—',
+  }));
+}
+
 // ── Inline admin mode ─────────────────────────────────────────────────────────
 // Re-pull programs from Firebase and re-render the dashboard (after an edit/add).
 async function refreshDashboard() {
   clearFirebaseCache();
   try {
-    const programs = await fetchPrograms(true);
-    S.allPrograms = programs;
-    S.programs = filterBySystem(programs, S.systemType).map(p => ({
-      ...p,
-      cost:   p.costs[S.systemType]   ?? 0,
-      glCode: p.glCodes[S.systemType] ?? '—',
-    }));
+    S.allPrograms = await fetchPrograms(true);
+    applyVisiblePrograms();
     renderMainScreen();
   } catch (e) { console.error('Refresh failed', e); }
 }
 
 function enterAdminMode() {
   S.admin = true;
+  applyVisiblePrograms();
   document.getElementById('mi-admin-mode-label').textContent = 'Exit Admin Mode';
   renderMainScreen();
 }
 function exitAdminMode() {
   S.admin = false;
+  applyVisiblePrograms();
   document.getElementById('mi-admin-mode-label').textContent = 'Enter Admin Mode';
   renderMainScreen();
 }
