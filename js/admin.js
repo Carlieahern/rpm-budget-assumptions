@@ -34,13 +34,7 @@ const money = n => isNaN(n) ? '—' : new Intl.NumberFormat('en-US', { style: 'c
 
 // ── Boot wiring ────────────────────────────────────────────────────────────────
 export function initAdmin() {
-  document.getElementById('btn-admin-entry')?.addEventListener('click', () => {
-    document.getElementById('admin-login-error').textContent = '';
-    document.getElementById('admin-name').value = '';
-    document.getElementById('admin-pass').value = '';
-    openModal('modal-admin-login');
-  });
-
+  // The setup-screen "Admin" link is wired by app.js to enter inline admin mode.
   document.getElementById('btn-admin-login-cancel')?.addEventListener('click', () => closeModal('modal-admin-login'));
   document.getElementById('btn-admin-login')?.addEventListener('click', tryLogin);
   document.getElementById('admin-pass')?.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });

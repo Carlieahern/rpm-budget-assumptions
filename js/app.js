@@ -1306,6 +1306,21 @@ document.getElementById('mi-admin-mode').addEventListener('click', () => {
   promptAdminLogin(enterAdminMode);
 });
 
+// Setup-screen "Admin" link → log in, turn on admin mode, and open the dashboard
+// (uses the selected property if any; defaults the system so cards are visible).
+async function enterAdminFromSetup() {
+  S.admin      = true;
+  S.mode       = 'interactive';
+  S.property   = document.getElementById('property-select').value || null;
+  S.systemType = S.systemType || 'Yardi';
+  document.getElementById('mi-admin-mode-label').textContent = 'Exit Admin Mode';
+  await launchMain();
+}
+document.getElementById('btn-admin-entry').addEventListener('click', () => {
+  if (isAdminAuthed()) enterAdminFromSetup();
+  else promptAdminLogin(enterAdminFromSetup);
+});
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 document.getElementById('btn-view-summary').addEventListener('click', openSummary);
 
