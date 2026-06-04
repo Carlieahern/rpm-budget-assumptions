@@ -2,7 +2,7 @@ import CONFIG from './config.js';
 import { fetchProperties, clearMondayCache } from './monday.js';
 import { fetchPrograms, filterBySystem, clearFirebaseCache } from './firebase.js';
 import { loadDecisions, saveDecision, deleteDecision, resetDecisions, loadPriorYearDecisions } from './sharepoint.js';
-import { showScreen, openModal, closeModal, groupStyle, formatCost,
+import { showScreen, openModal, closeModal, groupStyle, formatCost, formatRate,
          renderSummary, populatePropertySelect } from './ui.js';
 
 // ── App State ───────────────────────────────────────────────────────────────
@@ -19,6 +19,7 @@ const S = {
   quantities:      {},    // programId → per-card override quantity
   selectedTiers:   {},    // programId → selected tier index for tiered costs
   budgetAmounts:   {},    // programId → manual dollar amount (fallback for complex costs)
+  incurMonths:     {},    // programId → [month indices] for as-incurred programs
   currentOptOutId: null,
   viewingPrior:    false,
 };
@@ -138,6 +139,7 @@ async function launchMain() {
     try { S.quantities    = JSON.parse(localStorage.getItem(`rpm_qty_${S.property}_${S.budgetYear}`))   || {}; } catch { S.quantities    = {}; }
     try { S.selectedTiers = JSON.parse(localStorage.getItem(`rpm_tiers_${S.property}_${S.budgetYear}`)) || {}; } catch { S.selectedTiers = {}; }
     try { S.budgetAmounts = JSON.parse(localStorage.getItem(`rpm_budget_${S.property}_${S.budgetYear}`)) || {}; } catch { S.budgetAmounts = {}; }
+    try { S.incurMonths   = JSON.parse(localStorage.getItem(`rpm_incur_${S.property}_${S.budgetYear}`))  || {}; } catch { S.incurMonths   = {}; }
 
     renderMainScreen();
     showScreen('screen-main');
@@ -285,10 +287,15 @@ function getMonthlyBreakdown() {
       const hit = annual / 2;
       months[start % 12] += hit;
       months[(start + 6) % 12] += hit;
+    } else if (freq.includes('incurred') || freq.includes('implement')) {
+      const sel = S.incurMonths[p.id] || [];
+      if (sel.length) {
+        const per = annual / sel.length;
+        sel.forEach(m => months[m] += per);
+      }
     } else if (freq.includes('annual')) {
       months[start % 12] += annual;
     }
-    // as-incurred / when-implemented: excluded
   });
 
   return months;
@@ -617,11 +624,11 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   // Subtitle line under the program name — the rate basis
   let subtitle = '';
   if (info.type === 'per-unit' || info.type === 'per-quantity') {
-    subtitle = `${formatCost(info.rate)} / ${info.label.toLowerCase()}`;
+    subtitle = `${formatRate(info.rate)} / ${info.label.toLowerCase()}`;
   } else if (info.type === 'flat') {
     subtitle = 'Flat fee';
   } else if (info.type === 'flat-per-unit') {
-    subtitle = `${formatCost(info.baseFee)} base + ${formatCost(info.rate)} / unit`;
+    subtitle = `${formatRate(info.baseFee)} base + ${formatRate(info.rate)} / unit`;
   } else if (info.type === 'tiered') {
     subtitle = info.isPerUnit ? 'Select tier · per unit' : 'Select one';
   }
@@ -632,12 +639,12 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   if (info.type === 'per-unit' || info.type === 'per-quantity') {
     bodyHtml = `
       <div class="card-calc">
-        <span class="calc-rate">${formatCost(info.rate)}</span>
+        <span class="calc-rate">${formatRate(info.rate)}</span>
         <span class="calc-x">×</span>
         <div class="qty-field">
           <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
-          <span class="qty-label">${info.plural}</span>
         </div>
+        <span class="qty-label">${info.plural}</span>
       </div>`;
 
   } else if (info.type === 'tiered') {
@@ -647,15 +654,15 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     const tiersHtml = (info.tiers || []).map((t, i) => `
       <label class="tier-option${i === tierIdx ? ' is-selected' : ''}">
         <input type="radio" class="tier-radio" name="tier_${program.id}" data-pid="${program.id}" data-tier="${i}"${i === tierIdx ? ' checked' : ''}>
-        <span class="tier-label">${t.label} <span class="tier-rate">(${formatCost(t.rate)}${perSuffix})</span></span>
+        <span class="tier-label">${t.label} <span class="tier-rate">(${formatRate(t.rate)}${perSuffix})</span></span>
       </label>`).join('');
     const qtyField = info.isPerUnit ? `
       <div class="card-calc">
         <span class="calc-x">×</span>
         <div class="qty-field">
           <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
-          <span class="qty-label">Units</span>
         </div>
+        <span class="qty-label">Units</span>
       </div>` : '';
     bodyHtml = `
       <div class="tier-select-label">${info.isPerUnit ? 'Select a tier' : 'Select one'}</div>
@@ -665,14 +672,14 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   } else if (info.type === 'flat-per-unit') {
     bodyHtml = `
       <div class="card-calc">
-        <span class="calc-rate">${formatCost(info.baseFee)} base</span>
+        <span class="calc-rate">${formatRate(info.baseFee)} base</span>
         <span class="calc-x">+</span>
-        <span class="calc-rate">${formatCost(info.rate)}/unit</span>
+        <span class="calc-rate">${formatRate(info.rate)}/unit</span>
         <span class="calc-x">×</span>
         <div class="qty-field">
           <input class="qty-input" data-pid="${program.id}" type="number" min="0" placeholder="0" value="${qty || ''}">
-          <span class="qty-label">Units</span>
         </div>
+        <span class="qty-label">Units</span>
       </div>`;
 
   } else if (info.type === 'manual') {
@@ -682,6 +689,20 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
         <span class="budget-input-label">Budget&nbsp;$</span>
         <input class="budget-input" data-pid="${program.id}" type="number" min="0" step="1"
                placeholder="Enter amount" value="${savedAmt !== undefined ? savedAmt : ''}">
+      </div>`;
+  }
+
+  // As-incurred programs: let the PM flag which months they expect the expense
+  const isAsIncurred = (program.billingFreq || program.billingPeriod || '').toLowerCase().includes('incurred');
+  if (isAsIncurred) {
+    const sel = S.incurMonths[program.id] || [];
+    const chips = MONTH_NAMES.map((m, i) =>
+      `<button type="button" class="incur-chip${sel.includes(i) ? ' on' : ''}" data-month="${i}">${m}</button>`
+    ).join('');
+    bodyHtml += `
+      <div class="incur-months">
+        <div class="incur-label">Expected in which months?</div>
+        <div class="incur-chips">${chips}</div>
       </div>`;
   }
 
@@ -761,6 +782,21 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     const heroEl = el.querySelector('.cost-hero-num');
     if (heroEl) heroEl.textContent = heroCost(program);
   };
+
+  // As-incurred month chips
+  el.querySelectorAll('.incur-chip').forEach(chip => {
+    chip.addEventListener('click', e => {
+      e.stopPropagation();
+      const m   = parseInt(chip.dataset.month);
+      const arr = S.incurMonths[program.id] || [];
+      const idx = arr.indexOf(m);
+      if (idx >= 0) arr.splice(idx, 1); else arr.push(m);
+      S.incurMonths[program.id] = arr;
+      localStorage.setItem(`rpm_incur_${S.property}_${S.budgetYear}`, JSON.stringify(S.incurMonths));
+      chip.classList.toggle('on');
+      updateBudgetTotal();
+    });
+  });
 
   const qtyInput = el.querySelector('.qty-input');
   if (qtyInput) {
@@ -984,9 +1020,11 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
     S.quantities     = {};   // per-card overrides cleared; S.unitCount preserved
     S.selectedTiers  = {};
     S.budgetAmounts  = {};
+    S.incurMonths    = {};
     localStorage.removeItem(`rpm_qty_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_tiers_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_budget_${S.property}_${S.budgetYear}`);
+    localStorage.removeItem(`rpm_incur_${S.property}_${S.budgetYear}`);
     renderMainScreen();
     showScreen('screen-main');
   } catch (e) {

@@ -2334,20 +2334,56 @@ body {
   font-weight: 500;
 }
 .qty-field {
-  background: rgba(255,255,255,0.16);
-  border: 1.5px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.92);
+  border: 1.5px solid rgba(255,255,255,0.6);
   border-radius: 999px;
-  padding: 5px 14px;
+  padding: 5px 16px;
 }
-.qty-field:focus-within { border-color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.24); }
-.qty-input { color: #fff; font-family: 'Space Grotesk', sans-serif; font-weight: 600; }
-.qty-label { color: rgba(255,255,255,0.65); text-transform: uppercase; letter-spacing: 0.06em; }
+.qty-field:focus-within { border-color: #fff; background: #fff; }
+.qty-input { color: var(--navy); font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
+.qty-input::placeholder { color: rgba(27,42,74,0.35); font-weight: 500; }
+.qty-label { color: rgba(255,255,255,0.75); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
 .budget-input-label { color: rgba(255,255,255,0.8); font-size: 13px; font-weight: 600; }
 .budget-input {
-  background: rgba(255,255,255,0.16);
-  border: 1.5px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.92);
+  border: 1.5px solid rgba(255,255,255,0.6);
   border-radius: 999px;
-  color: #fff;
+  color: var(--navy);
+  font-weight: 700;
+}
+.budget-input::placeholder { color: rgba(27,42,74,0.35); font-weight: 500; }
+
+/* ── As-incurred month picker ── */
+.incur-months { margin-top: 4px; }
+.incur-label {
+  font-size: 13px;
+  font-style: italic;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 8px;
+}
+.incur-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.incur-chip {
+  background: rgba(255,255,255,0.12);
+  border: 1.5px solid rgba(255,255,255,0.25);
+  border-radius: 999px;
+  color: rgba(255,255,255,0.7);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.incur-chip:hover { border-color: rgba(255,255,255,0.5); color: #fff; }
+.incur-chip.on {
+  background: #fff;
+  color: var(--navy);
+  border-color: #fff;
 }
 
 /* ── Tier options (text rows, no boxes) ── */

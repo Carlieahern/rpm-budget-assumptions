@@ -26,6 +26,17 @@ export function formatCost(cost) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(cost);
 }
 
+// Per-unit / per-item rates — keep the cents so sub-$1 rates don't read as $0.
+// Whole numbers stay clean ($300, not $300.00); fractional show 2 decimals ($0.45, $1.50).
+export function formatRate(rate) {
+  if (rate == null) return '—';
+  const decimals = Number.isInteger(rate) ? 0 : 2;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency', currency: 'USD',
+    minimumFractionDigits: decimals, maximumFractionDigits: decimals,
+  }).format(rate);
+}
+
 // ── Screens ────────────────────────────────────────────────────────────────
 export function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
