@@ -498,7 +498,7 @@ function renderMonthlyBreakdown() {
         <div class="mb-bar-track">
           <div class="mb-bar" style="width:${zero ? 0 : Math.max(pct, 4)}%"></div>
         </div>
-        <span class="mb-amount">${zero ? '—' : fmtMo.format(val)}</span>
+        <span class="mb-amount">${zero ? '—' : formatCost(val)}</span>
       </div>`;
   }).join('');
 
@@ -515,10 +515,9 @@ const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD',
 
 function animateCost(el, newVal) {
   if (!el) return;
-  const oldText = el.textContent.replace(/[^0-9.]/g, '');
-  const oldVal  = parseFloat(oldText) || 0;
-  if (Math.round(oldVal) === Math.round(newVal)) {
-    el.textContent = newVal > 0 ? fmt.format(newVal) : '—';
+  const oldVal = parseFloat(el.textContent.replace(/[^0-9.]/g, '')) || 0;
+  if (Math.abs(oldVal - newVal) < 0.005) {
+    el.textContent = newVal > 0 ? formatCost(newVal) : '—';   // exact, with cents
     return;
   }
   const duration = 450;
@@ -527,7 +526,8 @@ function animateCost(el, newVal) {
     const p = Math.min((now - start) / duration, 1);
     const eased = 1 - Math.pow(1 - p, 3); // ease-out cubic
     const cur = oldVal + (newVal - oldVal) * eased;
-    el.textContent = newVal > 0 ? fmt.format(cur) : '—';
+    // Smooth whole-dollar count during the animation, exact value at the end
+    el.textContent = newVal > 0 ? (p >= 1 ? formatCost(newVal) : fmt.format(cur)) : '—';
     if (p < 1) requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
@@ -857,12 +857,14 @@ function buildComponentBody(program) {
         </div>`;
       }
       case 'percent': {
-        const baseLabel = part.base === 'capex' ? 'CapEx' : 'income';
+        const baseLabel = part.base === 'capex' ? 'CapEx budget' : 'total income';
         if (part.locked) return `<div class="comp-line"><span class="comp-label">${part.label || `${num(part.pct)}% of ${baseLabel}`}</span></div>`;
         const v = S.compInputs[key] != null ? S.compInputs[key] : (part.baseDefault || '');
+        const result = num(part.pct) / 100 * num(v);
         return `<div class="card-calc">
           <span class="calc-rate">${num(part.pct)}% of ${baseLabel}</span><span class="calc-x">×</span>
-          <div class="qty-field"><input class="comp-input" data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="$ ${baseLabel}" value="${v}"></div>
+          <div class="qty-field"><input class="comp-input" data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="Enter ${baseLabel} $" value="${v}"></div>
+          ${num(v) > 0 ? `<span class="qty-equals">= <strong>${formatCost(result)}</strong></span>` : ''}
         </div>`;
       }
       case 'options': {
@@ -904,6 +906,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   if (S.mode === 'info') return buildInfoCard(program);
   const el = document.createElement('div');
   el.className = 'prog-card';
+  if (!isRequired) el.classList.add('is-elective');   // elective = white/copper theme
   el.dataset.programId = program.id;
 
   const dec = decision?.decision;

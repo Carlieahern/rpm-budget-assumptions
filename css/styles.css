@@ -1009,6 +1009,58 @@ body {
   filter: grayscale(0.5);
   pointer-events: none;
 }
+
+/* ── Elective cards: white with copper outline + copper text ── */
+.prog-card.is-elective {
+  background: #ffffff;
+  box-shadow: inset 0 0 0 2px var(--copper), 0 2px 8px rgba(0,0,0,0.06);
+}
+.prog-card.is-elective.is-included {
+  background: #fdf4ea;
+  box-shadow: inset 0 0 0 2px var(--copper), 0 3px 12px rgba(0,0,0,0.08);
+}
+.prog-card.is-elective .prog-card-name,
+.prog-card.is-elective .cost-hero-num,
+.prog-card.is-elective .calc-rate,
+.prog-card.is-elective .comp-label,
+.prog-card.is-elective .comp-val,
+.prog-card.is-elective .tier-label,
+.prog-card.is-elective .tier-rate,
+.prog-card.is-elective .qty-equals strong { color: var(--copper2); }
+.prog-card.is-elective .cost-hero-period,
+.prog-card.is-elective .card-rate-basis,
+.prog-card.is-elective .card-owner,
+.prog-card.is-elective .card-gl,
+.prog-card.is-elective .card-billing,
+.prog-card.is-elective .prog-card-desc,
+.prog-card.is-elective .qty-label,
+.prog-card.is-elective .qty-sep,
+.prog-card.is-elective .qty-equals,
+.prog-card.is-elective .tier-select-label,
+.prog-card.is-elective .input-note,
+.prog-card.is-elective .cost-raw-text { color: #9a7350; }
+.prog-card.is-elective .card-gl { background: #f4e7d8; }
+.prog-card.is-elective .prog-card-meta-row { border-top-color: #eedcc9; }
+.prog-card.is-elective .card-divider { background: #eedcc9; }
+/* inputs / pills on white */
+.prog-card.is-elective .qty-field { background: #faf3ec; border-color: #e3c4a3; }
+.prog-card.is-elective .qty-field:focus-within { background: #fff; border-color: var(--copper); }
+.prog-card.is-elective .qty-input { color: var(--copper2); }
+.prog-card.is-elective .qty-input::placeholder { color: #c4a584; }
+.prog-card.is-elective .tier-option,
+.prog-card.is-elective .addrow { background: #faf3ec; border-color: #e3c4a3; }
+.prog-card.is-elective .tier-option.is-selected { background: #f5e6d6; border-color: var(--copper); }
+.prog-card.is-elective .incur-chip { background: #faf3ec; border-color: #e3c4a3; color: #9a7350; }
+.prog-card.is-elective .incur-chip.on { background: var(--copper); border-color: var(--copper); color: #fff; }
+/* buttons on white */
+.prog-card.is-elective .btn-card-ghost { background: #faf3ec; border-color: #e3c4a3; color: var(--copper2); }
+.prog-card.is-elective .btn-card-ghost:hover { background: #f2e2cf; }
+.prog-card.is-elective .btn-card-ghost.is-on-out { background: #6b7280; border-color: #6b7280; color: #fff; }
+.prog-card.is-elective .btn-card-fill { background: var(--copper); color: #fff; }
+.prog-card.is-elective .btn-card-fill.is-on { background: #fff; color: var(--copper2); box-shadow: inset 0 0 0 2px var(--copper); }
+
+/* Elective column header in copper to match */
+.col-hdr-cell:last-child .col-title { color: var(--copper2); }
 .prog-card.is-excluded .prog-card-action {
   pointer-events: all;
 }

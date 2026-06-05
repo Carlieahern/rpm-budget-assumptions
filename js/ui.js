@@ -23,7 +23,10 @@ export function groupStyle(groupTitle = '') {
 
 export function formatCost(cost) {
   if (!cost) return '—';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(cost);
+  // Exact: keep cents when the value isn't a whole dollar, clean when it is.
+  const rounded  = Math.round(cost * 100) / 100;
+  const decimals = Number.isInteger(rounded) ? 0 : 2;
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: decimals, maximumFractionDigits: 2 }).format(cost);
 }
 
 // Per-unit / per-item rates — keep the cents so sub-$1 rates don't read as $0.
