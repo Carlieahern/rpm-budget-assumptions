@@ -721,6 +721,7 @@ function updateColumnCounts() {
 function buildInfoCard(program) {
   const el = document.createElement('div');
   el.className = 'prog-card prog-card-info';
+  if (!program.required) el.classList.add('is-elective');   // mirror interactive theme
   el.dataset.programId = program.id;
 
   const info   = parseCostBasisInfo(program);
@@ -778,18 +779,24 @@ function buildInfoCard(program) {
   }
   if (program.inputNote) bodyHtml += `<div class="input-note">${program.inputNote}</div>`;
 
-  // Static billing-month chips (non-interactive)
-  const freqStr     = (program.billingFreq || program.billingPeriod || '').toLowerCase();
-  const isRecurring = /monthly|quarter|annual|bi-/.test(freqStr);
+  // Billing timing as plain text — "Billed monthly" or the specific months
+  const freqStr = (program.billingFreq || program.billingPeriod || '').toLowerCase();
   let monthsHtml = '';
-  if (isRecurring) {
+  let timingText = '';
+  if (freqStr.includes('monthly')) {
+    timingText = 'Billed monthly';
+  } else if (freqStr.includes('incurred') || freqStr.includes('implement')) {
+    timingText = 'Billed as incurred';
+  } else if (/quarter|annual|bi-/.test(freqStr)) {
     const active = activeMonthsFor(program);
-    monthsHtml = `
-      <div class="incur-months">
-        <div class="incur-label">Billing months</div>
-        <div class="incur-chips">${MONTH_NAMES.map((m, i) => `<span class="incur-chip${active.includes(i) ? ' on' : ''} is-static">${m}</span>`).join('')}</div>
-      </div>`;
+    if (active.length) {
+      timingText = `Billed in ${active.map(m => MONTH_NAMES[m]).join(', ')}`;
+      if (program.monthsFixed) timingText += ' · fixed';
+    } else if (freqStr.includes('quarter')) timingText = 'Billed quarterly';
+    else if (freqStr.includes('bi-'))       timingText = 'Billed twice a year';
+    else                                    timingText = 'Billed annually';
   }
+  if (timingText) monthsHtml = `<div class="info-billing-text">${timingText}</div>`;
 
   const resourceLink = program.resourceUrl
     ? `<a class="card-guide-link" href="${program.resourceUrl}" target="_blank" rel="noopener">Click here for the program guide →</a>`
