@@ -4,7 +4,7 @@ import { fetchPrograms, filterBySystem, clearFirebaseCache } from './firebase.js
 import { loadDecisions, saveDecision, deleteDecision, resetDecisions, loadPriorYearDecisions } from './sharepoint.js';
 import { showScreen, openModal, closeModal, groupStyle, formatCost, formatRate,
          renderSummary, populatePropertySelect } from './ui.js';
-import { initAdmin, promptAdminLogin, editProgram, newProgram, isAdminAuthed } from './admin.js';
+import { initAdmin, promptAdminLogin, editProgram, newProgram, isAdminAuthed, openAdmin } from './admin.js';
 
 // ── App State ───────────────────────────────────────────────────────────────
 const S = {
@@ -22,6 +22,8 @@ const S = {
   quantities:      {},    // programId → per-card override quantity
   selectedTiers:   {},    // programId → selected tier index for tiered costs (pick-one mode)
   optionQty:       {},    // programId → [qty per option] for additive tiered costs
+  compInputs:      {},    // "programId:partIdx" → PM numeric input (per-item qty, % base, formula qty)
+  compSel:         {},    // "programId:partIdx" → option selection (index for one, [qty] for multiple)
   budgetAmounts:   {},    // programId → manual dollar amount (fallback for complex costs)
   incurMonths:     {},    // programId → [month indices] for as-incurred programs
   currentOptOutId: null,
@@ -148,6 +150,8 @@ async function launchMain() {
     try { S.quantities    = JSON.parse(localStorage.getItem(`rpm_qty_${S.property}_${S.budgetYear}`))   || {}; } catch { S.quantities    = {}; }
     try { S.selectedTiers = JSON.parse(localStorage.getItem(`rpm_tiers_${S.property}_${S.budgetYear}`)) || {}; } catch { S.selectedTiers = {}; }
     try { S.optionQty     = JSON.parse(localStorage.getItem(`rpm_optqty_${S.property}_${S.budgetYear}`)) || {}; } catch { S.optionQty     = {}; }
+    try { S.compInputs    = JSON.parse(localStorage.getItem(`rpm_compin_${S.property}_${S.budgetYear}`)) || {}; } catch { S.compInputs    = {}; }
+    try { S.compSel       = JSON.parse(localStorage.getItem(`rpm_compsel_${S.property}_${S.budgetYear}`)) || {}; } catch { S.compSel       = {}; }
     try { S.budgetAmounts = JSON.parse(localStorage.getItem(`rpm_budget_${S.property}_${S.budgetYear}`)) || {}; } catch { S.budgetAmounts = {}; }
     try { S.incurMonths   = JSON.parse(localStorage.getItem(`rpm_incur_${S.property}_${S.budgetYear}`))  || {}; } catch { S.incurMonths   = {}; }
 
@@ -257,7 +261,58 @@ function customResult(program, info) {
   return safeFormula(info.formula, S.unitCount, qty);
 }
 
+// ── Universal cost builder ─────────────────────────────────────────────────────
+// A program's cost = sum of its parts (components). Each part returns a per-billing-
+// period amount; resolvedCost annualizes + clamps. PM inputs are keyed "id:idx".
+function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+function partPeriodCost(program, part, idx) {
+  const key = `${program.id}:${idx}`;
+  switch (part.kind) {
+    case 'flat':
+      return num(part.amount);
+    case 'perUnit':
+      return num(part.rate) * (S.unitCount + num(part.baseQty));
+    case 'perItem': {
+      const pm = part.locked ? 0 : num(S.compInputs[key]);
+      return num(part.rate) * (num(part.baseQty) + pm);
+    }
+    case 'percent': {
+      const base = part.locked ? num(part.baseDefault)
+                 : (S.compInputs[key] != null ? num(S.compInputs[key]) : num(part.baseDefault));
+      return num(part.pct) / 100 * base;
+    }
+    case 'options': {
+      const opts = part.options || [];
+      if (part.selectMode === 'multiple') {
+        const qtys = S.compSel[key] || [];
+        return opts.reduce((s, o, i) => s + num(o.rate) * (qtys[i] || 0), 0);
+      }
+      const sel = S.compSel[key] ?? 0;
+      return num(opts[sel]?.rate);
+    }
+    case 'formula':
+      return safeFormula(part.expr, S.unitCount, num(S.compInputs[key]));
+    default:
+      return 0;
+  }
+}
+
+function componentPeriodCost(program) {
+  return (program.components || []).reduce((s, part, i) => s + partPeriodCost(program, part, i), 0);
+}
+
+function hasComponents(program) {
+  return Array.isArray(program.components) && program.components.length > 0;
+}
+
 function rawResolvedCost(program) {
+  // New component model takes precedence when present
+  if (hasComponents(program)) {
+    const per = componentPeriodCost(program);
+    return program.billingPeriod === 'monthly' ? per * 12 : per;
+  }
+
   const info    = parseCostBasisInfo(program);
   const qty     = effectiveQty(program, info) + (program.baseQty || 0);
   const tierIdx = S.selectedTiers[program.id] ?? 0;
@@ -482,6 +537,7 @@ function animateCost(el, newVal) {
 // As-incurred, annual, and quarterly items return 0 here — they belong in the annual total only.
 function rawResolvedMonthlyCost(program) {
   if (program.billingPeriod !== 'monthly') return 0;
+  if (hasComponents(program)) return componentPeriodCost(program);
   const info = parseCostBasisInfo(program);
   const qty  = effectiveQty(program, info) + (program.baseQty || 0);
   switch (info.type) {
@@ -686,9 +742,28 @@ function buildInfoCard(program) {
   else if (info.type === 'tiered' && info.tiers?.length)      hero = 'from ' + formatRate(Math.min(...info.tiers.map(t => t.rate)));
   else                                                        hero = '—';
 
+  // Components override hero + subtitle
+  if (hasComponents(program)) {
+    if (program.costRaw) subtitle = program.costRaw;
+    hero = '—';
+  }
+
   // Body — static cost detail
   let bodyHtml = '';
-  if (info.type === 'tiered' && info.tiers?.length) {
+  if (hasComponents(program)) {
+    const lines = (program.components || []).map(part => {
+      switch (part.kind) {
+        case 'flat':    return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Flat fee'}</span><span class="tier-rate">${formatCost(num(part.amount))}</span></div>`;
+        case 'perUnit': return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Per unit'}</span><span class="tier-rate">${formatRate(num(part.rate))}/unit</span></div>`;
+        case 'perItem': return `<div class="info-tier-row"><span class="tier-label">${part.label || part.itemLabel || 'Per item'}</span><span class="tier-rate">${formatRate(num(part.rate))}/${(part.itemLabel || 'item').toLowerCase()}</span></div>`;
+        case 'percent': return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Percentage'}</span><span class="tier-rate">${num(part.pct)}% of ${part.base === 'capex' ? 'CapEx' : 'income'}</span></div>`;
+        case 'options': return (part.options || []).map(o => `<div class="info-tier-row"><span class="tier-label">${o.label}</span><span class="tier-rate">${formatRate(num(o.rate))}</span></div>`).join('');
+        case 'formula': return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Custom'}</span></div>`;
+        default: return '';
+      }
+    }).join('');
+    bodyHtml = `<div class="tier-select-label">Cost detail</div><div class="info-tier-list">${lines}</div>`;
+  } else if (info.type === 'tiered' && info.tiers?.length) {
     const perSuffix = info.isPerUnit ? (info.period === 'month' ? '/unit/mo' : '/unit/yr')
                     : (info.tiers[0]?.type === 'per-item' ? `/${(program.itemLabel || 'item').toLowerCase()}` : suffix);
     bodyHtml = `
@@ -759,6 +834,69 @@ function buildInfoCard(program) {
   });
 
   return el;
+}
+
+// Renders the PM-facing inputs for a component-based program.
+function buildComponentBody(program) {
+  return (program.components || []).map((part, i) => {
+    const key = `${program.id}:${i}`;
+    switch (part.kind) {
+      case 'flat':
+        return `<div class="comp-line"><span class="comp-label">${part.label || 'Flat fee'}</span><span class="comp-val">${formatCost(num(part.amount))}</span></div>`;
+      case 'perUnit':
+        return `<div class="comp-line"><span class="comp-label">${part.label || 'Per unit'}</span><span class="comp-val">${formatRate(num(part.rate))}/unit × ${S.unitCount} units</span></div>`;
+      case 'perItem': {
+        const item = (part.itemLabel || 'item');
+        if (part.locked) return `<div class="comp-line"><span class="comp-label">${part.label || item}</span><span class="comp-val">${formatRate(num(part.rate))} × ${num(part.baseQty)}</span></div>`;
+        const v = num(S.compInputs[key]);
+        return `<div class="card-calc">
+          <span class="calc-rate">${formatRate(num(part.rate))} / ${item.toLowerCase()}</span><span class="calc-x">×</span>
+          <div class="qty-field"><input class="comp-input" data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="0" value="${v || ''}"></div>
+          <span class="qty-label">${item}s</span>
+          ${part.baseQty ? `<span class="input-note">+${num(part.baseQty)} included</span>` : ''}
+        </div>`;
+      }
+      case 'percent': {
+        const baseLabel = part.base === 'capex' ? 'CapEx' : 'income';
+        if (part.locked) return `<div class="comp-line"><span class="comp-label">${part.label || `${num(part.pct)}% of ${baseLabel}`}</span></div>`;
+        const v = S.compInputs[key] != null ? S.compInputs[key] : (part.baseDefault || '');
+        return `<div class="card-calc">
+          <span class="calc-rate">${num(part.pct)}% of ${baseLabel}</span><span class="calc-x">×</span>
+          <div class="qty-field"><input class="comp-input" data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="$ ${baseLabel}" value="${v}"></div>
+        </div>`;
+      }
+      case 'options': {
+        const opts = part.options || [];
+        if (part.selectMode === 'multiple') {
+          const qtys = S.compSel[key] || [];
+          const orows = opts.map((o, oi) => {
+            const on = (qtys[oi] || 0) > 0;
+            return `<div class="addrow">
+              <label class="addrow-check"><input type="checkbox" class="comp-optchk" data-pid="${program.id}" data-idx="${i}" data-oi="${oi}"${on ? ' checked' : ''}>
+                <span class="addrow-label">${o.label} <span class="tier-rate">${formatRate(num(o.rate))}</span></span></label>
+              <span class="qty-sep">×</span>
+              <div class="qty-field"><input class="comp-optqty" data-pid="${program.id}" data-idx="${i}" data-oi="${oi}" type="number" min="0" value="${qtys[oi] || ''}"${on ? '' : ' disabled'}></div>
+            </div>`;
+          }).join('');
+          return `<div class="tier-select-label">${part.label || 'Select all that apply'}</div><div class="addrows">${orows}</div>`;
+        }
+        const sel = S.compSel[key] ?? 0;
+        const orows = opts.map((o, oi) => `
+          <label class="tier-option${oi === sel ? ' is-selected' : ''}">
+            <input type="radio" class="comp-optradio" name="copt_${program.id}_${i}" data-pid="${program.id}" data-idx="${i}" data-oi="${oi}"${oi === sel ? ' checked' : ''}>
+            <span class="tier-label">${o.label} <span class="tier-rate">(${formatRate(num(o.rate))})</span></span>
+          </label>`).join('');
+        return `<div class="tier-select-label">${part.label || 'Select one'}</div><div class="tier-options">${orows}</div>`;
+      }
+      case 'formula': {
+        if (part.locked || !/\bqty\b/.test(part.expr || '')) return '';
+        const v = num(S.compInputs[key]);
+        return `<div class="card-calc"><span class="calc-rate">${part.label || 'Quantity'}</span>
+          <div class="qty-field"><input class="comp-input" data-pid="${program.id}" data-idx="${i}" type="number" min="0" value="${v || ''}"></div></div>`;
+      }
+      default: return '';
+    }
+  }).join('');
 }
 
 function buildProgramCard(program, decision, priorDecision, isRequired) {
@@ -838,11 +976,15 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   } else if (info.type === 'custom') {
     subtitle = 'Custom calculation';
   }
+  // Cost summary (admin-entered) shows under the title when present
+  if (program.costRaw) subtitle = program.costRaw;
 
   // Card body — interactive cost controls
   let bodyHtml = '';
 
-  if (info.type === 'per-unit' || info.type === 'per-quantity') {
+  if (hasComponents(program)) {
+    bodyHtml = buildComponentBody(program);
+  } else if (info.type === 'per-unit' || info.type === 'per-quantity') {
     bodyHtml = `
       <div class="card-calc">
         <span class="calc-rate">${formatRate(info.rate)}</span>
@@ -1049,6 +1191,50 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     const heroEl = el.querySelector('.cost-hero-num');
     if (heroEl) heroEl.textContent = heroCost(program);
   };
+
+  // ── Component (cost-builder) inputs ───────────────────────────────────────
+  const persistComp = () => {
+    localStorage.setItem(`rpm_compin_${S.property}_${S.budgetYear}`, JSON.stringify(S.compInputs));
+    localStorage.setItem(`rpm_compsel_${S.property}_${S.budgetYear}`, JSON.stringify(S.compSel));
+  };
+  el.querySelectorAll('.comp-input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      e.stopPropagation();
+      S.compInputs[`${program.id}:${inp.dataset.idx}`] = parseFloat(e.target.value) || 0;
+      persistComp(); updateBudgetTotal(); refreshHero();
+    });
+  });
+  el.querySelectorAll('.comp-optradio').forEach(r => {
+    r.addEventListener('change', e => {
+      e.stopPropagation();
+      S.compSel[`${program.id}:${r.dataset.idx}`] = parseInt(r.dataset.oi);
+      persistComp(); updateBudgetTotal();
+      el.querySelectorAll(`.comp-optradio[data-idx="${r.dataset.idx}"]`).forEach(rr =>
+        rr.closest('.tier-option').classList.toggle('is-selected', rr === r));
+      refreshHero();
+    });
+  });
+  el.querySelectorAll('.comp-optchk').forEach(chk => {
+    chk.addEventListener('change', e => {
+      e.stopPropagation();
+      const key = `${program.id}:${chk.dataset.idx}`;
+      const oi  = parseInt(chk.dataset.oi);
+      const arr = S.compSel[key] || [];
+      arr[oi] = chk.checked ? (arr[oi] > 0 ? arr[oi] : 1) : 0;
+      S.compSel[key] = arr;
+      persistComp(); updateBudgetTotal(); refreshCard(program.id);
+    });
+  });
+  el.querySelectorAll('.comp-optqty').forEach(inp => {
+    inp.addEventListener('input', e => {
+      e.stopPropagation();
+      const key = `${program.id}:${inp.dataset.idx}`;
+      const arr = S.compSel[key] || [];
+      arr[parseInt(inp.dataset.oi)] = parseInt(e.target.value) || 0;
+      S.compSel[key] = arr;
+      persistComp(); updateBudgetTotal(); refreshHero();
+    });
+  });
 
   // Month chips (as-incurred body picker + per-card billing-month override)
   el.querySelectorAll('.incur-chip').forEach(chip => {
@@ -1302,26 +1488,16 @@ function exitAdminMode() {
   renderMainScreen();
 }
 
+// Admin → standalone admin page (program list + cost-builder editor)
 document.getElementById('mi-admin-mode').addEventListener('click', () => {
   closeModal('modal-menu');
-  if (S.admin) { exitAdminMode(); return; }
-  if (isAdminAuthed()) { enterAdminMode(); return; }
-  promptAdminLogin(enterAdminMode);
+  if (isAdminAuthed()) openAdmin();
+  else promptAdminLogin(openAdmin);
 });
 
-// Setup-screen "Admin" link → log in, turn on admin mode, and open the dashboard
-// (uses the selected property if any; defaults the system so cards are visible).
-async function enterAdminFromSetup() {
-  S.admin      = true;
-  S.mode       = 'interactive';
-  S.property   = document.getElementById('property-select').value || null;
-  S.systemType = S.systemType || 'Yardi';
-  document.getElementById('mi-admin-mode-label').textContent = 'Exit Admin Mode';
-  await launchMain();
-}
 document.getElementById('btn-admin-entry').addEventListener('click', () => {
-  if (isAdminAuthed()) enterAdminFromSetup();
-  else promptAdminLogin(enterAdminFromSetup);
+  if (isAdminAuthed()) openAdmin();
+  else promptAdminLogin(openAdmin);
 });
 
 // ── Summary ───────────────────────────────────────────────────────────────────
@@ -1409,11 +1585,15 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
     S.quantities     = {};   // per-card overrides cleared; S.unitCount preserved
     S.selectedTiers  = {};
     S.optionQty      = {};
+    S.compInputs     = {};
+    S.compSel        = {};
     S.budgetAmounts  = {};
     S.incurMonths    = {};
     localStorage.removeItem(`rpm_qty_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_tiers_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_optqty_${S.property}_${S.budgetYear}`);
+    localStorage.removeItem(`rpm_compin_${S.property}_${S.budgetYear}`);
+    localStorage.removeItem(`rpm_compsel_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_budget_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_incur_${S.property}_${S.budgetYear}`);
     renderMainScreen();

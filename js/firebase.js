@@ -68,6 +68,7 @@ export async function fetchPrograms(forceRefresh = false) {
       required:      p.elective === false,
       costBasis:     p.costBasis     || 'Manual',
       customFormula: p.customFormula || null,
+      components:    Array.isArray(p.components) ? p.components : null,  // new universal cost builder
       rate:          rate,
       systems,
       billingPeriod: p.billingPeriod || 'annual',

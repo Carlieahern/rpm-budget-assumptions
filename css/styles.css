@@ -2749,6 +2749,12 @@ body {
 
 .input-note { font-size: 12px; font-style: italic; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.4; }
 
+/* Component static lines (flat / per-unit / locked parts) */
+.comp-line { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 3px 0; }
+.comp-label { font-size: 14px; color: rgba(255,255,255,0.9); font-weight: 500; }
+.comp-val { font-size: 14px; color: #fff; font-weight: 700; white-space: nowrap; }
+.card-calc + .card-calc, .comp-line + .card-calc, .card-calc + .comp-line { margin-top: 8px; }
+
 /* ── Inline admin editing ── */
 .admin-badge { display: none; }
 .admin-badge.on {
@@ -2799,6 +2805,26 @@ body {
 .ae-tier-row { display: grid; grid-template-columns: 1fr 90px 130px 32px; gap: 8px; margin-bottom: 8px; }
 .ae-tier-row input, .ae-tier-row select { padding: 7px 10px; font-size: 13px; border: 1.5px solid var(--border); border-radius: 7px; font-family: inherit; }
 .ae-tier-del { background: none; border: none; color: var(--red); cursor: pointer; font-size: 14px; }
+
+/* Editor sections + cost-builder parts */
+.ae-section { margin-bottom: 16px; }
+.ae-section-label { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
+.ae-builder { background: #fdf6ec; border: 1px solid #f0d9bb; }
+.ae-part { background: #fff; border: 1px solid var(--border); border-radius: 9px; padding: 12px; margin-bottom: 10px; }
+.ae-part-head { display: grid; grid-template-columns: 1fr auto 28px; gap: 8px; align-items: center; margin-bottom: 10px; }
+.ae-part-head > select { padding: 7px 10px; font-size: 13px; border: 1.5px solid var(--border); border-radius: 7px; font-family: inherit; font-weight: 600; }
+.ae-part-lock { font-size: 12px; color: var(--text2); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.ae-part-del { background: none; border: none; color: var(--red); cursor: pointer; font-size: 15px; }
+.ae-part-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ae-part-fields .ae-field { gap: 4px; }
+.ae-part-fields .ae-field span { font-size: 11px; color: var(--text2); }
+.ae-part-fields input, .ae-part-fields select { padding: 7px 10px; font-size: 13px; border: 1.5px solid var(--border); border-radius: 7px; font-family: inherit; }
+.ae-part-fields .ae-wide { grid-column: 1 / -1; }
+.ae-popts { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.ae-popt { display: grid; grid-template-columns: 1fr 100px 28px; gap: 8px; }
+.ae-popt input { padding: 6px 9px; font-size: 13px; border: 1.5px solid var(--border); border-radius: 7px; font-family: inherit; }
+.ae-popt-del { background: none; border: none; color: var(--red); cursor: pointer; }
+.ae-popt-add { background: none; border: 1px dashed var(--copper); color: var(--copper); border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; align-self: flex-start; }
 
 .ae-formula-note { font-size: 11px; color: var(--text2); margin-top: 4px; line-height: 1.4; }
 .ae-formula-note code { background: #f0eee9; padding: 1px 5px; border-radius: 4px; font-size: 11px; }

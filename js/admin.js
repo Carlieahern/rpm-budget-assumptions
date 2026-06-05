@@ -92,7 +92,7 @@ export async function newProgram(dept, onDone) {
 }
 
 // ── Program list ─────────────────────────────────────────────────────────────
-async function openAdmin() {
+export async function openAdmin() {
   showScreen('screen-admin');
   document.getElementById('admin-user-note').textContent = `Signed in as ${adminName} · changes save to Firebase for everyone`;
   try { extraTypes = await fetchCostBasisTypes(); } catch { extraTypes = []; }
@@ -156,6 +156,10 @@ function openEditor(id) {
     ? { ...blankProgram(), ...structuredClone(rawCache[id]) }
     : blankProgram();
   if (!Array.isArray(form.options)) form.options = [];
+  // Migrate legacy programs into cost parts so they're editable in the builder
+  if (!Array.isArray(form.components) || !form.components.length) {
+    form.components = deriveComponents(form);
+  }
   buildEditor();
   openModal('modal-admin-editor');
 }
@@ -163,6 +167,83 @@ function openEditor(id) {
 function deptOptions(selected) {
   const depts = [...new Set(Object.values(rawCache).map(p => p.department).filter(Boolean))].sort();
   return depts.map(d => `<option value="${d}"${d === selected ? ' selected' : ''}>${d}</option>`).join('');
+}
+
+// ── Cost builder parts ────────────────────────────────────────────────────────
+const PART_KINDS = [
+  ['flat',    'Flat amount'],
+  ['perUnit', 'Per unit (× property units)'],
+  ['perItem', 'Per item (× a count)'],
+  ['percent', '% of income / CapEx'],
+  ['options', 'Options (pick one or multiple)'],
+  ['formula', 'Custom formula'],
+];
+
+// Derive a starter set of parts from a legacy program so editing migrates it.
+function deriveComponents(p) {
+  if (Array.isArray(p.components) && p.components.length) return structuredClone(p.components);
+  const rate = parseFloat(p.rate) || 0;
+  switch (p.costBasis) {
+    case 'Flat Fee':        return [{ kind: 'flat', label: '', amount: rate }];
+    case 'Per Unit':        return [{ kind: 'perUnit', label: '', rate, baseQty: p.baseQty || 0 }];
+    case 'Per Item':        return [{ kind: 'perItem', label: '', itemLabel: p.itemLabel || 'item', rate, baseQty: p.baseQty || 0 }];
+    case 'Flat + Per Unit': return [{ kind: 'flat', label: 'Base fee', amount: parseFloat(p.baseFee) || 0 }, { kind: 'perUnit', label: '', rate }];
+    case 'Tiered':          return [{ kind: 'options', label: '', selectMode: p.additive ? 'multiple' : 'one', options: (p.options || []).map(o => ({ label: o.label, rate: o.rate })) }];
+    case 'Manual':          return [];
+    default:                return p.customFormula ? [{ kind: 'formula', label: '', expr: p.customFormula }] : [];
+  }
+}
+
+function partFields(part, i) {
+  const L = (label, html) => `<label class="ae-field"><span>${label}</span>${html}</label>`;
+  switch (part.kind) {
+    case 'flat':
+      return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Base fee">`) +
+             L('Amount ($)', `<input class="ae-pf" data-i="${i}" data-k="amount" type="number" step="0.01" value="${esc(part.amount)}" placeholder="0.00">`);
+    case 'perUnit':
+      return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. License">`) +
+             L('Rate per unit ($)', `<input class="ae-pf" data-i="${i}" data-k="rate" type="number" step="0.01" value="${esc(part.rate)}" placeholder="0.00">`);
+    case 'perItem':
+      return L("What's counted?", `<input class="ae-pf" data-i="${i}" data-k="itemLabel" type="text" value="${esc(part.itemLabel)}" placeholder="e.g. Elevator, Associate">`) +
+             L(`Rate per ${(part.itemLabel || 'item').toLowerCase()} ($)`, `<input class="ae-pf" data-i="${i}" data-k="rate" type="number" step="0.01" value="${esc(part.rate)}" placeholder="0.00">`) +
+             L('Default / included qty', `<input class="ae-pf" data-i="${i}" data-k="baseQty" type="number" step="1" value="${esc(part.baseQty)}" placeholder="0">`);
+    case 'percent':
+      return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Oversight">`) +
+             L('Percentage (%)', `<input class="ae-pf" data-i="${i}" data-k="pct" type="number" step="0.01" value="${esc(part.pct)}" placeholder="e.g. 1.25">`) +
+             L('Of', `<select class="ae-pf" data-i="${i}" data-k="base"><option value="income"${part.base !== 'capex' ? ' selected' : ''}>Total income</option><option value="capex"${part.base === 'capex' ? ' selected' : ''}>CapEx</option></select>`);
+    case 'options': {
+      const opts = part.options || [];
+      const rows = opts.map((o, oi) => `
+        <div class="ae-popt" data-i="${i}" data-oi="${oi}">
+          <input class="ae-pf-opt" data-i="${i}" data-oi="${oi}" data-k="label" type="text" value="${esc(o.label)}" placeholder="Option label">
+          <input class="ae-pf-opt" data-i="${i}" data-oi="${oi}" data-k="rate" type="number" step="0.01" value="${esc(o.rate)}" placeholder="Rate">
+          <button class="ae-popt-del" data-i="${i}" data-oi="${oi}">✕</button>
+        </div>`).join('');
+      return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Select a package">`) +
+             L('How does the PM choose?', `<select class="ae-pf" data-i="${i}" data-k="selectMode"><option value="one"${part.selectMode !== 'multiple' ? ' selected' : ''}>Pick just one</option><option value="multiple"${part.selectMode === 'multiple' ? ' selected' : ''}>Pick one or more (with quantities)</option></select>`) +
+             `<div class="ae-field ae-wide"><span>Options</span><div class="ae-popts">${rows}</div><button class="ae-popt-add" data-i="${i}">+ Add option</button></div>`;
+    }
+    case 'formula':
+      return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Custom">`) +
+             `<label class="ae-field ae-wide"><span>Formula <span class="label-soft">— use <code>units</code> &amp; <code>qty</code></span></span><input class="ae-pf" data-i="${i}" data-k="expr" type="text" value="${esc(part.expr)}" placeholder="e.g. 40 + 12 * (qty - 1)"></label>`;
+    default:
+      return '';
+  }
+}
+
+function partRow(part, i) {
+  const showLock = ['perItem', 'percent', 'formula'].includes(part.kind);
+  return `
+    <div class="ae-part" data-i="${i}">
+      <div class="ae-part-head">
+        <select class="ae-part-kind" data-i="${i}">
+          ${PART_KINDS.map(([v, label]) => `<option value="${v}"${part.kind === v ? ' selected' : ''}>${label}</option>`).join('')}
+        </select>
+        ${showLock ? `<label class="ae-part-lock"><input type="checkbox" class="ae-part-locked" data-i="${i}"${part.locked ? ' checked' : ''}> PM can't edit</label>` : '<span></span>'}
+        <button class="ae-part-del" data-i="${i}" title="Remove part">✕</button>
+      </div>
+      <div class="ae-part-fields">${partFields(part, i)}</div>
+    </div>`;
 }
 
 function buildEditor() {
@@ -184,6 +265,9 @@ function buildEditor() {
   // Cost-basis dropdown: structured types + Custom Formula + admin-added types + "Add new"
   const basisOptions = [...STRUCTURED_BASES, 'Custom Formula', ...extraTypes, ADD_NEW];
 
+  const per = form.billingPeriod === 'monthly' ? '$/mo' : '$/yr';
+  const parts = form.components || [];
+
   body.innerHTML = `
     <div class="admin-editor-head">
       <h3>${editingId ? 'Edit Program' : 'New Program'}</h3>
@@ -195,13 +279,11 @@ function buildEditor() {
         <span>Program name</span>
         <input id="ae-name" type="text" value="${esc(form.name)}" placeholder="e.g. Elevator Management Services">
       </label>
-
       <label class="ae-field">
         <span>Department</span>
         <input id="ae-department" list="ae-dept-list" type="text" value="${esc(form.department)}" placeholder="Department">
         <datalist id="ae-dept-list">${deptOptions(form.department)}</datalist>
       </label>
-
       <label class="ae-field">
         <span>Type</span>
         <select id="ae-elective">
@@ -209,121 +291,76 @@ function buildEditor() {
           <option value="true"${form.elective !== false ? ' selected' : ''}>Elective</option>
         </select>
       </label>
-
       <label class="ae-field">
-        <span>Cost basis</span>
+        <span>Cost basis / category</span>
         <select id="ae-costBasis">
           ${basisOptions.map(c => `<option value="${c}"${c === cb ? ' selected' : ''}>${basisLabel(c)}</option>`).join('')}
         </select>
       </label>
-
       <label class="ae-field">
         <span>Billing frequency</span>
         <select id="ae-billingPeriod">
           ${BILLING.map(b => `<option value="${b}"${b === form.billingPeriod ? ' selected' : ''}>${b}</option>`).join('')}
         </select>
       </label>
-
-      ${showItem ? `
-      <label class="ae-field">
-        <span>What's counted?</span>
-        <input id="ae-itemLabel" type="text" value="${esc(form.itemLabel)}" placeholder="e.g. Invoice, Elevator, Device, Account">
-      </label>` : ''}
-
-      ${showRate ? `
-      <label class="ae-field">
-        <span id="ae-rate-label">${rateLabel}</span>
-        <input id="ae-rate" type="number" step="0.01" min="0" value="${esc(form.rate)}" placeholder="e.g. 0.99">
-      </label>` : ''}
-
-      ${showBase ? `
-      <label class="ae-field">
-        <span>Base fee ($)</span>
-        <input id="ae-baseFee" type="number" step="0.01" min="0" value="${esc(form.baseFee)}" placeholder="0.00">
-      </label>` : ''}
-
-      ${(cb === 'Per Unit' || cb === 'Per Item') ? `
-      <label class="ae-field">
-        <span>Default / included quantity <span class="label-soft">— optional</span></span>
-        <input id="ae-baseQty" type="number" step="1" min="0" value="${esc(form.baseQty)}" placeholder="e.g. 1">
-      </label>` : ''}
-
-      ${(showRate || showFormula) ? `
-      <label class="ae-field">
-        <span>Minimum (${form.billingPeriod === 'monthly' ? '$/mo' : '$/yr'}) <span class="label-soft">— optional</span></span>
-        <input id="ae-minCost" type="number" step="0.01" min="0" value="${esc(form.minCost)}" placeholder="no minimum">
-      </label>
-      <label class="ae-field">
-        <span>Maximum (${form.billingPeriod === 'monthly' ? '$/mo' : '$/yr'}) <span class="label-soft">— optional</span></span>
-        <input id="ae-maxCost" type="number" step="0.01" min="0" value="${esc(form.maxCost)}" placeholder="no maximum">
-      </label>` : ''}
-
-      ${showFormula ? `
-      <label class="ae-field ae-wide">
-        <span>Custom formula <span class="label-soft">— use <code>units</code> and <code>qty</code> (e.g. <code>0.45 * units</code> or <code>375 + 3.59 * units</code>)</span></span>
-        <input id="ae-customFormula" type="text" value="${esc(form.customFormula)}" placeholder="e.g. 40 + 12 * (qty - 1)">
-        <span class="ae-formula-note">Allowed: numbers, + − * / ( ), and the words <b>units</b> &amp; <b>qty</b>. Result is the ${form.billingPeriod === 'monthly' ? 'monthly' : 'annual'} amount.</span>
-      </label>` : ''}
-
-      ${form.billingPeriod !== 'monthly' && form.billingPeriod !== 'as-incurred' ? `
-      <div class="ae-field ae-wide">
-        <span>Default billing months</span>
-        <label class="ae-follows">
-          <input type="checkbox" id="ae-followsTransition"${/implement|transition|anniversar/i.test(form.billingStart || '') ? ' checked' : ''}>
-          Follows transition date (bills at go-live, no fixed month)
-        </label>
-        <div class="ae-month-chips" id="ae-month-chips">
-          ${MONTHS.map((m, i) => `<button type="button" class="ae-mchip${(form.defaultMonths || []).includes(i) ? ' on' : ''}" data-m="${i}">${m.slice(0,3)}</button>`).join('')}
-        </div>
-        <label class="ae-follows">
-          <input type="checkbox" id="ae-monthsFixed"${form.monthsFixed ? ' checked' : ''}>
-          Fixed — PMs can't change these months
-        </label>
-      </div>` : ''}
-
-      <label class="ae-field ae-wide">
-        <span>Applies to systems</span>
-        <div class="ae-systems">
-          ${SYSTEMS.map(([val, label]) => `
-            <label class="ae-sys-chip${(form.systems || []).includes(val) ? ' on' : ''}">
-              <input type="checkbox" class="ae-sys" value="${val}"${(form.systems || []).includes(val) ? ' checked' : ''}> ${label}
-            </label>`).join('')}
-        </div>
-      </label>
-
-      <label class="ae-field ae-wide">
-        <span>Cost summary (shown on the card)</span>
-        <input id="ae-costRaw" type="text" value="${esc(form.costRaw)}" placeholder="e.g. $20 per elevator / month">
-      </label>
     </div>
 
-    ${showTiers ? `
-    <div class="ae-tiers">
-      <div class="ae-tiers-head"><span>Options / Packages</span><button class="ae-tier-add" id="ae-tier-add">+ Add option</button></div>
-      <label class="ae-field" style="margin-bottom:10px;">
-        <span>How can the PM choose?</span>
-        <select id="ae-selectMode">
-          <option value="one"${!form.additive ? ' selected' : ''}>Select just one (pick a single option)</option>
-          <option value="multiple"${form.additive ? ' selected' : ''}>Select one or more (check any, enter how many of each)</option>
-        </select>
-      </label>
-      ${(form.options || []).map((o, i) => `
-        <div class="ae-tier-row" data-i="${i}">
-          <input class="ae-tier-label" data-i="${i}" type="text" value="${esc(o.label)}" placeholder="Label (e.g. Basic)">
-          <input class="ae-tier-rate" data-i="${i}" type="number" step="0.01" value="${esc(o.rate)}" placeholder="Rate">
-          <select class="ae-tier-type" data-i="${i}">
-            ${TIER_TYPES.map(t => `<option value="${t}"${t === o.type ? ' selected' : ''}>${t}</option>`).join('')}
-          </select>
-          <button class="ae-tier-del" data-i="${i}">✕</button>
-        </div>`).join('')}
-    </div>` : ''}
-
-    <details class="ae-more">
-      <summary>GL codes, owner, links & details</summary>
+    <div class="ae-section">
+      <div class="ae-section-label">Systems & GL codes</div>
+      <div class="ae-systems">
+        ${SYSTEMS.map(([val, label]) => `
+          <label class="ae-sys-chip${(form.systems || []).includes(val) ? ' on' : ''}">
+            <input type="checkbox" class="ae-sys" value="${val}"${(form.systems || []).includes(val) ? ' checked' : ''}> ${label}
+          </label>`).join('')}
+      </div>
       <div class="ae-grid">
         <label class="ae-field"><span>Yardi GL</span><input id="ae-yardiGL" type="text" value="${esc(form.yardiGL)}"></label>
         <label class="ae-field"><span>OneSite GL</span><input id="ae-onesiteGL" type="text" value="${esc(form.onesiteGL)}"></label>
         <label class="ae-field"><span>Pace GL</span><input id="ae-paceGL" type="text" value="${esc(form.paceGL)}"></label>
+      </div>
+    </div>
+
+    <label class="ae-field ae-wide">
+      <span>Cost summary <span class="label-soft">— shows under the program title</span></span>
+      <textarea id="ae-costRaw" rows="2" placeholder="e.g. $20 per elevator / month">${esc(form.costRaw)}</textarea>
+    </label>
+
+    <div class="ae-tiers ae-builder">
+      <div class="ae-tiers-head"><span>Cost builder — stack the parts</span><button class="ae-tier-add" id="ae-part-add">+ Add part</button></div>
+      <p class="label-soft" style="margin:0 0 12px;">Parts add together. Each can be locked so PMs can't change it.</p>
+      ${parts.length ? parts.map((p, i) => partRow(p, i)).join('') : '<p class="label-soft">No parts yet — add one to define the cost.</p>'}
+    </div>
+
+    <div class="ae-grid">
+      <label class="ae-field">
+        <span>Minimum (${per}) <span class="label-soft">— optional</span></span>
+        <input id="ae-minCost" type="number" step="0.01" min="0" value="${esc(form.minCost)}" placeholder="no minimum">
+      </label>
+      <label class="ae-field">
+        <span>Maximum (${per}) <span class="label-soft">— optional</span></span>
+        <input id="ae-maxCost" type="number" step="0.01" min="0" value="${esc(form.maxCost)}" placeholder="no maximum">
+      </label>
+    </div>
+
+    ${form.billingPeriod !== 'monthly' && form.billingPeriod !== 'as-incurred' ? `
+    <div class="ae-field ae-wide">
+      <span>Default billing months</span>
+      <label class="ae-follows">
+        <input type="checkbox" id="ae-followsTransition"${/implement|transition|anniversar/i.test(form.billingStart || '') ? ' checked' : ''}>
+        Follows transition date (bills at go-live, no fixed month)
+      </label>
+      <div class="ae-month-chips" id="ae-month-chips">
+        ${MONTHS.map((m, i) => `<button type="button" class="ae-mchip${(form.defaultMonths || []).includes(i) ? ' on' : ''}" data-m="${i}">${m.slice(0,3)}</button>`).join('')}
+      </div>
+      <label class="ae-follows">
+        <input type="checkbox" id="ae-monthsFixed"${form.monthsFixed ? ' checked' : ''}>
+        Fixed — PMs can't change these months
+      </label>
+    </div>` : ''}
+
+    <details class="ae-more">
+      <summary>Owner, links & details</summary>
+      <div class="ae-grid">
         <label class="ae-field"><span>Program owner</span><input id="ae-owner" type="text" value="${esc(form.owner)}"></label>
         <label class="ae-field ae-wide"><span>Setup fee (description)</span><input id="ae-setupFee" type="text" value="${esc(form.setupFee)}" placeholder="e.g. $750 flat fee at implementation"></label>
         <label class="ae-field ae-wide"><span>Prior year cost note</span><input id="ae-priorYearNote" type="text" value="${esc(form.priorYearNote)}" placeholder="e.g. Up from $1.50/unit last year"></label>
@@ -355,15 +392,6 @@ function wireEditor() {
   };
   bind('ae-name', 'name');
   bind('ae-department', 'department');
-  bind('ae-rate', 'rate');
-  document.getElementById('ae-itemLabel')?.addEventListener('input', e => {
-    form.itemLabel = e.target.value;
-    const lbl = document.getElementById('ae-rate-label');
-    if (lbl) lbl.textContent = `Rate per ${(form.itemLabel || 'item').toLowerCase()} ($)`;
-    updatePreview();
-  });
-  bind('ae-baseFee', 'baseFee');
-  bind('ae-baseQty', 'baseQty');
   bind('ae-minCost', 'minCost');
   bind('ae-maxCost', 'maxCost');
   bind('ae-costRaw', 'costRaw');
@@ -409,7 +437,6 @@ function wireEditor() {
     chip.classList.toggle('on');
   }));
   document.getElementById('ae-monthsFixed')?.addEventListener('change', e => { form.monthsFixed = e.target.checked; });
-  document.getElementById('ae-selectMode')?.addEventListener('change', e => { form.additive = e.target.value === 'multiple'; updatePreview(); });
 
   // Systems checkboxes
   document.querySelectorAll('.ae-sys').forEach(cb => cb.addEventListener('change', () => {
@@ -418,19 +445,51 @@ function wireEditor() {
       ch.classList.toggle('on', ch.querySelector('.ae-sys').checked));
   }));
 
-  // Tier repeater
-  document.getElementById('ae-tier-add')?.addEventListener('click', () => {
-    form.options.push({ label: '', rate: '', type: 'flat' });
+  // ── Cost builder: parts ──
+  if (!Array.isArray(form.components)) form.components = [];
+  document.getElementById('ae-part-add')?.addEventListener('click', () => {
+    form.components.push({ kind: 'flat', label: '', amount: '' });
     buildEditor();
   });
-  document.querySelectorAll('.ae-tier-del').forEach(b =>
-    b.addEventListener('click', () => { form.options.splice(+b.dataset.i, 1); buildEditor(); }));
-  document.querySelectorAll('.ae-tier-label').forEach(el =>
-    el.addEventListener('input', e => { form.options[+el.dataset.i].label = e.target.value; }));
-  document.querySelectorAll('.ae-tier-rate').forEach(el =>
-    el.addEventListener('input', e => { form.options[+el.dataset.i].rate = e.target.value; updatePreview(); }));
-  document.querySelectorAll('.ae-tier-type').forEach(el =>
-    el.addEventListener('change', e => { form.options[+el.dataset.i].type = e.target.value; updatePreview(); }));
+  document.querySelectorAll('.ae-part-kind').forEach(sel =>
+    sel.addEventListener('change', e => {
+      const i = +sel.dataset.i;
+      const k = e.target.value;
+      // Reset to a clean part of the new kind, keeping the label
+      form.components[i] = { kind: k, label: form.components[i].label || '',
+        ...(k === 'options' ? { selectMode: 'one', options: [{ label: '', rate: '' }] } : {}),
+        ...(k === 'perItem' ? { itemLabel: 'item' } : {}) };
+      buildEditor();
+    }));
+  document.querySelectorAll('.ae-part-del').forEach(b =>
+    b.addEventListener('click', () => { form.components.splice(+b.dataset.i, 1); buildEditor(); }));
+  document.querySelectorAll('.ae-part-locked').forEach(c =>
+    c.addEventListener('change', e => { form.components[+c.dataset.i].locked = e.target.checked; }));
+  document.querySelectorAll('.ae-pf').forEach(el =>
+    el.addEventListener('input', e => {
+      const i = +el.dataset.i, k = el.dataset.k;
+      form.components[i][k] = e.target.value;
+      // Re-render only when a structural field changes; plain values just preview
+      if (k === 'itemLabel' || k === 'selectMode' || k === 'base') buildEditor();
+      else updatePreview();
+    }));
+  // Option sub-rows within an "options" part
+  document.querySelectorAll('.ae-popt-add').forEach(b =>
+    b.addEventListener('click', () => {
+      const i = +b.dataset.i;
+      (form.components[i].options = form.components[i].options || []).push({ label: '', rate: '' });
+      buildEditor();
+    }));
+  document.querySelectorAll('.ae-popt-del').forEach(b =>
+    b.addEventListener('click', () => {
+      form.components[+b.dataset.i].options.splice(+b.dataset.oi, 1);
+      buildEditor();
+    }));
+  document.querySelectorAll('.ae-pf-opt').forEach(el =>
+    el.addEventListener('input', e => {
+      form.components[+el.dataset.i].options[+el.dataset.oi][el.dataset.k] = e.target.value;
+      updatePreview();
+    }));
 
   document.getElementById('ae-close').addEventListener('click', () => closeModal('modal-admin-editor'));
   document.getElementById('ae-cancel').addEventListener('click', () => closeModal('modal-admin-editor'));
@@ -438,56 +497,34 @@ function wireEditor() {
   document.getElementById('ae-delete')?.addEventListener('click', removeProgram);
 }
 
-// ── Live preview at a sample size ──────────────────────────────────────────────
+function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+// ── Live preview from the cost parts (sample: 100 units, PM inputs at 0) ────────
 function updatePreview() {
   const el = document.getElementById('ae-preview');
   if (!el) return;
-  const units = 100;
-  const rate  = parseFloat(form.rate) || 0;
-  const base  = parseFloat(form.baseFee) || 0;
-  const mo    = form.billingPeriod === 'monthly';
-  let annual = 0, note = '';
-
-  switch (form.costBasis) {
-    case 'Flat Fee':
-      annual = mo ? rate * 12 : rate;
-      note = `${money(rate)} ${mo ? '/mo → ' + money(annual) + '/yr' : '/yr'}`;
-      break;
-    case 'Per Unit':
-      annual = mo ? rate * units * 12 : rate * units;
-      note = `${money(rate)}/unit${mo ? '/mo' : '/yr'} × ${units} units → ${money(annual)}/yr`;
-      break;
-    case 'Per Item':
-      note = `${money(rate)} per ${form.itemLabel || 'item'}${mo ? '/mo' : '/yr'} (× count entered by PM)`;
-      break;
-    case 'Flat + Per Unit': {
-      const pu = mo ? rate * units * 12 : rate * units;
-      annual = base + pu;
-      note = `${money(base)} base + ${money(rate)}/unit × ${units} → ${money(annual)}/yr`;
-      break;
-    }
-    case 'Tiered': {
-      const first = form.options[0] || {};
-      note = form.additive
-        ? `${form.options.length} option(s), PM enters a qty for each and they sum. e.g. ${first.label || '—'} @ ${money(parseFloat(first.rate) || 0)} each`
-        : `Pick one of ${form.options.length} option(s). First: ${first.label || '—'} @ ${money(parseFloat(first.rate) || 0)}`;
-      break;
-    }
-    case 'Manual':
-      note = 'Manual — PM enters the dollar amount.';
-      break;
-    default: {
-      // Custom Formula or an added type
-      if (isFormulaType(form.costBasis)) {
-        const r = evalFormula(form.customFormula, units, 0);
-        if (r === null) { note = '⚠️ Formula invalid — only numbers, + − * / ( ), and units / qty allowed.'; }
-        else { annual = mo ? r * 12 : r; note = `Formula → ${money(r)}${mo ? '/mo → ' + money(annual) + '/yr' : '/yr'} (at ${units} units, qty 0)`; }
-      } else {
-        note = 'Manual — PM enters the dollar amount.';
-      }
-    }
+  const parts = form.components || [];
+  if (!parts.length) {
+    el.innerHTML = `<span class="ae-preview-label">Preview</span> Add a cost part to define the cost.`;
+    return;
   }
-  el.innerHTML = `<span class="ae-preview-label">Preview (at ${units} units)</span> ${note}`;
+  const units = 100;
+  const mo = form.billingPeriod === 'monthly';
+  let per = 0, bad = false;
+  parts.forEach(p => {
+    switch (p.kind) {
+      case 'flat':    per += num(p.amount); break;
+      case 'perUnit': per += num(p.rate) * units; break;
+      case 'perItem': per += num(p.rate) * num(p.baseQty); break;
+      case 'percent': break; // base entered by PM
+      case 'options': per += num((p.options || [])[0]?.rate); break;
+      case 'formula': { const r = evalFormula(p.expr, units, 0); if (r === null) bad = true; else per += r; break; }
+    }
+  });
+  const annual = mo ? per * 12 : per;
+  el.innerHTML = bad
+    ? `<span class="ae-preview-label">Preview</span> ⚠️ a formula is invalid.`
+    : `<span class="ae-preview-label">Preview · 100 units, PM inputs 0</span> ${money(per)}${mo ? '/mo → ' + money(annual) + '/yr' : '/yr'}`;
 }
 
 // Mirror of the app's safe evaluator — returns null on invalid input.
@@ -522,6 +559,20 @@ async function save() {
     baseQty: cleanNum(form.baseQty) || 0,
     minCost: cleanNum(form.minCost),
     maxCost: cleanNum(form.maxCost),
+    components: (form.components || []).map(p => {
+      const c = { kind: p.kind, label: p.label || '' };
+      if (p.locked) c.locked = true;
+      switch (p.kind) {
+        case 'flat':    c.amount = cleanNum(p.amount) || 0; break;
+        case 'perUnit': c.rate = cleanNum(p.rate) || 0; if (cleanNum(p.baseQty)) c.baseQty = cleanNum(p.baseQty); break;
+        case 'perItem': c.rate = cleanNum(p.rate) || 0; c.itemLabel = p.itemLabel || 'item'; if (cleanNum(p.baseQty)) c.baseQty = cleanNum(p.baseQty); break;
+        case 'percent': c.pct = cleanNum(p.pct) || 0; c.base = p.base || 'income'; if (cleanNum(p.baseDefault)) c.baseDefault = cleanNum(p.baseDefault); break;
+        case 'options': c.selectMode = p.selectMode === 'multiple' ? 'multiple' : 'one';
+                        c.options = (p.options || []).filter(o => o.label || o.rate).map(o => ({ label: o.label || '', rate: cleanNum(o.rate) || 0 })); break;
+        case 'formula': c.expr = p.expr || ''; break;
+      }
+      return c;
+    }).filter(c => c.kind),
     options: (form.costBasis === 'Tiered')
       ? form.options.filter(o => o.label).map(o => ({ label: o.label, rate: cleanNum(o.rate) || 0, type: o.type || 'flat' }))
       : [],
