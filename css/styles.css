@@ -2928,6 +2928,8 @@ body {
 .addrow-total { font-size: 14px; font-weight: 700; color: #fff; margin-left: auto; }
 
 .input-note { font-size: 12px; font-style: italic; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.4; }
+.min-note { font-size: 12px; font-weight: 700; color: #ff6b6b; margin-top: 8px; line-height: 1.4; }
+.prog-card.is-elective .min-note { color: #d32f2f; }
 
 /* Component static lines (flat / per-unit / locked parts) */
 /* Component entry boxes — keep them short (a couple of digits) */

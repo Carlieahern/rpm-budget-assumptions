@@ -378,6 +378,26 @@ function resolvedCost(program) {
   return v;
 }
 
+// Is the PM's entry below the program's minimum (per billing period)?
+function belowMinimum(program) {
+  if (program.minCost == null) return false;
+  const raw = program.billingPeriod === 'monthly'
+    ? rawResolvedMonthlyCost(program)
+    : rawResolvedCost(program);
+  return raw < program.minCost;
+}
+
+// Live-toggle the red minimum warnings across all visible cards
+function updateMinNotes() {
+  document.querySelectorAll('.prog-card').forEach(card => {
+    const note = card.querySelector('.min-note');
+    if (!note) return;
+    const p = S.programs.find(x => x.id === card.dataset.programId);
+    if (!p) return;
+    note.style.display = belowMinimum(p) ? 'block' : 'none';
+  });
+}
+
 // ── Monthly breakdown ─────────────────────────────────────────────────────────
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -631,6 +651,7 @@ function updateBudgetTotal() {
   const monthly = annual / 12;               // true average per month — moves with month selection
   animateCost(document.getElementById('budget-total'),  annual);
   animateCost(document.getElementById('monthly-total'), monthly);
+  updateMinNotes();
   if (monthlyExpanded) renderMonthlyBreakdown();
 }
 
@@ -1144,6 +1165,13 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   }
   // Optional clarification note shown by the entry box
   if (program.inputNote) bodyHtml += `<div class="input-note">${program.inputNote}</div>`;
+
+  // Minimum-not-met warning (shown until the entry meets the monthly/annual minimum)
+  if (program.minCost != null) {
+    const per   = program.billingPeriod === 'monthly' ? 'month' : 'year';
+    const below = belowMinimum(program);
+    bodyHtml += `<div class="min-note"${below ? '' : ' style="display:none"'}>*must meet the minimum requirement of ${formatCost(program.minCost)}/${per}</div>`;
+  }
 
   // Month selection — as-incurred programs pick explicitly (shown in body);
   // every other recurring program gets an adjustable strip inside Details.
