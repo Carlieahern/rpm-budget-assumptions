@@ -1172,7 +1172,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     ${bodyHtml ? '<div class="card-divider"></div>' : ''}
     ${bodyHtml}
     <div class="card-foot">
-      <button class="details-toggle" type="button">▾ Details</button>
+      ${(program.priorYearNote || program.resourceUrl || program.description || program.minCost != null || program.maxCost != null || priorDecision) ? `<button class="details-toggle" type="button">▾ Details</button>` : '<span></span>'}
       ${S.admin ? `<button class="card-edit-btn" type="button">✎ Edit</button>` : ''}
       <div class="prog-card-action">${actionHtml}</div>
     </div>

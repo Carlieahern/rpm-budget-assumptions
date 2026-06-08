@@ -362,8 +362,8 @@ function buildEditor() {
       </label>
     </div>` : ''}
 
-    <details class="ae-more">
-      <summary>Links & details</summary>
+    <details class="ae-more" open>
+      <summary>Setup fee, links & details</summary>
       <div class="ae-grid">
         <label class="ae-field"><span>Setup fee amount ($) <span class="label-soft">— one-time</span></span><input id="ae-setupAmount" type="number" step="0.01" min="0" value="${esc(form.setupAmount)}" placeholder="e.g. 750"></label>
         <label class="ae-field"><span>Default setup month</span><select id="ae-setupMonth">${MONTHS.map((m, i) => `<option value="${i}"${(form.setupMonth ?? 0) == i ? ' selected' : ''}>${m}</option>`).join('')}</select></label>
