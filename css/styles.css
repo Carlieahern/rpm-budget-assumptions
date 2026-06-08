@@ -2347,16 +2347,27 @@ body {
 .card-gl {
   font-size: 13px;
   font-weight: 700;
-  color: rgba(255,255,255,0.92);
+  color: #fff;
   letter-spacing: 0.02em;
+  border: 1.5px solid var(--navy);
+  background: rgba(27,42,74,0.45);
+  border-radius: 6px;
+  padding: 2px 8px;
+  margin-bottom: 3px;
 }
 .card-billing {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(255,255,255,0.55);
+  color: #fff;
+  border: 1.5px solid var(--navy);
+  background: rgba(27,42,74,0.45);
+  border-radius: 6px;
+  padding: 2px 8px;
 }
+.prog-card.is-elective .card-gl,
+.prog-card.is-elective .card-billing { background: var(--navy); color: #fff; border-color: var(--navy); }
 .card-cost-hero {
   margin-top: 10px;
   display: flex;
@@ -2459,6 +2470,45 @@ body {
 .incur-months { margin-top: 4px; }
 .months-detail { margin-top: 12px; }
 .incur-directive { font-weight: 400; font-style: italic; opacity: 0.8; }
+
+/* Setup fee block — one-time, blue, with its own month */
+.setup-fee-block {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.18);
+}
+.setup-fee-head { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.setup-fee-head input { width: 16px; height: 16px; accent-color: #fff; flex-shrink: 0; }
+.setup-fee-amount {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--navy);
+  border-radius: 7px;
+  padding: 4px 12px;
+}
+.setup-once { font-size: 12px; font-weight: 500; opacity: 0.7; }
+.setup-fee-note { font-size: 12px; font-style: italic; color: rgba(255,255,255,0.6); margin: 6px 0 0; }
+.setup-fee-monthlabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(255,255,255,0.55); margin: 10px 0 6px; }
+.setup-mchip {
+  background: rgba(255,255,255,0.12); border: 1.5px solid rgba(255,255,255,0.25);
+  border-radius: 999px; color: rgba(255,255,255,0.7); font-family: inherit; font-size: 11px;
+  font-weight: 600; padding: 4px 10px; cursor: pointer; margin: 0 4px 4px 0;
+}
+.setup-mchip.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+/* Details rows with labels */
+.detail-row { font-size: 13px; color: rgba(255,255,255,0.82); line-height: 1.5; margin-bottom: 6px; }
+.detail-k { font-weight: 700; color: #fff; }
+.prog-card.is-elective .setup-fee-amount { background: var(--navy); color: #fff; }
+.prog-card.is-elective .setup-fee-note { color: #9a7350; }
+.prog-card.is-elective .setup-fee-monthlabel { color: #9a7350; }
+.prog-card.is-elective .setup-mchip { background: #faf3ec; border-color: #e3c4a3; color: #9a7350; }
+.prog-card.is-elective .setup-mchip.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+.prog-card.is-elective .setup-fee-head input { accent-color: var(--navy); }
+.prog-card.is-elective .detail-row { color: #6b5640; }
+.prog-card.is-elective .detail-k { color: var(--copper2); }
 .incur-label {
   font-size: 13px;
   font-style: italic;

@@ -24,6 +24,8 @@ const S = {
   optionQty:       {},    // programId → [qty per option] for additive tiered costs
   compInputs:      {},    // "programId:partIdx" → PM numeric input (per-item qty, % base, formula qty)
   compSel:         {},    // "programId:partIdx" → option selection (index for one, [qty] for multiple)
+  setupOn:         {},    // programId → include the one-time setup fee?
+  setupMonth:      {},    // programId → month index the setup fee is charged
   budgetAmounts:   {},    // programId → manual dollar amount (fallback for complex costs)
   incurMonths:     {},    // programId → [month indices] for as-incurred programs
   currentOptOutId: null,
@@ -152,6 +154,8 @@ async function launchMain() {
     try { S.optionQty     = JSON.parse(localStorage.getItem(`rpm_optqty_${S.property}_${S.budgetYear}`)) || {}; } catch { S.optionQty     = {}; }
     try { S.compInputs    = JSON.parse(localStorage.getItem(`rpm_compin_${S.property}_${S.budgetYear}`)) || {}; } catch { S.compInputs    = {}; }
     try { S.compSel       = JSON.parse(localStorage.getItem(`rpm_compsel_${S.property}_${S.budgetYear}`)) || {}; } catch { S.compSel       = {}; }
+    try { S.setupOn       = JSON.parse(localStorage.getItem(`rpm_setupon_${S.property}_${S.budgetYear}`)) || {}; } catch { S.setupOn       = {}; }
+    try { S.setupMonth    = JSON.parse(localStorage.getItem(`rpm_setupmonth_${S.property}_${S.budgetYear}`)) || {}; } catch { S.setupMonth    = {}; }
     try { S.budgetAmounts = JSON.parse(localStorage.getItem(`rpm_budget_${S.property}_${S.budgetYear}`)) || {}; } catch { S.budgetAmounts = {}; }
     try { S.incurMonths   = JSON.parse(localStorage.getItem(`rpm_incur_${S.property}_${S.budgetYear}`))  || {}; } catch { S.incurMonths   = {}; }
 
@@ -460,6 +464,12 @@ function getMonthlyBreakdown() {
       : dec === 'in';
     if (!included) return;
 
+    // One-time setup fee lands in its chosen month
+    if (S.setupOn[p.id] && (p.setupAmount || 0) > 0) {
+      const sm = S.setupMonth[p.id] ?? (p.setupMonth ?? 0);
+      months[sm] += p.setupAmount;
+    }
+
     const base = resolvedCost(p);
     if (!base) return;
     const nat = naturalMonthCount(p);
@@ -592,6 +602,7 @@ function updateBudgetTotal() {
       : dec === 'in';
     if (included) {
       annual += proratedAnnual(p);           // respects transition / active months
+      if (S.setupOn[p.id] && (p.setupAmount || 0) > 0) annual += p.setupAmount;  // one-time setup fee
     }
   });
   const monthly = annual / 12;               // true average per month — moves with month selection
@@ -1117,6 +1128,22 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       </div>`;
   }
 
+  // Setup fee — one-time charge with its own month, shown in blue under the cost
+  if ((program.setupAmount || 0) > 0) {
+    const on = !!S.setupOn[program.id];
+    const sm = S.setupMonth[program.id] ?? (program.setupMonth ?? 0);
+    bodyHtml += `
+      <div class="setup-fee-block${on ? ' on' : ''}">
+        <label class="setup-fee-head">
+          <input type="checkbox" class="setup-include" data-pid="${program.id}"${on ? ' checked' : ''}>
+          <span class="setup-fee-amount">Setup fee: ${formatCost(program.setupAmount)} <span class="setup-once">· one-time</span></span>
+        </label>
+        ${program.setupFee ? `<div class="setup-fee-note">${program.setupFee}</div>` : ''}
+        <div class="setup-fee-monthlabel">Charged in:</div>
+        <div class="incur-chips">${MONTH_NAMES.map((m, i) => `<button type="button" class="setup-mchip${i === sm ? ' on' : ''}" data-pid="${program.id}" data-month="${i}">${m}</button>`).join('')}</div>
+      </div>`;
+  }
+
   const dnaCorner = isRequired ? `
     <label class="dna-corner" title="Does not apply to this property">
       <input type="checkbox" class="dna-check" data-pid="${program.id}"${dec === 'not-applicable' ? ' checked' : ''}>
@@ -1150,11 +1177,10 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       <div class="prog-card-action">${actionHtml}</div>
     </div>
     <div class="card-details-panel">
-      ${resourceLink}
-      ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
-      ${program.setupFee ? `<div class="card-setup-fee">Setup: ${program.setupFee}</div>` : ''}
+      ${program.priorYearNote ? `<div class="detail-row"><span class="detail-k">Prior year cost:</span> ${program.priorYearNote}</div>` : ''}
+      ${program.resourceUrl ? `<div class="detail-row"><span class="detail-k">Program guide:</span> <a class="card-guide-link" href="${program.resourceUrl}" target="_blank" rel="noopener">Open link →</a></div>` : ''}
+      ${program.description ? `<div class="detail-row"><span class="detail-k">Details:</span> ${program.description}</div>` : ''}
       ${minMaxNote(program)}
-      ${program.priorYearNote ? `<div class="card-prioryear">Prior year: ${program.priorYearNote}</div>` : ''}
       ${priorChip}
     </div>
   `;
@@ -1244,6 +1270,24 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       arr[parseInt(inp.dataset.oi)] = parseInt(e.target.value) || 0;
       S.compSel[key] = arr;
       persistComp(); updateBudgetTotal(); refreshHero();
+    });
+  });
+
+  // Setup fee include toggle + month
+  el.querySelector('.setup-include')?.addEventListener('change', e => {
+    e.stopPropagation();
+    S.setupOn[program.id] = e.target.checked;
+    localStorage.setItem(`rpm_setupon_${S.property}_${S.budgetYear}`, JSON.stringify(S.setupOn));
+    updateBudgetTotal();
+    refreshCard(program.id);
+  });
+  el.querySelectorAll('.setup-mchip').forEach(chip => {
+    chip.addEventListener('click', e => {
+      e.stopPropagation();
+      S.setupMonth[program.id] = parseInt(chip.dataset.month);
+      localStorage.setItem(`rpm_setupmonth_${S.property}_${S.budgetYear}`, JSON.stringify(S.setupMonth));
+      el.querySelectorAll('.setup-mchip').forEach(c => c.classList.toggle('on', c === chip));
+      updateBudgetTotal();
     });
   });
 
@@ -1598,6 +1642,8 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
     S.optionQty      = {};
     S.compInputs     = {};
     S.compSel        = {};
+    S.setupOn        = {};
+    S.setupMonth     = {};
     S.budgetAmounts  = {};
     S.incurMonths    = {};
     localStorage.removeItem(`rpm_qty_${S.property}_${S.budgetYear}`);
@@ -1605,6 +1651,8 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
     localStorage.removeItem(`rpm_optqty_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_compin_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_compsel_${S.property}_${S.budgetYear}`);
+    localStorage.removeItem(`rpm_setupon_${S.property}_${S.budgetYear}`);
+    localStorage.removeItem(`rpm_setupmonth_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_budget_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_incur_${S.property}_${S.budgetYear}`);
     renderMainScreen();

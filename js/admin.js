@@ -145,7 +145,7 @@ function blankProgram() {
     billingPeriod: 'monthly', billingStart: 'January',
     defaultMonths: [], monthsFixed: false,
     systems: ['Yardi', 'OneSite', 'PaceOneSite'],
-    setupFee: '', priorYearNote: '', inputNote: '', costRaw: '', description: '', resourceUrl: '',
+    setupFee: '', setupAmount: '', setupMonth: 0, priorYearNote: '', inputNote: '', costRaw: '', description: '', resourceUrl: '',
     yardiGL: '', onesiteGL: '', paceGL: '', owner: '',
   };
 }
@@ -365,7 +365,9 @@ function buildEditor() {
     <details class="ae-more">
       <summary>Links & details</summary>
       <div class="ae-grid">
-        <label class="ae-field ae-wide"><span>Setup fee (description)</span><input id="ae-setupFee" type="text" value="${esc(form.setupFee)}" placeholder="e.g. $750 flat fee at implementation"></label>
+        <label class="ae-field"><span>Setup fee amount ($) <span class="label-soft">— one-time</span></span><input id="ae-setupAmount" type="number" step="0.01" min="0" value="${esc(form.setupAmount)}" placeholder="e.g. 750"></label>
+        <label class="ae-field"><span>Default setup month</span><select id="ae-setupMonth">${MONTHS.map((m, i) => `<option value="${i}"${(form.setupMonth ?? 0) == i ? ' selected' : ''}>${m}</option>`).join('')}</select></label>
+        <label class="ae-field ae-wide"><span>Setup fee note (optional)</span><input id="ae-setupFee" type="text" value="${esc(form.setupFee)}" placeholder="e.g. includes iPad & install"></label>
         <label class="ae-field ae-wide"><span>Prior year cost note</span><input id="ae-priorYearNote" type="text" value="${esc(form.priorYearNote)}" placeholder="e.g. Up from $1.50/unit last year"></label>
         <label class="ae-field ae-wide"><span>Clarification note (shown by the entry box)</span><input id="ae-inputNote" type="text" value="${esc(form.inputNote)}" placeholder="e.g. *Check with your local housing authority"></label>
         <label class="ae-field ae-wide"><span>Program guide URL</span><input id="ae-resourceUrl" type="text" value="${esc(form.resourceUrl)}" placeholder="https://…"></label>
@@ -403,6 +405,8 @@ function wireEditor() {
   bind('ae-paceGL', 'paceGL');
   bind('ae-owner', 'owner');
   bind('ae-setupFee', 'setupFee');
+  bind('ae-setupAmount', 'setupAmount');
+  document.getElementById('ae-setupMonth')?.addEventListener('change', e => { form.setupMonth = parseInt(e.target.value); });
   bind('ae-priorYearNote', 'priorYearNote');
   bind('ae-inputNote', 'inputNote');
   bind('ae-resourceUrl', 'resourceUrl');
@@ -594,6 +598,8 @@ async function save() {
     monthsFixed: !!form.monthsFixed,
     systems: (Array.isArray(form.systems) && form.systems.length) ? form.systems : ['Yardi', 'OneSite', 'PaceOneSite'],
     setupFee: form.setupFee || null,
+    setupAmount: cleanNum(form.setupAmount) || 0,
+    setupMonth: Number.isInteger(form.setupMonth) ? form.setupMonth : 0,
     priorYearNote: form.priorYearNote || null,
     inputNote: form.inputNote || null,
     costRaw: form.costRaw || null,
