@@ -868,9 +868,9 @@ function buildComponentBody(program) {
         if (part.locked) return `<div class="comp-line"><span class="comp-label">${part.label || item}</span><span class="comp-val">${formatRate(num(part.rate))} × ${num(part.baseQty)}</span></div>`;
         const v = num(S.compInputs[key]);
         return `<div class="card-calc">
-          <span class="calc-rate">${formatRate(num(part.rate))} / ${item.toLowerCase()}</span><span class="calc-x">×</span>
+          <span class="calc-rate">${formatRate(num(part.rate))}</span><span class="calc-x">×</span>
           <div class="qty-field"><input class="comp-input" data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="0" value="${v || ''}"></div>
-          <span class="qty-label">${item}s</span>
+          <span class="qty-label">${item}</span>
           ${part.baseQty ? `<span class="input-note">+${num(part.baseQty)} included</span>` : ''}
         </div>`;
       }
