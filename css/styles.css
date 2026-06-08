@@ -2528,6 +2528,7 @@ body {
 .sep-bill-toggle input { accent-color: #fff; }
 .prog-card.is-elective .sep-bill-toggle { color: #9a7350; }
 .prog-card.is-elective .sep-bill-toggle input { accent-color: var(--navy); }
+.sep-bill-label { margin-top: 8px; }
 .sep-bill-chips { margin-top: 6px; }
 
 /* Setup fee block — one-time, blue, with its own month */

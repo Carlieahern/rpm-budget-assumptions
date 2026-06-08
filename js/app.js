@@ -887,7 +887,8 @@ function partSeparateUI(program, i) {
       <input type="checkbox" class="part-sep-check" data-pid="${program.id}" data-idx="${i}"${on ? ' checked' : ''}>
       Will be billed separately
     </label>
-    ${on ? `<div class="incur-chips sep-bill-chips">${MONTH_NAMES.map((m, mi) =>
+    ${on ? `<div class="incur-label sep-bill-label">Bill this item separately in: <span class="incur-directive">(overrides the default months)</span></div>
+      <div class="incur-chips sep-bill-chips">${MONTH_NAMES.map((m, mi) =>
       `<button type="button" class="incur-chip part-sep-chip${sel.includes(mi) ? ' on' : ''}" data-pid="${program.id}" data-idx="${i}" data-month="${mi}">${m}</button>`).join('')}</div>` : ''}`;
 }
 
@@ -1160,7 +1161,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     const directive = locked ? '' : ' <span class="incur-directive">(select applicable months)</span>';
     bodyHtml += `
       <div class="incur-months">
-        <div class="incur-label">Billing months${note}${directive}</div>
+        <div class="incur-label">Default billing months${note}${directive}</div>
         <div class="incur-chips">${monthChipStrip(activeMonthsFor(program), locked)}</div>
       </div>`;
   }
