@@ -626,6 +626,7 @@ async function save() {
     await saveProgram(id, data);
     closeModal('modal-admin-editor');
     if (afterSave) await afterSave();
+    window.dispatchEvent(new CustomEvent('rpm-programs-changed'));
   } catch (e) {
     alert('Save failed: ' + e.message);
     btn.disabled = false; btn.textContent = editingId ? 'Save changes' : 'Create program';
@@ -639,6 +640,7 @@ async function removeProgram() {
     await deleteProgram(editingId);
     closeModal('modal-admin-editor');
     if (afterSave) await afterSave();
+    window.dispatchEvent(new CustomEvent('rpm-programs-changed'));
   } catch (e) {
     alert('Delete failed: ' + e.message);
   }

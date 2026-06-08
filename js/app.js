@@ -1172,7 +1172,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     ${bodyHtml ? '<div class="card-divider"></div>' : ''}
     ${bodyHtml}
     <div class="card-foot">
-      ${(program.priorYearNote || program.resourceUrl || program.description || program.minCost != null || program.maxCost != null || priorDecision) ? `<button class="details-toggle" type="button">▾ Details</button>` : '<span></span>'}
+      <button class="details-toggle" type="button">▾ Details</button>
       ${S.admin ? `<button class="card-edit-btn" type="button">✎ Edit</button>` : ''}
       <div class="prog-card-action">${actionHtml}</div>
     </div>
@@ -1733,6 +1733,17 @@ document.getElementById('btn-refresh').addEventListener('click', async () => {
   btn.classList.add('spinning');
   clearFirebaseCache();
   try { await launchMain(); } finally { btn.classList.remove('spinning'); }
+});
+
+// A program was saved/deleted in admin → silently pull fresh data into the dashboard
+window.addEventListener('rpm-programs-changed', async () => {
+  if (!S.programs || !S.programs.length) return;   // no dashboard session yet
+  try {
+    clearFirebaseCache();
+    S.allPrograms = await fetchPrograms(true);
+    applyVisiblePrograms();
+    renderMainScreen();
+  } catch (e) { console.error('Auto-refresh failed', e); }
 });
 
 document.getElementById('mi-change-property').addEventListener('click', () => {
