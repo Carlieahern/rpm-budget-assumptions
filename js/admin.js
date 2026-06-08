@@ -469,9 +469,16 @@ function wireEditor() {
     el.addEventListener('input', e => {
       const i = +el.dataset.i, k = el.dataset.k;
       form.components[i][k] = e.target.value;
-      // Re-render only when a structural field changes; plain values just preview
-      if (k === 'itemLabel' || k === 'selectMode' || k === 'base') buildEditor();
-      else updatePreview();
+      // Selects change which fields show → full rebuild (no focus to lose).
+      if (k === 'selectMode' || k === 'base') { buildEditor(); return; }
+      // Text fields must NOT rebuild (would drop the cursor). Update the
+      // "Rate per X" label in place instead.
+      if (k === 'itemLabel') {
+        const rateInput = document.querySelector(`.ae-pf[data-i="${i}"][data-k="rate"]`);
+        const span = rateInput?.closest('.ae-field')?.querySelector('span');
+        if (span) span.textContent = `Rate per ${(e.target.value || 'item').toLowerCase()} ($)`;
+      }
+      updatePreview();
     }));
   // Option sub-rows within an "options" part
   document.querySelectorAll('.ae-popt-add').forEach(b =>
