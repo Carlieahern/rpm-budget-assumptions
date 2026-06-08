@@ -2643,6 +2643,11 @@ body {
   padding: 0;
 }
 .details-toggle:hover { color: #fff; }
+/* Elective cards are white — flip the toggle/edit/link text to be visible */
+.prog-card.is-elective .details-toggle { color: var(--copper2); }
+.prog-card.is-elective .details-toggle:hover { color: var(--navy); }
+.prog-card.is-elective .card-edit-btn { color: var(--copper2); }
+.prog-card.is-elective .card-guide-link { color: var(--navy); }
 .prog-card-action { display: flex; align-items: center; gap: 8px; }
 
 /* ── Buttons: navy fill pill + ghost outline pill ── */
