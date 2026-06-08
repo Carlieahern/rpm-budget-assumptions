@@ -2325,14 +2325,15 @@ body {
 .card-owner {
   font-size: 12px;
   color: rgba(255,255,255,0.62);
-  margin-top: 8px;
+  margin-top: 6px;
   word-break: break-word;
 }
 .card-rate-basis {
-  font-size: 13px;
+  font-size: 15px;
   font-style: italic;
-  color: rgba(255,255,255,0.78);
-  margin-top: 3px;
+  color: rgba(255,255,255,0.9);
+  margin-top: 4px;
+  line-height: 1.4;
 }
 
 .card-head-side {
@@ -2344,9 +2345,9 @@ body {
   gap: 1px;
 }
 .card-gl {
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(255,255,255,0.7);
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.92);
   letter-spacing: 0.02em;
 }
 .card-billing {
@@ -2457,6 +2458,7 @@ body {
 /* ── Month picker (as-incurred + per-card billing months) ── */
 .incur-months { margin-top: 4px; }
 .months-detail { margin-top: 12px; }
+.incur-directive { font-weight: 400; font-style: italic; opacity: 0.8; }
 .incur-label {
   font-size: 13px;
   font-style: italic;
@@ -2813,6 +2815,23 @@ body {
 .input-note { font-size: 12px; font-style: italic; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.4; }
 
 /* Component static lines (flat / per-unit / locked parts) */
+/* Component entry boxes — keep them short (a couple of digits) */
+.qty-field { flex: 0 0 auto; width: auto; }
+.comp-input, .comp-optqty, .qty-input {
+  width: 56px;
+  min-width: 0;
+  border: none;
+  background: none;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  color: var(--navy);
+  text-align: center;
+  outline: none;
+}
+.comp-input::placeholder, .comp-optqty::placeholder { color: rgba(27,42,74,0.35); font-weight: 500; }
+/* % of income/CapEx needs room for a dollar figure */
+.card-calc .comp-input[placeholder^="$"] { width: 110px; }
+
 .comp-line { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 3px 0; }
 .comp-label { font-size: 14px; color: rgba(255,255,255,0.9); font-weight: 500; }
 .comp-val { font-size: 14px; color: #fff; font-weight: 700; white-space: nowrap; }

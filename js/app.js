@@ -1104,14 +1104,15 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   if (isAsIncurred) {
     bodyHtml += `
       <div class="incur-months">
-        <div class="incur-label">Expected in which months?</div>
+        <div class="incur-label">Expected in which months? <span class="incur-directive">(select applicable months)</span></div>
         <div class="incur-chips">${monthChipStrip(S.incurMonths[program.id] || [], false)}</div>
       </div>`;
   } else if (isRecurring) {
     const note = locked ? ' · 🔒 fixed' : (S.transitionMonth != null ? ' · transition applied' : '');
+    const directive = locked ? '' : ' <span class="incur-directive">(select applicable months)</span>';
     bodyHtml += `
       <div class="incur-months">
-        <div class="incur-label">Billing months${note}</div>
+        <div class="incur-label">Billing months${note}${directive}</div>
         <div class="incur-chips">${monthChipStrip(activeMonthsFor(program), locked)}</div>
       </div>`;
   }

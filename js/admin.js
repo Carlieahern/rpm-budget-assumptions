@@ -279,6 +279,10 @@ function buildEditor() {
         <span>Program name</span>
         <input id="ae-name" type="text" value="${esc(form.name)}" placeholder="e.g. Elevator Management Services">
       </label>
+      <label class="ae-field ae-wide">
+        <span>Program owner <span class="label-soft">— shown under the title</span></span>
+        <input id="ae-owner" type="text" value="${esc(form.owner)}" placeholder="e.g. Kim Polly">
+      </label>
       <label class="ae-field">
         <span>Department</span>
         <input id="ae-department" list="ae-dept-list" type="text" value="${esc(form.department)}" placeholder="Department">
@@ -359,9 +363,8 @@ function buildEditor() {
     </div>` : ''}
 
     <details class="ae-more">
-      <summary>Owner, links & details</summary>
+      <summary>Links & details</summary>
       <div class="ae-grid">
-        <label class="ae-field"><span>Program owner</span><input id="ae-owner" type="text" value="${esc(form.owner)}"></label>
         <label class="ae-field ae-wide"><span>Setup fee (description)</span><input id="ae-setupFee" type="text" value="${esc(form.setupFee)}" placeholder="e.g. $750 flat fee at implementation"></label>
         <label class="ae-field ae-wide"><span>Prior year cost note</span><input id="ae-priorYearNote" type="text" value="${esc(form.priorYearNote)}" placeholder="e.g. Up from $1.50/unit last year"></label>
         <label class="ae-field ae-wide"><span>Clarification note (shown by the entry box)</span><input id="ae-inputNote" type="text" value="${esc(form.inputNote)}" placeholder="e.g. *Check with your local housing authority"></label>
