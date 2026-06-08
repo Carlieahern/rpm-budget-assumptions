@@ -1683,6 +1683,45 @@ body {
 
 #summary-body { padding: 16px 20px 40px; overflow-y: auto; flex: 1; }
 
+/* ── Rebuilt summary ── */
+.sum-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  background: var(--navy); color: #fff; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px;
+  position: sticky; top: 0; z-index: 2;
+}
+.sum-grand { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.7); display: flex; flex-direction: column; gap: 2px; }
+.sum-grand strong { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 800; color: var(--copper); letter-spacing: -0.5px; }
+.btn-export {
+  background: var(--copper); color: #fff; border: none; border-radius: 8px; padding: 10px 18px;
+  font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.btn-export:hover { background: var(--copper2); }
+
+.sum-dept { margin-bottom: 26px; }
+.sum-dept-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  border-bottom: 2px solid var(--copper); padding-bottom: 6px; margin-bottom: 8px;
+}
+.sum-dept-name { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; color: var(--navy); letter-spacing: -0.3px; }
+.sum-dept-total { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; color: var(--copper2); }
+.sum-subhead { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin: 12px 0 4px; }
+
+.sum-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: center;
+  padding: 9px 4px; border-bottom: 1px solid #eef0f5;
+}
+.sum-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sum-name { font-size: 14px; font-weight: 600; color: var(--navy); }
+.sum-costraw { font-size: 12px; color: var(--text2); font-style: italic; }
+.sum-choice { font-size: 12px; color: var(--copper2); font-weight: 600; }
+.sum-badge { font-size: 11px; font-weight: 700; border-radius: 5px; padding: 3px 9px; white-space: nowrap; }
+.sum-badge.st-ack     { background: #dcfce7; color: #15803d; }
+.sum-badge.st-out     { background: #fee2e2; color: #b91c1c; }
+.sum-badge.st-flag    { background: #dbeafe; color: #1d4ed8; }
+.sum-badge.st-na      { background: #f3f4f6; color: #6b7280; }
+.sum-badge.st-pending { background: #fef3c7; color: #92400e; }
+.sum-cost { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: var(--navy); text-align: right; min-width: 72px; }
+
 .summary-stat-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -1558,13 +1558,142 @@ document.getElementById('btn-admin-entry').addEventListener('click', () => {
 // ── Summary ───────────────────────────────────────────────────────────────────
 document.getElementById('btn-view-summary').addEventListener('click', openSummary);
 
+// ── Summary helpers ───────────────────────────────────────────────────────────
+function programStatus(p) {
+  const dec = S.decisions[p.id]?.decision;
+  if (p.required) {
+    if (dec === 'acknowledged')   return { label: 'Acknowledged', cls: 'st-ack',     included: true  };
+    if (dec === 'opted-out')      return { label: 'Opted Out',    cls: 'st-out',     included: false };
+    if (dec === 'needs-followup') return { label: 'Flagged',      cls: 'st-flag',    included: true  };
+    if (dec === 'not-applicable') return { label: 'N/A',          cls: 'st-na',      included: false };
+    return { label: 'Not yet acknowledged', cls: 'st-pending', included: true };
+  }
+  if (dec === 'in')  return { label: 'Included', cls: 'st-ack',     included: true  };
+  if (dec === 'out') return { label: 'Removed',  cls: 'st-out',     included: false };
+  return { label: 'Not selected', cls: 'st-pending', included: false };
+}
+
+function summaryCost(p) {
+  let c = proratedAnnual(p);
+  if (S.setupOn[p.id] && (p.setupAmount || 0) > 0) c += p.setupAmount;
+  return c;
+}
+
+// Human description of what the PM chose
+function programChoiceText(p) {
+  const parts = [];
+  if (hasComponents(p)) {
+    (p.components || []).forEach((c, i) => {
+      const key = `${p.id}:${i}`;
+      if (c.kind === 'perItem' && !c.locked) {
+        const q = num(S.compInputs[key]) + (c.baseQty || 0);
+        if (q) parts.push(`${q} ${(c.itemLabel || 'item')}${q === 1 ? '' : 's'}`);
+      } else if (c.kind === 'options') {
+        if (c.selectMode === 'multiple') {
+          const qs = S.compSel[key] || [];
+          (c.options || []).forEach((o, oi) => { if (qs[oi] > 0) parts.push(`${o.label} ×${qs[oi]}`); });
+        } else {
+          const sel = S.compSel[key] ?? 0;
+          if (c.options?.[sel]) parts.push(c.options[sel].label);
+        }
+      } else if (c.kind === 'percent' && !c.locked) {
+        const b = S.compInputs[key];
+        if (b) parts.push(`${num(c.pct)}% of ${formatCost(num(b))}`);
+      }
+    });
+  } else {
+    const info = parseCostBasisInfo(p);
+    if (info.type === 'per-unit' || info.type === 'per-quantity') {
+      const q = effectiveQty(p, info);
+      if (q) parts.push(`${q} ${info.plural || 'units'}`);
+    } else if (info.type === 'tiered') {
+      if (info.additive) {
+        const qs = S.optionQty[p.id] || [];
+        (info.tiers || []).forEach((t, i) => { if (qs[i] > 0) parts.push(`${t.label} ×${qs[i]}`); });
+      } else {
+        const ti = S.selectedTiers[p.id] ?? 0;
+        if (info.tiers?.[ti]) parts.push(info.tiers[ti].label);
+      }
+    }
+  }
+  if (S.setupOn[p.id] && (p.setupAmount || 0) > 0) parts.push(`+ setup ${formatCost(p.setupAmount)}`);
+  return parts.join(', ');
+}
+
 function openSummary() {
-  renderSummary(S.programs, S.decisions, S.priorDecisions, S.budgetYear, S.viewingPrior);
+  const body = document.getElementById('summary-body');
+  const deptOrder = [];
+  const seen = new Set();
+  S.programs.forEach(p => { if (!seen.has(p.group)) { seen.add(p.group); deptOrder.push(p.group); } });
+
+  let grand = 0;
+  let html = `
+    <div class="sum-toolbar">
+      <div class="sum-grand">Estimated Annual Budget<strong id="sum-grand-val">—</strong></div>
+      <button class="btn-export" id="btn-export-csv">⬇ Export to Excel</button>
+    </div>`;
+
+  deptOrder.forEach(dept => {
+    const progs = S.programs.filter(p => p.group === dept);
+    const render = (list, title) => {
+      if (!list.length) return '';
+      return `<div class="sum-subhead">${title}</div>` + list.map(p => {
+        const st = programStatus(p);
+        const cost = st.included ? summaryCost(p) : 0;
+        const choice = programChoiceText(p);
+        return `
+          <div class="sum-row">
+            <div class="sum-row-main">
+              <span class="sum-name">${p.name}</span>
+              ${p.costRaw ? `<span class="sum-costraw">${p.costRaw}</span>` : ''}
+              ${choice ? `<span class="sum-choice">${choice}</span>` : ''}
+            </div>
+            <span class="sum-badge ${st.cls}">${st.label}</span>
+            <span class="sum-cost">${st.included && cost ? formatCost(cost) : (st.included ? '—' : '')}</span>
+          </div>`;
+      }).join('');
+    };
+    const ne = progs.filter(p => p.required);
+    const el = progs.filter(p => !p.required);
+    let deptTotal = 0;
+    progs.forEach(p => { const st = programStatus(p); if (st.included) deptTotal += summaryCost(p); });
+    grand += deptTotal;
+    html += `
+      <div class="sum-dept">
+        <div class="sum-dept-head"><span class="sum-dept-name">${dept}</span><span class="sum-dept-total">${formatCost(deptTotal)}</span></div>
+        ${render(ne, 'Non-Elective')}
+        ${render(el, 'Elective')}
+      </div>`;
+  });
+
+  body.innerHTML = html;
+  const gv = document.getElementById('sum-grand-val');
+  if (gv) gv.textContent = formatCost(grand);
+  document.getElementById('btn-export-csv')?.addEventListener('click', exportSummaryCsv);
+
   const toggleBtn = document.getElementById('btn-prior-year-toggle');
-  toggleBtn.textContent = S.viewingPrior
-    ? `Show ${S.budgetYear}`
-    : `Show ${S.budgetYear - 1}`;
+  if (toggleBtn) toggleBtn.style.display = 'none';
   showScreen('screen-summary');
+}
+
+function exportSummaryCsv() {
+  const rows = [['Department', 'Program', 'Type', 'Status', 'Selection', 'Cost Summary', 'Annual Cost']];
+  S.programs.forEach(p => {
+    const st = programStatus(p);
+    rows.push([
+      p.group, p.name, p.required ? 'Non-elective' : 'Elective', st.label,
+      programChoiceText(p), (p.costRaw || '').replace(/[\r\n]+/g, ' '),
+      st.included ? summaryCost(p).toFixed(2) : '',
+    ]);
+  });
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `${(S.property || 'Budget').replace(/[^a-z0-9]+/gi, '_')}_FY${S.budgetYear}_Assumptions.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
 }
 
 document.getElementById('btn-summary-back').addEventListener('click', () => showScreen('screen-main'));
