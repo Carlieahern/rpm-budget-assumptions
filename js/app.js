@@ -894,6 +894,11 @@ function partSeparateUI(program, i) {
 
 // Renders the PM-facing inputs for a component-based program.
 function buildComponentBody(program) {
+  const multiParts = (program.components || []).length > 1;
+  // Separate billing only makes sense with multiple items, or an options part with >1 choice
+  const sepUI = (part, i) =>
+    (multiParts || (part.kind === 'options' && (part.options || []).length > 1))
+      ? partSeparateUI(program, i) : '';
   return (program.components || []).map((part, i) => {
     const key = `${program.id}:${i}`;
     switch (part.kind) {
@@ -910,7 +915,7 @@ function buildComponentBody(program) {
           <div class="qty-field"><input class="comp-input" data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="0" value="${v || ''}"></div>
           <span class="qty-label">${item}</span>
           ${part.baseQty ? `<span class="input-note">+${num(part.baseQty)} included</span>` : ''}
-        </div>${partSeparateUI(program, i)}`;
+        </div>${sepUI(part, i)}`;
       }
       case 'percent': {
         const baseLabel = part.base === 'capex' ? 'CapEx budget' : 'total income';
@@ -936,7 +941,7 @@ function buildComponentBody(program) {
               <div class="qty-field"><input class="comp-optqty" data-pid="${program.id}" data-idx="${i}" data-oi="${oi}" type="number" min="0" value="${qtys[oi] || ''}"${on ? '' : ' disabled'}></div>
             </div>`;
           }).join('');
-          return `<div class="tier-select-label">${part.label || 'Select all that apply'}</div><div class="addrows">${orows}</div>${partSeparateUI(program, i)}`;
+          return `<div class="tier-select-label">${part.label || 'Select all that apply'}</div><div class="addrows">${orows}</div>${sepUI(part, i)}`;
         }
         const sel = S.compSel[key] ?? 0;
         const orows = opts.map((o, oi) => `
@@ -944,7 +949,7 @@ function buildComponentBody(program) {
             <input type="radio" class="comp-optradio" name="copt_${program.id}_${i}" data-pid="${program.id}" data-idx="${i}" data-oi="${oi}"${oi === sel ? ' checked' : ''}>
             <span class="tier-label">${o.label} <span class="tier-rate">(${formatRate(num(o.rate))})</span></span>
           </label>`).join('');
-        return `<div class="tier-select-label">${part.label || 'Select one'}</div><div class="tier-options">${orows}</div>${partSeparateUI(program, i)}`;
+        return `<div class="tier-select-label">${part.label || 'Select one'}</div><div class="tier-options">${orows}</div>${sepUI(part, i)}`;
       }
       case 'formula': {
         if (part.locked || !/\bqty\b/.test(part.expr || '')) return '';
