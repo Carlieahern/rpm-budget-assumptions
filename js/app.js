@@ -24,6 +24,8 @@ const S = {
   optionQty:       {},    // programId → [qty per option] for additive tiered costs
   compInputs:      {},    // "programId:partIdx" → PM numeric input (per-item qty, % base, formula qty)
   compSel:         {},    // "programId:partIdx" → option selection (index for one, [qty] for multiple)
+  partSeparate:    {},    // "programId:partIdx" → bool: this part is billed in its own months
+  partMonths:      {},    // "programId:partIdx" → [month indices] when billed separately
   setupOn:         {},    // programId → include the one-time setup fee?
   setupMonth:      {},    // programId → month index the setup fee is charged
   budgetAmounts:   {},    // programId → manual dollar amount (fallback for complex costs)
@@ -154,6 +156,8 @@ async function launchMain() {
     try { S.optionQty     = JSON.parse(localStorage.getItem(`rpm_optqty_${S.property}_${S.budgetYear}`)) || {}; } catch { S.optionQty     = {}; }
     try { S.compInputs    = JSON.parse(localStorage.getItem(`rpm_compin_${S.property}_${S.budgetYear}`)) || {}; } catch { S.compInputs    = {}; }
     try { S.compSel       = JSON.parse(localStorage.getItem(`rpm_compsel_${S.property}_${S.budgetYear}`)) || {}; } catch { S.compSel       = {}; }
+    try { S.partSeparate  = JSON.parse(localStorage.getItem(`rpm_partsep_${S.property}_${S.budgetYear}`)) || {}; } catch { S.partSeparate  = {}; }
+    try { S.partMonths    = JSON.parse(localStorage.getItem(`rpm_partmo_${S.property}_${S.budgetYear}`)) || {}; } catch { S.partMonths    = {}; }
     try { S.setupOn       = JSON.parse(localStorage.getItem(`rpm_setupon_${S.property}_${S.budgetYear}`)) || {}; } catch { S.setupOn       = {}; }
     try { S.setupMonth    = JSON.parse(localStorage.getItem(`rpm_setupmonth_${S.property}_${S.budgetYear}`)) || {}; } catch { S.setupMonth    = {}; }
     try { S.budgetAmounts = JSON.parse(localStorage.getItem(`rpm_budget_${S.property}_${S.budgetYear}`)) || {}; } catch { S.budgetAmounts = {}; }
@@ -470,12 +474,31 @@ function getMonthlyBreakdown() {
       months[sm] += p.setupAmount;
     }
 
+    const progMonths = activeMonthsFor(p);
+
+    // Component programs: distribute each part, honoring "billed separately" months
+    if (hasComponents(p)) {
+      const mo = p.billingPeriod === 'monthly';
+      (p.components || []).forEach((c, i) => {
+        const partPer    = partPeriodCost(p, c, i);
+        const partAnnual = mo ? partPer * 12 : partPer;
+        if (!partAnnual) return;
+        const key = `${p.id}:${i}`;
+        const sepMonths = (S.partSeparate[key] && (S.partMonths[key] || []).length) ? S.partMonths[key] : null;
+        const ms = sepMonths || progMonths;
+        if (!ms.length) return;
+        const each = partAnnual / ms.length;
+        ms.forEach(m => months[m] += each);
+      });
+      return;
+    }
+
     const base = resolvedCost(p);
     if (!base) return;
     const nat = naturalMonthCount(p);
     if (nat <= 0) return;
     const per = base / nat;                  // amount per billing hit
-    activeMonthsFor(p).forEach(m => months[m] += per);
+    progMonths.forEach(m => months[m] += per);
   });
   return months;
 }
@@ -854,6 +877,20 @@ function buildInfoCard(program) {
   return el;
 }
 
+// "Will be billed separately" control for per-item / options parts
+function partSeparateUI(program, i) {
+  const key = `${program.id}:${i}`;
+  const on  = !!S.partSeparate[key];
+  const sel = S.partMonths[key] || [];
+  return `
+    <label class="sep-bill-toggle">
+      <input type="checkbox" class="part-sep-check" data-pid="${program.id}" data-idx="${i}"${on ? ' checked' : ''}>
+      Will be billed separately
+    </label>
+    ${on ? `<div class="incur-chips sep-bill-chips">${MONTH_NAMES.map((m, mi) =>
+      `<button type="button" class="incur-chip part-sep-chip${sel.includes(mi) ? ' on' : ''}" data-pid="${program.id}" data-idx="${i}" data-month="${mi}">${m}</button>`).join('')}</div>` : ''}`;
+}
+
 // Renders the PM-facing inputs for a component-based program.
 function buildComponentBody(program) {
   return (program.components || []).map((part, i) => {
@@ -872,7 +909,7 @@ function buildComponentBody(program) {
           <div class="qty-field"><input class="comp-input" data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="0" value="${v || ''}"></div>
           <span class="qty-label">${item}</span>
           ${part.baseQty ? `<span class="input-note">+${num(part.baseQty)} included</span>` : ''}
-        </div>`;
+        </div>${partSeparateUI(program, i)}`;
       }
       case 'percent': {
         const baseLabel = part.base === 'capex' ? 'CapEx budget' : 'total income';
@@ -898,7 +935,7 @@ function buildComponentBody(program) {
               <div class="qty-field"><input class="comp-optqty" data-pid="${program.id}" data-idx="${i}" data-oi="${oi}" type="number" min="0" value="${qtys[oi] || ''}"${on ? '' : ' disabled'}></div>
             </div>`;
           }).join('');
-          return `<div class="tier-select-label">${part.label || 'Select all that apply'}</div><div class="addrows">${orows}</div>`;
+          return `<div class="tier-select-label">${part.label || 'Select all that apply'}</div><div class="addrows">${orows}</div>${partSeparateUI(program, i)}`;
         }
         const sel = S.compSel[key] ?? 0;
         const orows = opts.map((o, oi) => `
@@ -906,7 +943,7 @@ function buildComponentBody(program) {
             <input type="radio" class="comp-optradio" name="copt_${program.id}_${i}" data-pid="${program.id}" data-idx="${i}" data-oi="${oi}"${oi === sel ? ' checked' : ''}>
             <span class="tier-label">${o.label} <span class="tier-rate">(${formatRate(num(o.rate))})</span></span>
           </label>`).join('');
-        return `<div class="tier-select-label">${part.label || 'Select one'}</div><div class="tier-options">${orows}</div>`;
+        return `<div class="tier-select-label">${part.label || 'Select one'}</div><div class="tier-options">${orows}</div>${partSeparateUI(program, i)}`;
       }
       case 'formula': {
         if (part.locked || !/\bqty\b/.test(part.expr || '')) return '';
@@ -1273,6 +1310,31 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     });
   });
 
+  // "Will be billed separately" — per-part billing months
+  const persistParts = () => {
+    localStorage.setItem(`rpm_partsep_${S.property}_${S.budgetYear}`, JSON.stringify(S.partSeparate));
+    localStorage.setItem(`rpm_partmo_${S.property}_${S.budgetYear}`, JSON.stringify(S.partMonths));
+  };
+  el.querySelectorAll('.part-sep-check').forEach(chk => {
+    chk.addEventListener('change', e => {
+      e.stopPropagation();
+      S.partSeparate[`${program.id}:${chk.dataset.idx}`] = chk.checked;
+      persistParts(); updateBudgetTotal(); refreshCard(program.id);
+    });
+  });
+  el.querySelectorAll('.part-sep-chip').forEach(chip => {
+    chip.addEventListener('click', e => {
+      e.stopPropagation();
+      const key = `${program.id}:${chip.dataset.idx}`;
+      const m   = parseInt(chip.dataset.month);
+      const arr = S.partMonths[key] || [];
+      const idx = arr.indexOf(m);
+      if (idx >= 0) arr.splice(idx, 1); else arr.push(m);
+      S.partMonths[key] = arr;
+      persistParts(); chip.classList.toggle('on'); updateBudgetTotal();
+    });
+  });
+
   // Setup fee include toggle + month
   el.querySelector('.setup-include')?.addEventListener('change', e => {
     e.stopPropagation();
@@ -1620,6 +1682,17 @@ function programChoiceText(p) {
   return parts.join(', ');
 }
 
+// "All" if every month, else 1-indexed month numbers (e.g. 6,7,8,9,10,11,12)
+function monthsBilledText(p) {
+  const freq = (p.billingFreq || p.billingPeriod || '').toLowerCase();
+  let months;
+  if (freq.includes('incurred') || freq.includes('implement')) months = S.incurMonths[p.id] || [];
+  else months = activeMonthsFor(p);
+  if (!months.length) return '—';
+  if (months.length === 12) return 'All';
+  return months.slice().sort((a, b) => a - b).map(m => m + 1).join(',');
+}
+
 function openSummary() {
   const body = document.getElementById('summary-body');
   const deptOrder = [];
@@ -1647,6 +1720,7 @@ function openSummary() {
               <span class="sum-name">${p.name}</span>
               ${p.costRaw ? `<span class="sum-costraw">${p.costRaw}</span>` : ''}
               ${choice ? `<span class="sum-choice">${choice}</span>` : ''}
+              <span class="sum-meta">GL ${p.glCode} · Months billed: ${monthsBilledText(p)}</span>
             </div>
             <span class="sum-badge ${st.cls}">${st.label}</span>
             <span class="sum-cost">${st.included && cost ? formatCost(cost) : (st.included ? '—' : '')}</span>
@@ -1677,12 +1751,12 @@ function openSummary() {
 }
 
 function exportSummaryCsv() {
-  const rows = [['Department', 'Program', 'Type', 'Status', 'Selection', 'Cost Summary', 'Annual Cost']];
+  const rows = [['Department', 'Program', 'GL', 'Type', 'Status', 'Selection', 'Months billed', 'Cost Summary', 'Annual Cost']];
   S.programs.forEach(p => {
     const st = programStatus(p);
     rows.push([
-      p.group, p.name, p.required ? 'Non-elective' : 'Elective', st.label,
-      programChoiceText(p), (p.costRaw || '').replace(/[\r\n]+/g, ' '),
+      p.group, p.name, p.glCode, p.required ? 'Non-elective' : 'Elective', st.label,
+      programChoiceText(p), monthsBilledText(p), (p.costRaw || '').replace(/[\r\n]+/g, ' '),
       st.included ? summaryCost(p).toFixed(2) : '',
     ]);
   });
@@ -1782,6 +1856,8 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
     S.optionQty      = {};
     S.compInputs     = {};
     S.compSel        = {};
+    S.partSeparate   = {};
+    S.partMonths     = {};
     S.setupOn        = {};
     S.setupMonth     = {};
     S.budgetAmounts  = {};
@@ -1791,6 +1867,8 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
     localStorage.removeItem(`rpm_optqty_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_compin_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_compsel_${S.property}_${S.budgetYear}`);
+    localStorage.removeItem(`rpm_partsep_${S.property}_${S.budgetYear}`);
+    localStorage.removeItem(`rpm_partmo_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_setupon_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_setupmonth_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_budget_${S.property}_${S.budgetYear}`);
