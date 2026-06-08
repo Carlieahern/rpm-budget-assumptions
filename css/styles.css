@@ -1038,7 +1038,15 @@ body {
 .prog-card.is-elective .qty-equals,
 .prog-card.is-elective .tier-select-label,
 .prog-card.is-elective .input-note,
-.prog-card.is-elective .cost-raw-text { color: #9a7350; }
+.prog-card.is-elective .cost-raw-text,
+.prog-card.is-elective .calc-x,
+.prog-card.is-elective .incur-label,
+.prog-card.is-elective .incur-directive,
+.prog-card.is-elective .addrow-label,
+.prog-card.is-elective .addrow-total,
+.prog-card.is-elective .budget-input-label,
+.prog-card.is-elective .fpu-label,
+.prog-card.is-elective .fpu-value { color: #9a7350; }
 .prog-card.is-elective .card-gl { background: #f4e7d8; }
 .prog-card.is-elective .prog-card-meta-row { border-top-color: #eedcc9; }
 .prog-card.is-elective .card-divider { background: #eedcc9; }
