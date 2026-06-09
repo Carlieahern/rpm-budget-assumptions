@@ -679,8 +679,13 @@ function updateBudgetTotal() {
 }
 
 function renderMainScreen() {
-  document.getElementById('hdr-property').textContent   = S.property;
-  document.getElementById('hdr-system').textContent     = S.systemType;
+  // With no property selected (system-only browse), the system becomes the big title
+  const hasProp = !!S.property;
+  document.getElementById('hdr-property').textContent = hasProp ? S.property : S.systemType;
+  const sysSpan = document.getElementById('hdr-system');
+  sysSpan.textContent = hasProp ? S.systemType : '';
+  sysSpan.style.display = hasProp ? '' : 'none';
+  if (sysSpan.nextElementSibling) sysSpan.nextElementSibling.style.display = hasProp ? '' : 'none';
   document.getElementById('hdr-year').textContent       = `FY ${S.budgetYear}`;
   document.getElementById('hdr-unit-count').textContent = S.unitCount > 0 ? `${S.unitCount} units` : 'Set units';
 
