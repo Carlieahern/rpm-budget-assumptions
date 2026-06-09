@@ -850,29 +850,47 @@ async function commitImport() {
   commit.disabled = true; commit.textContent = 'Importing…';
   let existing = {};
   try { existing = await fetchRawPrograms(); } catch {}
-  const slugs = new Set(Object.keys(existing));
-  let added = 0, skipped = 0;
+  const slugs  = new Set(Object.keys(existing));
+  // Match existing programs by NAME (not id) so seed/custom ids don't cause duplicates
+  const byName = {};
+  Object.entries(existing).forEach(([id, p]) => { if (p && p.name) byName[p.name.trim().toLowerCase()] = id; });
+
+  let added = 0, updated = 0, skipped = 0;
   for (const p of importRows) {
-    let id = slugify(p.name);
-    if (slugs.has(id) && !overwrite) { skipped++; continue; }
-    if (!slugs.has(id)) { let base = id, k = 2; while (slugs.has(id)) id = `${base}-${k++}`; }
+    const nameKey = p.name.trim().toLowerCase();
+    const existingId = byName[nameKey];
+    let id, isUpdate = false;
+    if (existingId) {
+      if (!overwrite) { skipped++; continue; }
+      id = existingId; isUpdate = true;          // update in place — preserves its current id
+    } else {
+      id = slugify(p.name);
+      let base = id, k = 2; while (slugs.has(id)) id = `${base}-${k++}`;
+    }
+    // When updating, keep the existing program's fields we don't import (don't wipe them)
+    const prev = isUpdate ? (existing[id] || {}) : {};
     const data = {
+      ...prev,
       ...p,
       rate: p.components?.[0]?.rate ?? null,
       itemLabel: p.components?.find(c => c.kind === 'perItem')?.itemLabel || null,
       baseFee: null, baseQty: 0, options: [], additive: false, customFormula: null,
-      setupAmount: 0, setupMonth: 0, defaultMonths: null, monthsFixed: false,
-      systems: ['Yardi', 'OneSite', 'PaceOneSite'],
-      inputNote: null, resourceUrl: null,
-      priorYearNote: p.priorYearNote || null,
+      setupAmount: prev.setupAmount ?? 0, setupMonth: prev.setupMonth ?? 0,
+      defaultMonths: prev.defaultMonths ?? null, monthsFixed: prev.monthsFixed ?? false,
+      systems: prev.systems || ['Yardi', 'OneSite', 'PaceOneSite'],
+      inputNote: prev.inputNote ?? null, resourceUrl: prev.resourceUrl ?? null,
+      priorYearNote: p.priorYearNote || prev.priorYearNote || null,
       lastEditedBy: adminName || 'Import', lastEditedAt: new Date().toISOString(),
     };
-    try { await saveProgram(id, data); slugs.add(id); added++; }
-    catch (e) { console.error('Import save failed for', p.name, e); }
+    try {
+      await saveProgram(id, data);
+      slugs.add(id); byName[nameKey] = id;
+      if (isUpdate) updated++; else added++;
+    } catch (e) { console.error('Import save failed for', p.name, e); }
   }
   commit.textContent = 'Import';
   closeModal('modal-import');
   if (afterSave) await afterSave();
   window.dispatchEvent(new CustomEvent('rpm-programs-changed'));
-  alert(`Imported ${added} program(s)${skipped ? `, skipped ${skipped} existing` : ''}.`);
+  alert(`Import complete — ${added} added, ${updated} updated${skipped ? `, ${skipped} skipped` : ''}.`);
 }
