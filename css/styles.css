@@ -2999,9 +2999,11 @@ body {
 /* % of income/CapEx needs room for a dollar figure */
 .card-calc .comp-input[placeholder^="$"] { width: 110px; }
 
-.comp-line { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 3px 0; }
-.comp-label { font-size: 14px; color: rgba(255,255,255,0.9); font-weight: 500; }
-.comp-val { font-size: 14px; color: #fff; font-weight: 700; white-space: nowrap; }
+.comp-line { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 5px 0; }
+.comp-label { font-size: 17px; color: #fff; font-weight: 600; }
+.comp-val { font-size: 18px; color: #fff; font-weight: 700; white-space: nowrap; }
+.prog-card.is-elective .comp-label { color: var(--copper2); }
+.prog-card.is-elective .comp-val { color: var(--copper2); }
 .card-calc + .card-calc, .comp-line + .card-calc, .card-calc + .comp-line { margin-top: 8px; }
 
 /* ── Inline admin editing ── */
