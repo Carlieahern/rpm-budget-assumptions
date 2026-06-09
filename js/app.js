@@ -274,8 +274,8 @@ function customResult(program, info) {
 // period amount; resolvedCost annualizes + clamps. PM inputs are keyed "id:idx".
 function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
 
-function partPeriodCost(program, part, idx) {
-  const key = `${program.id}:${idx}`;
+function partPeriodCost(program, part, idx, prefix = '') {
+  const key = `${prefix}${program.id}:${idx}`;
   switch (part.kind) {
     case 'flat':
       return num(part.amount);
@@ -318,6 +318,18 @@ function componentPeriodCost(program) {
 
 function hasComponents(program) {
   return Array.isArray(program.components) && program.components.length > 0;
+}
+
+function hasSetupBuilder(program) {
+  return Array.isArray(program.setupComponents) && program.setupComponents.length > 0;
+}
+
+// One-time setup fee total — from the setup cost builder, else the legacy flat amount
+function setupTotal(program) {
+  if (hasSetupBuilder(program)) {
+    return program.setupComponents.reduce((s, part, i) => s + partPeriodCost(program, part, i, 'setup:'), 0);
+  }
+  return num(program.setupAmount);
 }
 
 function rawResolvedCost(program) {
@@ -495,9 +507,9 @@ function getMonthlyBreakdown() {
     if (!included) return;
 
     // One-time setup fee lands in its chosen month
-    if (S.setupOn[p.id] && (p.setupAmount || 0) > 0) {
-      const sm = S.setupMonth[p.id] ?? (p.setupMonth ?? 0);
-      months[sm] += p.setupAmount;
+    if (S.setupOn[p.id]) {
+      const st = setupTotal(p);
+      if (st > 0) { const sm = S.setupMonth[p.id] ?? (p.setupMonth ?? 0); months[sm] += st; }
     }
 
     const progMonths = activeMonthsFor(p);
@@ -651,7 +663,7 @@ function updateBudgetTotal() {
       : dec === 'in';
     if (included) {
       annual += proratedAnnual(p);           // respects transition / active months
-      if (S.setupOn[p.id] && (p.setupAmount || 0) > 0) annual += p.setupAmount;  // one-time setup fee
+      if (S.setupOn[p.id]) annual += setupTotal(p);  // one-time setup fee
     }
   });
   const monthly = annual / 12;               // true average per month — moves with month selection
@@ -920,14 +932,16 @@ function partSeparateUI(program, i) {
 }
 
 // Renders the PM-facing inputs for a component-based program.
-function buildComponentBody(program) {
-  const multiParts = (program.components || []).length > 1;
-  // Separate billing only makes sense with multiple items, or an options part with >1 choice
+function buildComponentBody(program, parts = program.components, prefix = '') {
+  parts = parts || [];
+  const multiParts = parts.length > 1;
+  // Separate billing only on the MAIN builder (setup fee has its own month)
   const sepUI = (part, i) =>
-    (multiParts || (part.kind === 'options' && (part.options || []).length > 1))
+    (prefix === '' && (multiParts || (part.kind === 'options' && (part.options || []).length > 1)))
       ? partSeparateUI(program, i) : '';
-  return (program.components || []).map((part, i) => {
-    const key = `${program.id}:${i}`;
+  const pfx = `data-prefix="${prefix}"`;
+  return parts.map((part, i) => {
+    const key = `${prefix}${program.id}:${i}`;
     switch (part.kind) {
       case 'flat':
         return `<div class="comp-line"><span class="comp-label">${part.label || 'Flat fee'}</span><span class="comp-val">${formatCost(num(part.amount))}</span></div>`;
@@ -936,18 +950,17 @@ function buildComponentBody(program) {
         const v = S.compInputs[key] != null ? num(S.compInputs[key]) : S.unitCount;
         return `<div class="card-calc">
           <span class="calc-rate">${formatRate(num(part.rate))}</span><span class="calc-x">×</span>
-          <div class="qty-field"><input class="comp-input" data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="0" value="${v || ''}"></div>
+          <div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="0" value="${v || ''}"></div>
           <span class="qty-label">units</span>
         </div>`;
       }
       case 'perItem': {
         const item = (part.itemLabel || 'item');
         if (part.locked) return `<div class="comp-line"><span class="comp-label">${part.label || item}</span><span class="comp-val">${formatRate(num(part.rate))} × ${num(part.baseQty)}</span></div>`;
-        // Box defaults to the included quantity so the PM sees it on load
         const v = S.compInputs[key] != null ? num(S.compInputs[key]) : num(part.baseQty);
         return `<div class="card-calc">
           <span class="calc-rate">${formatRate(num(part.rate))}</span><span class="calc-x">×</span>
-          <div class="qty-field"><input class="comp-input" data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="0" value="${v || ''}"></div>
+          <div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="0" value="${v || ''}"></div>
           <span class="qty-label">${item}</span>
         </div>${sepUI(part, i)}`;
       }
@@ -958,7 +971,7 @@ function buildComponentBody(program) {
         const result = num(part.pct) / 100 * num(v);
         return `<div class="card-calc">
           <span class="calc-rate">${num(part.pct)}% of ${baseLabel}</span><span class="calc-x">×</span>
-          <div class="qty-field"><input class="comp-input" data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="Enter ${baseLabel} $" value="${v}"></div>
+          <div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="Enter ${baseLabel} $" value="${v}"></div>
           ${num(v) > 0 ? `<span class="qty-equals">= <strong>${formatCost(result)}</strong></span>` : ''}
         </div>`;
       }
@@ -969,10 +982,10 @@ function buildComponentBody(program) {
           const orows = opts.map((o, oi) => {
             const on = (qtys[oi] || 0) > 0;
             return `<div class="addrow">
-              <label class="addrow-check"><input type="checkbox" class="comp-optchk" data-pid="${program.id}" data-idx="${i}" data-oi="${oi}"${on ? ' checked' : ''}>
+              <label class="addrow-check"><input type="checkbox" class="comp-optchk" ${pfx} data-pid="${program.id}" data-idx="${i}" data-oi="${oi}"${on ? ' checked' : ''}>
                 <span class="addrow-label">${o.label} <span class="tier-rate">${formatRate(num(o.rate))}</span></span></label>
               <span class="qty-sep">×</span>
-              <div class="qty-field"><input class="comp-optqty" data-pid="${program.id}" data-idx="${i}" data-oi="${oi}" type="number" min="0" value="${qtys[oi] || ''}"${on ? '' : ' disabled'}></div>
+              <div class="qty-field"><input class="comp-optqty" ${pfx} data-pid="${program.id}" data-idx="${i}" data-oi="${oi}" type="number" min="0" value="${qtys[oi] || ''}"${on ? '' : ' disabled'}></div>
             </div>`;
           }).join('');
           return `<div class="tier-select-label">${part.label || 'Select all that apply'}</div><div class="addrows">${orows}</div>${sepUI(part, i)}`;
@@ -980,7 +993,7 @@ function buildComponentBody(program) {
         const sel = S.compSel[key] ?? 0;
         const orows = opts.map((o, oi) => `
           <label class="tier-option${oi === sel ? ' is-selected' : ''}">
-            <input type="radio" class="comp-optradio" name="copt_${program.id}_${i}" data-pid="${program.id}" data-idx="${i}" data-oi="${oi}"${oi === sel ? ' checked' : ''}>
+            <input type="radio" class="comp-optradio" ${pfx} name="copt_${prefix}${program.id}_${i}" data-pid="${program.id}" data-idx="${i}" data-oi="${oi}"${oi === sel ? ' checked' : ''}>
             <span class="tier-label">${o.label} <span class="tier-rate">(${formatRate(num(o.rate))})</span></span>
           </label>`).join('');
         return `<div class="tier-select-label">${part.label || 'Select one'}</div><div class="tier-options">${orows}</div>${sepUI(part, i)}`;
@@ -989,7 +1002,7 @@ function buildComponentBody(program) {
         if (part.locked || !/\bqty\b/.test(part.expr || '')) return '';
         const v = num(S.compInputs[key]);
         return `<div class="card-calc"><span class="calc-rate">${part.label || 'Quantity'}</span>
-          <div class="qty-field"><input class="comp-input" data-pid="${program.id}" data-idx="${i}" type="number" min="0" value="${v || ''}"></div></div>`;
+          <div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}" type="number" min="0" value="${v || ''}"></div></div>`;
       }
       default: return '';
     }
@@ -1212,16 +1225,21 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       </div>`;
   }
 
-  // Setup fee — one-time charge with its own month, shown in blue under the cost
-  if ((program.setupAmount || 0) > 0) {
-    const on = !!S.setupOn[program.id];
-    const sm = S.setupMonth[program.id] ?? (program.setupMonth ?? 0);
+  // Setup fee — one-time charge with its own cost builder + month, shown in blue
+  if (hasSetupBuilder(program) || (program.setupAmount || 0) > 0) {
+    const on  = !!S.setupOn[program.id];
+    const sm  = S.setupMonth[program.id] ?? (program.setupMonth ?? 0);
+    const tot = setupTotal(program);
+    const setupBody = hasSetupBuilder(program)
+      ? buildComponentBody(program, program.setupComponents, 'setup:')
+      : '';
     bodyHtml += `
       <div class="setup-fee-block${on ? ' on' : ''}">
         <label class="setup-fee-head">
           <input type="checkbox" class="setup-include" data-pid="${program.id}"${on ? ' checked' : ''}>
-          <span class="setup-fee-amount">Setup fee: ${formatCost(program.setupAmount)} <span class="setup-once">· one-time</span></span>
+          <span class="setup-fee-amount">Setup fee: ${formatCost(tot)} <span class="setup-once">· one-time</span></span>
         </label>
+        ${setupBody ? `<div class="setup-fee-builder">${setupBody}</div>` : ''}
         ${program.setupFee ? `<div class="setup-fee-note">${program.setupFee}</div>` : ''}
         <div class="setup-fee-monthlabel">Charged in:</div>
         <div class="incur-chips">${MONTH_NAMES.map((m, i) => `<button type="button" class="setup-mchip${i === sm ? ' on' : ''}" data-pid="${program.id}" data-month="${i}">${m}</button>`).join('')}</div>
@@ -1318,19 +1336,20 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     localStorage.setItem(`rpm_compin_${S.property}_${S.budgetYear}`, JSON.stringify(S.compInputs));
     localStorage.setItem(`rpm_compsel_${S.property}_${S.budgetYear}`, JSON.stringify(S.compSel));
   };
+  const pfxKey = ds => `${ds.prefix || ''}${program.id}:${ds.idx}`;
   el.querySelectorAll('.comp-input').forEach(inp => {
     inp.addEventListener('input', e => {
       e.stopPropagation();
-      S.compInputs[`${program.id}:${inp.dataset.idx}`] = parseFloat(e.target.value) || 0;
+      S.compInputs[pfxKey(inp.dataset)] = parseFloat(e.target.value) || 0;
       persistComp(); updateBudgetTotal(); refreshHero();
     });
   });
   el.querySelectorAll('.comp-optradio').forEach(r => {
     r.addEventListener('change', e => {
       e.stopPropagation();
-      S.compSel[`${program.id}:${r.dataset.idx}`] = parseInt(r.dataset.oi);
+      S.compSel[pfxKey(r.dataset)] = parseInt(r.dataset.oi);
       persistComp(); updateBudgetTotal();
-      el.querySelectorAll(`.comp-optradio[data-idx="${r.dataset.idx}"]`).forEach(rr =>
+      el.querySelectorAll(`.comp-optradio[data-prefix="${r.dataset.prefix || ''}"][data-idx="${r.dataset.idx}"]`).forEach(rr =>
         rr.closest('.tier-option').classList.toggle('is-selected', rr === r));
       refreshHero();
     });
@@ -1338,7 +1357,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   el.querySelectorAll('.comp-optchk').forEach(chk => {
     chk.addEventListener('change', e => {
       e.stopPropagation();
-      const key = `${program.id}:${chk.dataset.idx}`;
+      const key = pfxKey(chk.dataset);
       const oi  = parseInt(chk.dataset.oi);
       const arr = S.compSel[key] || [];
       arr[oi] = chk.checked ? (arr[oi] > 0 ? arr[oi] : 1) : 0;
@@ -1349,7 +1368,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   el.querySelectorAll('.comp-optqty').forEach(inp => {
     inp.addEventListener('input', e => {
       e.stopPropagation();
-      const key = `${program.id}:${inp.dataset.idx}`;
+      const key = pfxKey(inp.dataset);
       const arr = S.compSel[key] || [];
       arr[parseInt(inp.dataset.oi)] = parseInt(e.target.value) || 0;
       S.compSel[key] = arr;
@@ -1684,7 +1703,7 @@ function programStatus(p) {
 
 function summaryCost(p) {
   let c = proratedAnnual(p);
-  if (S.setupOn[p.id] && (p.setupAmount || 0) > 0) c += p.setupAmount;
+  if (S.setupOn[p.id]) c += setupTotal(p);
   return c;
 }
 
@@ -1725,7 +1744,7 @@ function programChoiceText(p) {
       }
     }
   }
-  if (S.setupOn[p.id] && (p.setupAmount || 0) > 0) parts.push(`+ setup ${formatCost(p.setupAmount)}`);
+  if (S.setupOn[p.id] && setupTotal(p) > 0) parts.push(`+ setup ${formatCost(setupTotal(p))}`);
   return parts.join(', ');
 }
 

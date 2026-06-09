@@ -2552,6 +2552,8 @@ body {
   padding: 4px 12px;
 }
 .setup-once { font-size: 12px; font-weight: 500; opacity: 0.7; }
+.setup-fee-builder { margin: 10px 0; padding: 10px 12px; background: rgba(27,42,74,0.14); border-radius: 8px; }
+.prog-card.is-elective .setup-fee-builder { background: rgba(27,42,74,0.06); }
 .setup-fee-note { font-size: 12px; font-style: italic; color: rgba(255,255,255,0.6); margin: 6px 0 0; }
 .setup-fee-monthlabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(255,255,255,0.55); margin: 10px 0 6px; }
 .setup-mchip {

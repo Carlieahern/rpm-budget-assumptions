@@ -161,7 +161,7 @@ function blankProgram() {
     billingPeriod: 'monthly', billingStart: 'January',
     defaultMonths: [], monthsFixed: false,
     systems: ['Yardi', 'OneSite', 'PaceOneSite'],
-    setupFee: '', setupAmount: '', setupMonth: 0, priorYearNote: '', inputNote: '', costRaw: '', description: '', resourceUrl: '',
+    setupFee: '', setupAmount: '', setupMonth: 0, setupComponents: [], priorYearNote: '', inputNote: '', costRaw: '', description: '', resourceUrl: '',
     yardiGL: '', onesiteGL: '', paceGL: '', owner: '',
   };
 }
@@ -175,6 +175,11 @@ function openEditor(id) {
   // Migrate legacy programs into cost parts so they're editable in the builder
   if (!Array.isArray(form.components) || !form.components.length) {
     form.components = deriveComponents(form);
+  }
+  // Migrate a legacy flat setup amount into a setup cost part
+  if (!Array.isArray(form.setupComponents)) form.setupComponents = [];
+  if (!form.setupComponents.length && cleanNum(form.setupAmount)) {
+    form.setupComponents = [{ kind: 'flat', label: 'Setup fee', amount: cleanNum(form.setupAmount) }];
   }
   buildEditor();
   openModal('modal-admin-editor');
@@ -247,10 +252,10 @@ function partFields(part, i) {
   }
 }
 
-function partRow(part, i) {
+function partRow(part, i, arr = 'components') {
   const showLock = ['perItem', 'percent', 'formula'].includes(part.kind);
   return `
-    <div class="ae-part" data-i="${i}">
+    <div class="ae-part" data-arr="${arr}" data-i="${i}">
       <div class="ae-part-head">
         <select class="ae-part-kind" data-i="${i}">
           ${PART_KINDS.map(([v, label]) => `<option value="${v}"${part.kind === v ? ' selected' : ''}>${label}</option>`).join('')}
@@ -346,9 +351,9 @@ function buildEditor() {
     </label>
 
     <div class="ae-tiers ae-builder">
-      <div class="ae-tiers-head"><span>Cost builder — stack the parts</span><button class="ae-tier-add" id="ae-part-add">+ Add part</button></div>
+      <div class="ae-tiers-head"><span>Cost builder — stack the parts</span><button class="ae-tier-add ae-part-add" data-arr="components">+ Add part</button></div>
       <p class="label-soft" style="margin:0 0 12px;">Parts add together. Each can be locked so PMs can't change it.</p>
-      ${parts.length ? parts.map((p, i) => partRow(p, i)).join('') : '<p class="label-soft">No parts yet — add one to define the cost.</p>'}
+      ${parts.length ? parts.map((p, i) => partRow(p, i, 'components')).join('') : '<p class="label-soft">No parts yet — add one to define the cost.</p>'}
     </div>
 
     <div class="ae-grid">
@@ -378,11 +383,20 @@ function buildEditor() {
       </label>
     </div>` : ''}
 
+    <div class="ae-section">
+      <label class="ae-follows ae-setup-toggle"><input type="checkbox" id="ae-has-setup"${(form.setupComponents && form.setupComponents.length) ? ' checked' : ''}> This program has a setup / one-time fee</label>
+      ${(form.setupComponents && form.setupComponents.length) ? `
+        <div class="ae-tiers ae-builder ae-setup-builder">
+          <div class="ae-tiers-head"><span>Setup fee builder</span><button class="ae-tier-add ae-part-add" data-arr="setupComponents">+ Add part</button></div>
+          <p class="label-soft" style="margin:0 0 12px;">Built the same way as the cost — parts add together. Charged once.</p>
+          ${form.setupComponents.map((p, i) => partRow(p, i, 'setupComponents')).join('')}
+          <label class="ae-field" style="margin-top:10px;"><span>Default setup month</span><select id="ae-setupMonth">${MONTHS.map((m, i) => `<option value="${i}"${(form.setupMonth ?? 0) == i ? ' selected' : ''}>${m}</option>`).join('')}</select></label>
+        </div>` : ''}
+    </div>
+
     <details class="ae-more" open>
-      <summary>Setup fee, links & details</summary>
+      <summary>Notes, links & details</summary>
       <div class="ae-grid">
-        <label class="ae-field"><span>Setup fee amount ($) <span class="label-soft">— one-time</span></span><input id="ae-setupAmount" type="number" step="0.01" min="0" value="${esc(form.setupAmount)}" placeholder="e.g. 750"></label>
-        <label class="ae-field"><span>Default setup month</span><select id="ae-setupMonth">${MONTHS.map((m, i) => `<option value="${i}"${(form.setupMonth ?? 0) == i ? ' selected' : ''}>${m}</option>`).join('')}</select></label>
         <label class="ae-field ae-wide"><span>Setup fee note (optional)</span><input id="ae-setupFee" type="text" value="${esc(form.setupFee)}" placeholder="e.g. includes iPad & install"></label>
         <label class="ae-field ae-wide"><span>Prior year cost note</span><input id="ae-priorYearNote" type="text" value="${esc(form.priorYearNote)}" placeholder="e.g. Up from $1.50/unit last year"></label>
         <label class="ae-field ae-wide"><span>Clarification note (shown by the entry box)</span><input id="ae-inputNote" type="text" value="${esc(form.inputNote)}" placeholder="e.g. *Check with your local housing authority"></label>
@@ -421,8 +435,6 @@ function wireEditor() {
   bind('ae-paceGL', 'paceGL');
   bind('ae-owner', 'owner');
   bind('ae-setupFee', 'setupFee');
-  bind('ae-setupAmount', 'setupAmount');
-  document.getElementById('ae-setupMonth')?.addEventListener('change', e => { form.setupMonth = parseInt(e.target.value); });
   bind('ae-priorYearNote', 'priorYearNote');
   bind('ae-inputNote', 'inputNote');
   bind('ae-resourceUrl', 'resourceUrl');
@@ -468,56 +480,62 @@ function wireEditor() {
       ch.classList.toggle('on', ch.querySelector('.ae-sys').checked));
   }));
 
-  // ── Cost builder: parts ──
+  // ── Cost builders (main + setup), parameterized by data-arr ──
   if (!Array.isArray(form.components)) form.components = [];
-  document.getElementById('ae-part-add')?.addEventListener('click', () => {
-    form.components.push({ kind: 'flat', label: '', amount: '' });
+  if (!Array.isArray(form.setupComponents)) form.setupComponents = [];
+  const arrOf = el => (el.closest('.ae-part')?.dataset.arr) || 'components';
+
+  // Setup-fee toggle
+  document.getElementById('ae-has-setup')?.addEventListener('change', e => {
+    if (e.target.checked) { if (!form.setupComponents.length) form.setupComponents = [{ kind: 'flat', label: '', amount: '' }]; }
+    else { form.setupComponents = []; }
     buildEditor();
   });
+  document.getElementById('ae-setupMonth')?.addEventListener('change', e => { form.setupMonth = parseInt(e.target.value); });
+
+  document.querySelectorAll('.ae-part-add').forEach(b =>
+    b.addEventListener('click', () => {
+      const arr = b.dataset.arr || 'components';
+      (form[arr] = form[arr] || []).push({ kind: 'flat', label: '', amount: '' });
+      buildEditor();
+    }));
   document.querySelectorAll('.ae-part-kind').forEach(sel =>
     sel.addEventListener('change', e => {
-      const i = +sel.dataset.i;
-      const k = e.target.value;
-      // Reset to a clean part of the new kind, keeping the label
-      form.components[i] = { kind: k, label: form.components[i].label || '',
+      const arr = arrOf(sel), i = +sel.dataset.i, k = e.target.value;
+      form[arr][i] = { kind: k, label: form[arr][i].label || '',
         ...(k === 'options' ? { selectMode: 'one', options: [{ label: '', rate: '' }] } : {}),
         ...(k === 'perItem' ? { itemLabel: 'item' } : {}) };
       buildEditor();
     }));
   document.querySelectorAll('.ae-part-del').forEach(b =>
-    b.addEventListener('click', () => { form.components.splice(+b.dataset.i, 1); buildEditor(); }));
+    b.addEventListener('click', () => { form[arrOf(b)].splice(+b.dataset.i, 1); buildEditor(); }));
   document.querySelectorAll('.ae-part-locked').forEach(c =>
-    c.addEventListener('change', e => { form.components[+c.dataset.i].locked = e.target.checked; }));
+    c.addEventListener('change', e => { form[arrOf(c)][+c.dataset.i].locked = e.target.checked; }));
   document.querySelectorAll('.ae-pf').forEach(el =>
     el.addEventListener('input', e => {
-      const i = +el.dataset.i, k = el.dataset.k;
-      form.components[i][k] = e.target.value;
-      // Selects change which fields show → full rebuild (no focus to lose).
+      const arr = arrOf(el), i = +el.dataset.i, k = el.dataset.k;
+      form[arr][i][k] = e.target.value;
       if (k === 'selectMode' || k === 'base') { buildEditor(); return; }
-      // Text fields must NOT rebuild (would drop the cursor). Update the
-      // "Rate per X" label in place instead.
       if (k === 'itemLabel') {
-        const rateInput = document.querySelector(`.ae-pf[data-i="${i}"][data-k="rate"]`);
-        const span = rateInput?.closest('.ae-field')?.querySelector('span');
+        const span = el.closest('.ae-part')?.querySelector('.ae-pf[data-k="rate"]')?.closest('.ae-field')?.querySelector('span');
         if (span) span.textContent = `Rate per ${(e.target.value || 'item').toLowerCase()} ($)`;
       }
       updatePreview();
     }));
-  // Option sub-rows within an "options" part
   document.querySelectorAll('.ae-popt-add').forEach(b =>
     b.addEventListener('click', () => {
-      const i = +b.dataset.i;
-      (form.components[i].options = form.components[i].options || []).push({ label: '', rate: '' });
+      const arr = arrOf(b), i = +b.dataset.i;
+      (form[arr][i].options = form[arr][i].options || []).push({ label: '', rate: '' });
       buildEditor();
     }));
   document.querySelectorAll('.ae-popt-del').forEach(b =>
     b.addEventListener('click', () => {
-      form.components[+b.dataset.i].options.splice(+b.dataset.oi, 1);
+      form[arrOf(b)][+b.dataset.i].options.splice(+b.dataset.oi, 1);
       buildEditor();
     }));
   document.querySelectorAll('.ae-pf-opt').forEach(el =>
     el.addEventListener('input', e => {
-      form.components[+el.dataset.i].options[+el.dataset.oi][el.dataset.k] = e.target.value;
+      form[arrOf(el)][+el.dataset.i].options[+el.dataset.oi][el.dataset.k] = e.target.value;
       updatePreview();
     }));
 
@@ -575,6 +593,24 @@ function slugify(name) {
 
 function cleanNum(v) { const n = parseFloat(v); return isNaN(n) ? null : n; }
 
+// Normalize a parts array (used for both the cost builder and the setup builder)
+function cleanParts(arr) {
+  return (arr || []).map(p => {
+    const c = { kind: p.kind, label: p.label || '' };
+    if (p.locked) c.locked = true;
+    switch (p.kind) {
+      case 'flat':    c.amount = cleanNum(p.amount) || 0; break;
+      case 'perUnit': c.rate = cleanNum(p.rate) || 0; if (cleanNum(p.baseQty)) c.baseQty = cleanNum(p.baseQty); break;
+      case 'perItem': c.rate = cleanNum(p.rate) || 0; c.itemLabel = p.itemLabel || 'item'; if (cleanNum(p.baseQty)) c.baseQty = cleanNum(p.baseQty); break;
+      case 'percent': c.pct = cleanNum(p.pct) || 0; c.base = p.base || 'income'; if (cleanNum(p.baseDefault)) c.baseDefault = cleanNum(p.baseDefault); break;
+      case 'options': c.selectMode = p.selectMode === 'multiple' ? 'multiple' : 'one';
+                      c.options = (p.options || []).filter(o => o.label || o.rate).map(o => ({ label: o.label || '', rate: cleanNum(o.rate) || 0 })); break;
+      case 'formula': c.expr = p.expr || ''; break;
+    }
+    return c;
+  }).filter(c => c.kind);
+}
+
 async function save() {
   if (!form.name.trim()) { alert('Program name is required.'); return; }
 
@@ -589,20 +625,8 @@ async function save() {
     baseQty: cleanNum(form.baseQty) || 0,
     minCost: cleanNum(form.minCost),
     maxCost: cleanNum(form.maxCost),
-    components: (form.components || []).map(p => {
-      const c = { kind: p.kind, label: p.label || '' };
-      if (p.locked) c.locked = true;
-      switch (p.kind) {
-        case 'flat':    c.amount = cleanNum(p.amount) || 0; break;
-        case 'perUnit': c.rate = cleanNum(p.rate) || 0; if (cleanNum(p.baseQty)) c.baseQty = cleanNum(p.baseQty); break;
-        case 'perItem': c.rate = cleanNum(p.rate) || 0; c.itemLabel = p.itemLabel || 'item'; if (cleanNum(p.baseQty)) c.baseQty = cleanNum(p.baseQty); break;
-        case 'percent': c.pct = cleanNum(p.pct) || 0; c.base = p.base || 'income'; if (cleanNum(p.baseDefault)) c.baseDefault = cleanNum(p.baseDefault); break;
-        case 'options': c.selectMode = p.selectMode === 'multiple' ? 'multiple' : 'one';
-                        c.options = (p.options || []).filter(o => o.label || o.rate).map(o => ({ label: o.label || '', rate: cleanNum(o.rate) || 0 })); break;
-        case 'formula': c.expr = p.expr || ''; break;
-      }
-      return c;
-    }).filter(c => c.kind),
+    components: cleanParts(form.components),
+    setupComponents: cleanParts(form.setupComponents),
     options: (form.costBasis === 'Tiered')
       ? form.options.filter(o => o.label).map(o => ({ label: o.label, rate: cleanNum(o.rate) || 0, type: o.type || 'flat' }))
       : [],
@@ -614,7 +638,6 @@ async function save() {
     monthsFixed: !!form.monthsFixed,
     systems: (Array.isArray(form.systems) && form.systems.length) ? form.systems : ['Yardi', 'OneSite', 'PaceOneSite'],
     setupFee: form.setupFee || null,
-    setupAmount: cleanNum(form.setupAmount) || 0,
     setupMonth: Number.isInteger(form.setupMonth) ? form.setupMonth : 0,
     priorYearNote: form.priorYearNote || null,
     inputNote: form.inputNote || null,
@@ -711,6 +734,17 @@ function costTextFromProgram(p) {
   return '';
 }
 
+// Setup fee for export — a single flat amount round-trips; richer builders export a note
+function setupTextFromProgram(p) {
+  const sc = p.setupComponents;
+  if (Array.isArray(sc) && sc.length) {
+    if (sc.length === 1 && sc[0].kind === 'flat') return '$' + (sc[0].amount ?? 0);
+    return p.setupFee || (sc.map(c => c.label || c.kind).join(' + ') + ' (edit in app)');
+  }
+  if (p.setupAmount) return '$' + p.setupAmount;
+  return p.setupFee || '';
+}
+
 async function exportProgramsCsv() {
   let existing = {};
   try { existing = await fetchRawPrograms(); } catch (e) { alert('Could not load programs: ' + e.message); return; }
@@ -722,7 +756,7 @@ async function exportProgramsCsv() {
       p.department || '', p.name || '', p.owner || '',
       p.elective === false ? 'Non-elective' : 'Elective',
       costTextFromProgram(p), basisFromProgram(p),
-      p.setupFee || '', p.billingPeriod || '', p.billingStart || '',
+      setupTextFromProgram(p), p.billingPeriod || '', p.billingStart || '',
       p.minCost ?? '', p.maxCost ?? '',
       p.yardiGL || '', p.onesiteGL || '', p.paceGL || '',
       p.priorYearNote || '', p.description || '',
@@ -868,6 +902,7 @@ function mapImportRows(rows) {
       paceGL: g(r, idx.pace) || null,
       priorYearNote: g(r, idx.prior) || null,
       description: g(r, idx.details) || null,
+      setupComponents: impNum(g(r, idx.setup)) ? [{ kind: 'flat', label: 'Setup fee', amount: impNum(g(r, idx.setup)) }] : [],
     });
   }
   return out;
@@ -933,7 +968,8 @@ async function commitImport() {
       rate: comps?.[0]?.rate ?? null,
       itemLabel: comps?.find(c => c.kind === 'perItem')?.itemLabel || null,
       baseFee: null, baseQty: 0, options: [], additive: false, customFormula: null,
-      setupAmount: prev.setupAmount ?? 0, setupMonth: prev.setupMonth ?? 0,
+      setupComponents: (p.setupComponents && p.setupComponents.length) ? p.setupComponents : (prev.setupComponents || []),
+      setupAmount: 0, setupMonth: prev.setupMonth ?? 0,
       defaultMonths: prev.defaultMonths ?? null, monthsFixed: prev.monthsFixed ?? false,
       systems: prev.systems || ['Yardi', 'OneSite', 'PaceOneSite'],
       inputNote: prev.inputNote ?? null, resourceUrl: prev.resourceUrl ?? null,

@@ -84,6 +84,7 @@ export async function fetchPrograms(forceRefresh = false) {
       setupFee:      p.setupFee      || null,
       setupAmount:   p.setupAmount   ?? 0,
       setupMonth:    p.setupMonth    ?? 0,
+      setupComponents: Array.isArray(p.setupComponents) ? p.setupComponents : null,
       costRaw:       p.costRaw       || '',
       description:   p.description   || '',
       resourceUrl:   p.resourceUrl   || null,
