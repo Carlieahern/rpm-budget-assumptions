@@ -309,13 +309,25 @@ function partPeriodCost(program, part, idx, prefix = '') {
       return part.locked ? 0 : num(S.compInputs[key]);
     case 'formula':
       return safeFormula(part.expr, S.unitCount, num(S.compInputs[key]));
+    case 'tax':
+      return 0;   // tax is computed against the other parts (see sumPartsWithTax)
     default:
       return 0;
   }
 }
 
+// Sum a parts array, adding any "tax" part as a % of the non-tax (taxable) total.
+function sumPartsWithTax(program, parts, prefix = '') {
+  let taxable = 0, taxPct = 0;
+  (parts || []).forEach((part, i) => {
+    if (part.kind === 'tax') taxPct += num(part.pct);
+    else taxable += partPeriodCost(program, part, i, prefix);
+  });
+  return taxable + taxable * taxPct / 100;
+}
+
 function componentPeriodCost(program) {
-  return (program.components || []).reduce((s, part, i) => s + partPeriodCost(program, part, i), 0);
+  return sumPartsWithTax(program, program.components, '');
 }
 
 function hasComponents(program) {
@@ -329,7 +341,7 @@ function hasSetupBuilder(program) {
 // One-time setup fee total — from the setup cost builder, else the legacy flat amount
 function setupTotal(program) {
   if (hasSetupBuilder(program)) {
-    return program.setupComponents.reduce((s, part, i) => s + partPeriodCost(program, part, i, 'setup:'), 0);
+    return sumPartsWithTax(program, program.setupComponents, 'setup:');
   }
   return num(program.setupAmount);
 }
@@ -509,7 +521,9 @@ function programMonths12(program) {
   const mo  = program.billingPeriod === 'monthly';
   const nat = naturalMonthCount(program) || 1;
   const progMonths = activeMonthsFor(program);
+  let taxPct = 0;
   (program.components || []).forEach((c, i) => {
+    if (c.kind === 'tax') { taxPct += num(c.pct); return; }
     const per = partPeriodCost(program, c, i);
     if (!per) return;
     const hit = mo ? per : per / nat;            // amount charged per billing month
@@ -518,6 +532,8 @@ function programMonths12(program) {
     const ms = S.partSeparate[key] ? (S.partMonths[key] || []) : progMonths;
     ms.forEach(m => arr[m] += hit);
   });
+  // Tax applies on top of each month's taxable spend
+  if (taxPct) for (let m = 0; m < 12; m++) arr[m] += arr[m] * taxPct / 100;
   return arr;
 }
 
@@ -855,6 +871,7 @@ function buildInfoCard(program) {
         case 'percent': return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Percentage'}</span><span class="tier-rate">${num(part.pct)}% of ${part.base === 'capex' ? 'CapEx' : 'income'}</span></div>`;
         case 'options': return (part.options || []).map(o => `<div class="info-tier-row"><span class="tier-label">${o.label}</span><span class="tier-rate">${formatRate(num(o.rate))}</span></div>`).join('');
         case 'manual':  return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Estimated amount'}</span><span class="tier-rate">PM estimates</span></div>`;
+        case 'tax':     return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Tax'}</span><span class="tier-rate">+${num(part.pct)}%</span></div>`;
         case 'formula': return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Custom'}</span></div>`;
         default: return '';
       }
@@ -962,7 +979,7 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
   // Separate billing only on the MAIN builder. For options parts it only makes
   // sense in "pick one or more" mode (a single pick has nothing to split off).
   const sepUI = (part, i) => {
-    if (prefix !== '') return '';
+    if (prefix !== '' || part.kind === 'tax') return '';
     if (part.kind === 'options') return part.selectMode === 'multiple' ? partSeparateUI(program, i) : '';
     return multiParts ? partSeparateUI(program, i) : '';
   };
@@ -1033,6 +1050,12 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
           <span class="calc-rate">${part.label || 'Estimated amount'}:</span>
           <div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="$ estimate" value="${v}"></div>
         </div>`;
+      }
+      case 'tax': {
+        // Tax on the other (non-tax) parts of this builder
+        const taxable = parts.reduce((s, c2, j) => c2.kind === 'tax' ? s : s + partPeriodCost(program, c2, j, prefix), 0);
+        const amt = num(part.pct) / 100 * taxable;
+        return `<div class="comp-line"><span class="comp-label">${part.label || 'Tax'} (${num(part.pct)}%)</span><span class="comp-val">${formatCost(amt)}</span></div>`;
       }
       case 'formula': {
         if (part.locked || !/\bqty\b/.test(part.expr || '')) return '';

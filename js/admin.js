@@ -203,6 +203,7 @@ const PART_KINDS = [
   ['percent', '% of income / CapEx'],
   ['options', 'Options (pick one or multiple)'],
   ['manual',  'Manual (PM estimates the $)'],
+  ['tax',     'Tax (% added to the cost)'],
 ];
 
 // Derive a starter set of parts from a legacy program so editing migrates it.
@@ -251,6 +252,9 @@ function partFields(part, i) {
     }
     case 'manual':
       return L('What are they budgeting?', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Estimated travel">`);
+    case 'tax':
+      return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Sales tax">`) +
+             L('Tax rate (%) <span class="label-soft">— applied to the other parts</span>', `<input class="ae-pf" data-i="${i}" data-k="pct" type="number" step="0.01" value="${esc(part.pct)}" placeholder="e.g. 8.25">`);
     case 'formula':
       return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Custom">`) +
              `<label class="ae-field ae-wide"><span>Formula <span class="label-soft">— use <code>units</code> &amp; <code>qty</code></span></span><input class="ae-pf" data-i="${i}" data-k="expr" type="text" value="${esc(part.expr)}" placeholder="e.g. 40 + 12 * (qty - 1)"></label>`;
@@ -613,6 +617,7 @@ function cleanParts(arr) {
       case 'options': c.selectMode = p.selectMode === 'multiple' ? 'multiple' : 'one';
                       c.options = (p.options || []).filter(o => o.label || o.rate).map(o => ({ label: o.label || '', rate: cleanNum(o.rate) || 0 })); break;
       case 'formula': c.expr = p.expr || ''; break;
+      case 'tax':     c.pct = cleanNum(p.pct) || 0; break;
     }
     return c;
   }).filter(c => c.kind);
