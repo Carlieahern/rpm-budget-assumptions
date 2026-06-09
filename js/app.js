@@ -970,13 +970,15 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
         </div>${sepUI(part, i)}`;
       }
       case 'percent': {
-        const baseLabel = part.base === 'capex' ? 'CapEx budget' : 'total income';
-        if (part.locked) return `<div class="comp-line"><span class="comp-label">${part.label || `${num(part.pct)}% of ${baseLabel}`}</span></div>`;
+        const baseLabel = part.base === 'capex' ? 'Total CapEx' : 'Total income';
+        if (part.locked) return `<div class="comp-line"><span class="comp-label">${part.label || `${num(part.pct)}% of ${baseLabel.toLowerCase()}`}</span></div>`;
         const v = S.compInputs[key] != null ? S.compInputs[key] : (part.baseDefault || '');
         const result = num(part.pct) / 100 * num(v);
         return `<div class="card-calc">
-          <span class="calc-rate">${num(part.pct)}% of ${baseLabel}</span><span class="calc-x">×</span>
-          <div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="Enter ${baseLabel} $" value="${v}"></div>
+          <span class="calc-rate">${baseLabel}:</span>
+          <div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="$" value="${v}"></div>
+          <span class="calc-x">×</span>
+          <span class="calc-rate">${num(part.pct)}%</span>
           ${num(v) > 0 ? `<span class="qty-equals">= <strong>${formatCost(result)}</strong></span>` : ''}
         </div>`;
       }
