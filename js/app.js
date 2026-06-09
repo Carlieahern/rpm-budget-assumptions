@@ -450,7 +450,8 @@ function defaultMonthsFor(program) {
 
 function activeMonthsFor(program) {
   // Per-card override (also how as-incurred programs are set) — only if not locked
-  if (!program.monthsFixed && S.incurMonths[program.id]) {
+  // and only when it actually has months (an empty override must not shadow the admin default)
+  if (!program.monthsFixed && S.incurMonths[program.id] && S.incurMonths[program.id].length) {
     return S.incurMonths[program.id].slice().sort((a, b) => a - b);
   }
 
@@ -956,7 +957,7 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
           <span class="calc-rate">${formatRate(num(part.rate))}</span><span class="calc-x">×</span>
           <div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="0" value="${v || ''}"></div>
           <span class="qty-label">units</span>
-        </div>`;
+        </div>${sepUI(part, i)}`;
       }
       case 'perItem': {
         const item = (part.itemLabel || 'item');
