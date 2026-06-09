@@ -941,9 +941,13 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
   parts = parts || [];
   const multiParts = parts.length > 1;
   // Separate billing only on the MAIN builder (setup fee has its own month)
-  const sepUI = (part, i) =>
-    (prefix === '' && (multiParts || (part.kind === 'options' && (part.options || []).length > 1)))
-      ? partSeparateUI(program, i) : '';
+  // Separate billing only on the MAIN builder. For options parts it only makes
+  // sense in "pick one or more" mode (a single pick has nothing to split off).
+  const sepUI = (part, i) => {
+    if (prefix !== '') return '';
+    if (part.kind === 'options') return part.selectMode === 'multiple' ? partSeparateUI(program, i) : '';
+    return multiParts ? partSeparateUI(program, i) : '';
+  };
   const pfx = `data-prefix="${prefix}"`;
   return parts.map((part, i) => {
     const key = `${prefix}${program.id}:${i}`;
