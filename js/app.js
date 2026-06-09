@@ -455,14 +455,15 @@ function activeMonthsFor(program) {
   }
 
   const freq = (program.billingFreq || program.billingPeriod || '').toLowerCase();
-  if (freq.includes('incurred')) return [];
-
+  const isIncurred = freq.includes('incurred') || freq.includes('implement');
   const followsTransition = /implement|transition|anniversar/i.test(program.billingStart || '');
 
   // Admin-defined default months take precedence over frequency-derived ones
   let months;
   if (Array.isArray(program.defaultMonths) && program.defaultMonths.length) {
     months = program.defaultMonths.slice();
+  } else if (isIncurred) {
+    return [];   // as-incurred with no admin default — PM picks from scratch
   } else {
     let start = parseStartMonth(program.billingStart);
     if (followsTransition && S.transitionMonth != null) start = S.transitionMonth;
@@ -483,7 +484,7 @@ function naturalMonthCount(program) {
   if (freq.includes('quarterly')) return 4;
   if (freq.includes('bi'))        return 2;
   if (freq.includes('incurred') || freq.includes('implement')) {
-    return (S.incurMonths[program.id] || []).length || 1;
+    return activeMonthsFor(program).length || 1;
   }
   return 1; // annual / one-time
 }
@@ -1212,13 +1213,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     `<button type="button" class="incur-chip${preset.includes(i) ? ' on' : ''}${isLocked ? ' is-static' : ''}" data-month="${i}"${isLocked ? ' disabled' : ''}>${m}</button>`
   ).join('');
 
-  if (isAsIncurred) {
-    bodyHtml += `
-      <div class="incur-months">
-        <div class="incur-label">Expected in which months? <span class="incur-directive">(select applicable months)</span></div>
-        <div class="incur-chips">${monthChipStrip(S.incurMonths[program.id] || [], false)}</div>
-      </div>`;
-  } else if (isRecurring) {
+  if (isRecurring || isAsIncurred) {
     // If every billable part is billed separately, the default months no longer
     // apply to anything — hide the strip so it doesn't look double-counted.
     const billableParts = hasComponents(program)
@@ -1232,12 +1227,14 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     if (!allSeparate) {
       const anySeparate = hasComponents(program) &&
         program.components.some((c, i) => S.partSeparate[`${program.id}:${i}`] && (S.partMonths[`${program.id}:${i}`] || []).length);
-      const note = locked ? ' · 🔒 fixed' : (S.transitionMonth != null ? ' · transition applied' : '');
+      const hasDefaults = Array.isArray(program.defaultMonths) && program.defaultMonths.length;
+      const label = (isAsIncurred && !hasDefaults) ? 'Expected in which months?' : 'Default billing months';
+      const note = locked ? ' · 🔒 fixed' : (S.transitionMonth != null && !isAsIncurred ? ' · transition applied' : '');
       const directive = locked ? '' : ' <span class="incur-directive">(select applicable months)</span>';
       const sepNote = anySeparate ? ' <span class="incur-directive">(items billed separately are excluded)</span>' : '';
       bodyHtml += `
         <div class="incur-months">
-          <div class="incur-label">Default billing months${note}${directive}${sepNote}</div>
+          <div class="incur-label">${label}${note}${directive}${sepNote}</div>
           <div class="incur-chips">${monthChipStrip(activeMonthsFor(program), locked)}</div>
         </div>`;
     }
@@ -1438,13 +1435,13 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   });
 
   // Month chips (as-incurred body picker + per-card billing-month override)
-  el.querySelectorAll('.incur-chip').forEach(chip => {
+  el.querySelectorAll('.incur-chip:not(.part-sep-chip)').forEach(chip => {
     chip.addEventListener('click', e => {
       e.stopPropagation();
       const m = parseInt(chip.dataset.month);
       // Seed an override from the current active months the first time it's touched
       let arr = S.incurMonths[program.id];
-      if (!arr) arr = isAsIncurred ? [] : activeMonthsFor(program).slice();
+      if (!arr) arr = activeMonthsFor(program).slice();
       const idx = arr.indexOf(m);
       if (idx >= 0) arr.splice(idx, 1); else arr.push(m);
       S.incurMonths[program.id] = arr;

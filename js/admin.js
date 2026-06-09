@@ -117,7 +117,9 @@ export async function openAdmin() {
 
 async function renderList() {
   const list = document.getElementById('admin-list');
-  list.innerHTML = '<p class="admin-loading">Loading programs…</p>';
+  const scroller = document.getElementById('screen-admin');
+  const keepY = scroller ? scroller.scrollTop : 0;          // remember place across re-render
+  if (!Object.keys(rawCache).length) list.innerHTML = '<p class="admin-loading">Loading programs…</p>';
   try {
     rawCache = await fetchRawPrograms();
   } catch (e) {
@@ -151,6 +153,9 @@ async function renderList() {
 
   list.querySelectorAll('.btn-admin-edit').forEach(btn =>
     btn.addEventListener('click', () => { afterSave = renderList; openEditor(btn.dataset.id); }));
+
+  // Restore scroll position so saving doesn't jump you back to the top
+  if (scroller) requestAnimationFrame(() => { scroller.scrollTop = keepY; });
 }
 
 // ── Editor ─────────────────────────────────────────────────────────────────────
@@ -367,7 +372,7 @@ function buildEditor() {
       </label>
     </div>
 
-    ${form.billingPeriod !== 'monthly' && form.billingPeriod !== 'as-incurred' ? `
+    ${form.billingPeriod !== 'monthly' ? `
     <div class="ae-field ae-wide">
       <span>Default billing months</span>
       <label class="ae-follows">
