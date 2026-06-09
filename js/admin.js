@@ -203,7 +203,6 @@ const PART_KINDS = [
   ['percent', '% of income / CapEx'],
   ['options', 'Options (pick one or multiple)'],
   ['manual',  'Manual (PM estimates the $)'],
-  ['formula', 'Custom formula'],
 ];
 
 // Derive a starter set of parts from a legacy program so editing migrates it.
@@ -292,7 +291,7 @@ function buildEditor() {
                   : 'Amount ($)';
 
   // Cost-basis dropdown: structured types + Custom Formula + admin-added types + "Add new"
-  const basisOptions = [...STRUCTURED_BASES, 'Custom Formula', ...extraTypes, ADD_NEW];
+  const basisOptions = [...STRUCTURED_BASES, ...extraTypes, ADD_NEW];
 
   const per = form.billingPeriod === 'monthly' ? '$/mo' : '$/yr';
   const parts = form.components || [];
