@@ -829,7 +829,7 @@ function mapImportRows(rows) {
     owner:   col('owner'),
     elect:   col('elect'),
     basis:   col('basis'),
-    cost:    H.findIndex(h => h.includes('cost') && !h.includes('basis') && !h.includes('setup')),
+    cost:    H.findIndex(h => h.includes('cost') && !h.includes('basis') && !h.includes('setup') && !h.includes('name') && !h.includes('prior')),
     setup:   col('setup'),
     billing: col('billing frequency', 'frequency'),
     start:   col('start'),
