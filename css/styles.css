@@ -2643,6 +2643,9 @@ body {
   color: rgba(255,255,255,0.78);
 }
 .tier-option.is-selected .tier-label { color: #fff; font-weight: 600; }
+/* Elective cards are white — keep selected option text copper, not the fading white */
+.prog-card.is-elective .tier-option.is-selected .tier-label,
+.prog-card.is-elective .tier-option.is-selected .tier-rate { color: var(--copper2); font-weight: 700; }
 .tier-rate {
   font-style: italic;
   font-weight: 500;
