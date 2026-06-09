@@ -512,8 +512,8 @@ function programMonths12(program) {
     if (!per) return;
     const hit = mo ? per : per / nat;            // amount charged per billing month
     const key = `${program.id}:${i}`;
-    const sep = S.partSeparate[key] && (S.partMonths[key] || []).length;
-    const ms  = sep ? S.partMonths[key] : progMonths;
+    // Checked "billed separately" → excluded from default months (uses its own, even if none picked yet)
+    const ms = S.partSeparate[key] ? (S.partMonths[key] || []) : progMonths;
     ms.forEach(m => arr[m] += hit);
   });
   return arr;
@@ -1217,19 +1217,13 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   ).join('');
 
   if (isRecurring || isAsIncurred) {
-    // If every billable part is billed separately, the default months no longer
-    // apply to anything — hide the strip so it doesn't look double-counted.
-    const billableParts = hasComponents(program)
-      ? program.components.filter(c => c.kind !== 'formula' || /\bqty\b/.test(c.expr || ''))
-      : [];
-    const allSeparate = hasComponents(program) && billableParts.length > 0 &&
-      program.components.every((c, i) => {
-        const k = `${program.id}:${i}`;
-        return S.partSeparate[k] && (S.partMonths[k] || []).length;
-      });
+    // If every part is billed separately, the default months no longer apply to
+    // anything — hide the strip so it isn't confusingly lit up.
+    const allSeparate = hasComponents(program) && program.components.length > 0 &&
+      program.components.every((c, i) => S.partSeparate[`${program.id}:${i}`]);
     if (!allSeparate) {
       const anySeparate = hasComponents(program) &&
-        program.components.some((c, i) => S.partSeparate[`${program.id}:${i}`] && (S.partMonths[`${program.id}:${i}`] || []).length);
+        program.components.some((c, i) => S.partSeparate[`${program.id}:${i}`]);
       const hasDefaults = Array.isArray(program.defaultMonths) && program.defaultMonths.length;
       const label = (isAsIncurred && !hasDefaults) ? 'Expected in which months?' : 'Default billing months';
       const note = locked ? ' · 🔒 fixed' : (S.transitionMonth != null && !isAsIncurred ? ' · transition applied' : '');

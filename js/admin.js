@@ -372,9 +372,9 @@ function buildEditor() {
       </label>
     </div>
 
-    ${form.billingPeriod !== 'monthly' ? `
     <div class="ae-field ae-wide">
       <span>Default billing months</span>
+      <p class="label-soft" style="margin:2px 0 8px;">Leave all unselected for the standard schedule (monthly = every month). Select specific months to bill only then.</p>
       <label class="ae-follows">
         <input type="checkbox" id="ae-followsTransition"${/implement|transition|anniversar/i.test(form.billingStart || '') ? ' checked' : ''}>
         Follows transition date (bills at go-live, no fixed month)
@@ -386,7 +386,7 @@ function buildEditor() {
         <input type="checkbox" id="ae-monthsFixed"${form.monthsFixed ? ' checked' : ''}>
         Fixed — PMs can't change these months
       </label>
-    </div>` : ''}
+    </div>
 
     <div class="ae-section">
       <label class="ae-follows ae-setup-toggle"><input type="checkbox" id="ae-has-setup"${(form.setupComponents && form.setupComponents.length) ? ' checked' : ''}> This program has a setup / one-time fee</label>
