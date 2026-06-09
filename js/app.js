@@ -282,8 +282,10 @@ function partPeriodCost(program, part, idx) {
     case 'perUnit':
       return num(part.rate) * (S.unitCount + num(part.baseQty));
     case 'perItem': {
-      const pm = part.locked ? 0 : num(S.compInputs[key]);
-      return num(part.rate) * (num(part.baseQty) + pm);
+      // The editable box shows the count (defaults to baseQty). Cost = rate × count.
+      const count = part.locked ? num(part.baseQty)
+                  : (S.compInputs[key] != null ? num(S.compInputs[key]) : num(part.baseQty));
+      return num(part.rate) * count;
     }
     case 'percent': {
       const base = part.locked ? num(part.baseDefault)
@@ -930,12 +932,12 @@ function buildComponentBody(program) {
       case 'perItem': {
         const item = (part.itemLabel || 'item');
         if (part.locked) return `<div class="comp-line"><span class="comp-label">${part.label || item}</span><span class="comp-val">${formatRate(num(part.rate))} × ${num(part.baseQty)}</span></div>`;
-        const v = num(S.compInputs[key]);
+        // Box defaults to the included quantity so the PM sees it on load
+        const v = S.compInputs[key] != null ? num(S.compInputs[key]) : num(part.baseQty);
         return `<div class="card-calc">
           <span class="calc-rate">${formatRate(num(part.rate))}</span><span class="calc-x">×</span>
           <div class="qty-field"><input class="comp-input" data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="0" value="${v || ''}"></div>
           <span class="qty-label">${item}</span>
-          ${part.baseQty ? `<span class="input-note">+${num(part.baseQty)} included</span>` : ''}
         </div>${sepUI(part, i)}`;
       }
       case 'percent': {
