@@ -8,7 +8,7 @@
   <title>RPM Budget Assumptions</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=43">
+  <link rel="stylesheet" href="css/styles.css?v=44">
 </head>
 <body>
 <div id="app">
@@ -228,7 +228,10 @@
         Exit Admin
       </button>
       <h2>Program Admin</h2>
-      <button class="btn-primary admin-add-btn" id="btn-admin-add">+ Add Program</button>
+      <div class="admin-bar-actions">
+        <button class="btn-secondary admin-import-btn" id="btn-admin-import">⬆ Import</button>
+        <button class="btn-primary admin-add-btn" id="btn-admin-add">+ Add Program</button>
+      </div>
     </div>
     <div class="admin-user-note" id="admin-user-note"></div>
     <div id="admin-list"></div>
@@ -255,6 +258,38 @@
 <div class="overlay" id="modal-admin-editor">
   <div class="sheet sheet-wide">
     <div id="admin-editor-body"></div>
+  </div>
+</div>
+
+<!-- ── Modal: Import Programs ── -->
+<div class="overlay" id="modal-import">
+  <div class="sheet sheet-wide">
+    <div class="admin-editor-head">
+      <h3>Import Programs</h3>
+      <button class="admin-editor-close" id="imp-close">✕</button>
+    </div>
+    <p class="imp-hint">Upload the Budget Assumptions spreadsheet (.xlsx or .csv), or paste rows below. We map the columns, build a starter cost part from the Cost Basis, and keep the original cost text as the summary — you refine specifics in the editor.</p>
+    <div class="imp-controls">
+      <label class="imp-file-btn">
+        <input type="file" id="imp-file" accept=".xlsx,.xls,.csv" hidden>
+        Choose file (.xlsx / .csv)
+      </label>
+      <span class="imp-file-name" id="imp-file-name"></span>
+    </div>
+    <details class="ae-more">
+      <summary>…or paste CSV / tab-separated rows</summary>
+      <textarea id="imp-paste" rows="6" placeholder="Paste rows including the header row" style="width:100%;"></textarea>
+      <button class="btn-secondary" id="imp-parse-paste" style="margin-top:8px;">Parse pasted rows</button>
+    </details>
+    <div id="imp-status" class="imp-status"></div>
+    <div id="imp-preview" class="imp-preview"></div>
+    <div class="ae-actions">
+      <label class="imp-overwrite"><input type="checkbox" id="imp-overwrite" checked> Overwrite existing programs with the same name</label>
+      <div class="ae-actions-right">
+        <button class="btn-ghost" id="imp-cancel">Cancel</button>
+        <button class="btn-primary" id="imp-commit" disabled>Import</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -367,6 +402,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=43"></script>
+<script type="module" src="js/app.js?v=44"></script>
 </body>
 </html>

@@ -2929,6 +2929,23 @@ body {
 
 .input-note { font-size: 12px; font-style: italic; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.4; }
 .min-note { font-size: 12px; font-weight: 700; color: #ff6b6b; margin-top: 8px; line-height: 1.4; }
+
+/* ── Import modal ── */
+.admin-bar-actions { display: flex; gap: 10px; }
+.imp-hint { font-size: 13px; color: var(--text2); line-height: 1.5; margin-bottom: 16px; }
+.imp-controls { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.imp-file-btn {
+  display: inline-block; background: var(--copper); color: #fff; border-radius: 8px;
+  padding: 10px 18px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.imp-file-btn:hover { background: var(--copper2); }
+.imp-file-name { font-size: 13px; color: var(--text2); }
+.imp-status { font-size: 13px; font-weight: 600; color: var(--navy); margin: 12px 0 6px; }
+.imp-preview { max-height: 320px; overflow-y: auto; }
+.imp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.imp-table th { text-align: left; color: var(--text3); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; padding: 6px 8px; border-bottom: 2px solid var(--border); position: sticky; top: 0; background: #fff; }
+.imp-table td { padding: 6px 8px; border-bottom: 1px solid #eef0f5; color: var(--text); }
+.imp-overwrite { font-size: 12px; color: var(--text2); display: inline-flex; align-items: center; gap: 6px; }
 .prog-card.is-elective .min-note { color: #d32f2f; }
 
 /* Component static lines (flat / per-unit / locked parts) */

@@ -41,6 +41,16 @@ export function initAdmin() {
 
   document.getElementById('btn-admin-back')?.addEventListener('click', () => showScreen('screen-setup'));
   document.getElementById('btn-admin-add')?.addEventListener('click', () => { afterSave = renderList; openEditor(null); });
+
+  // Import
+  document.getElementById('btn-admin-import')?.addEventListener('click', openImport);
+  document.getElementById('imp-close')?.addEventListener('click', () => closeModal('modal-import'));
+  document.getElementById('imp-cancel')?.addEventListener('click', () => closeModal('modal-import'));
+  document.getElementById('imp-file')?.addEventListener('change', handleImportFile);
+  document.getElementById('imp-parse-paste')?.addEventListener('click', () => {
+    ingestImport(parseTable(document.getElementById('imp-paste').value || ''));
+  });
+  document.getElementById('imp-commit')?.addEventListener('click', commitImport);
 }
 
 // Open the login modal; on success run cb (used for inline dashboard admin mode)
@@ -649,4 +659,194 @@ async function removeProgram() {
 function esc(v) {
   if (v == null) return '';
   return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── Import ──────────────────────────────────────────────────────────────────────
+let importRows = [];
+
+function openImport() {
+  importRows = [];
+  document.getElementById('imp-file-name').textContent = '';
+  document.getElementById('imp-status').textContent = '';
+  document.getElementById('imp-preview').innerHTML = '';
+  document.getElementById('imp-paste').value = '';
+  document.getElementById('imp-file').value = '';
+  document.getElementById('imp-commit').disabled = true;
+  openModal('modal-import');
+}
+
+async function handleImportFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('imp-file-name').textContent = file.name;
+  document.getElementById('imp-status').textContent = 'Reading file…';
+  try {
+    let rows;
+    if (/\.(xlsx|xls)$/i.test(file.name)) {
+      const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.mjs');
+      const wb   = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }).map(r => r.map(c => String(c)));
+    } else {
+      rows = parseTable(await file.text());
+    }
+    ingestImport(rows);
+  } catch (err) {
+    document.getElementById('imp-status').textContent = 'Could not read file: ' + err.message;
+  }
+}
+
+// Delimited parser — auto-detects tab vs comma, handles quoted fields
+function parseTable(text) {
+  text = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  if (!text.trim()) return [];
+  const firstLine = text.split('\n')[0];
+  const delim = (firstLine.split('\t').length > firstLine.split(',').length) ? '\t' : ',';
+  const rows = []; let row = [], f = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
+      else f += c;
+    } else if (c === '"') q = true;
+    else if (c === delim) { row.push(f); f = ''; }
+    else if (c === '\n') { row.push(f); rows.push(row); row = []; f = ''; }
+    else f += c;
+  }
+  if (f.length || row.length) { row.push(f); rows.push(row); }
+  return rows.filter(r => r.some(x => String(x).trim() !== ''));
+}
+
+const impNum = t => { const m = String(t).match(/[\d,]+\.?\d*/); return m ? parseFloat(m[0].replace(/,/g, '')) : null; };
+const impDollar = t => { const m = String(t).match(/\$?\s*([\d,]+\.?\d*)/); return m ? parseFloat(m[1].replace(/,/g, '')) : 0; };
+const impCap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+
+function impBilling(t) {
+  t = (t || '').toLowerCase();
+  if (t.includes('month')) return 'monthly';
+  if (t.includes('quarter')) return 'quarterly';
+  if (t.includes('bi')) return 'bi-annual';
+  if (t.includes('annual') || t.includes('year')) return 'annual';
+  if (t.includes('incur') || t.includes('implement') || t.includes('request') || t.includes('as ')) return 'as-incurred';
+  if (t.includes('one')) return 'one-time';
+  return 'monthly';
+}
+
+function impStarter(basis, costText) {
+  const b = (basis || '').toLowerCase();
+  const rate = impDollar(costText);
+  if (b.includes('flat')) return [{ kind: 'flat', label: '', amount: rate }];
+  if (b.includes('%') || b.includes('percent')) return [{ kind: 'percent', label: '', pct: impNum(costText) || 0, base: b.includes('capex') ? 'capex' : 'income' }];
+  const per = b.match(/per\s+(.+)/);
+  if (per) {
+    const thing = per[1].replace(/\/.*/, '').trim();
+    if (thing === 'unit' || thing === 'units') return [{ kind: 'perUnit', label: '', rate }];
+    return [{ kind: 'perItem', label: '', itemLabel: impCap(thing), rate }];
+  }
+  return []; // manual — admin builds; original text kept as cost summary
+}
+
+function mapImportRows(rows) {
+  if (rows.length < 2) return [];
+  const H = rows[0].map(h => (h || '').trim().toLowerCase());
+  const col = (...keys) => H.findIndex(h => keys.some(k => h.includes(k)));
+  const idx = {
+    dept:    col('department'),
+    name:    H.findIndex(h => h.includes('name')),
+    owner:   col('owner'),
+    elect:   col('elect'),
+    basis:   col('basis'),
+    cost:    H.findIndex(h => h.includes('cost') && !h.includes('basis') && !h.includes('setup')),
+    setup:   col('setup'),
+    billing: col('billing frequency', 'frequency'),
+    start:   col('start'),
+    min:     H.findIndex(h => h === 'min' || (h.includes('min') && !h.includes('admin'))),
+    max:     H.findIndex(h => h === 'max' || h.includes('max')),
+    yardi:   col('yardi'),
+    onesite: col('onesite'),
+    pace:    col('pace'),
+    details: col('details', 'description'),
+  };
+  const g = (r, i) => (i >= 0 && r[i] != null) ? String(r[i]).trim() : '';
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const name = g(r, idx.name);
+    if (!name) continue;
+    const basis = g(r, idx.basis);
+    const costText = g(r, idx.cost);
+    const comps = impStarter(basis, costText);
+    out.push({
+      name,
+      department: g(r, idx.dept) || 'Other',
+      owner: g(r, idx.owner) || null,
+      elective: !/non/i.test(g(r, idx.elect)),
+      costBasis: basis || 'Manual',
+      costRaw: costText || null,
+      components: comps,
+      billingPeriod: impBilling(g(r, idx.billing)),
+      billingStart: g(r, idx.start) || null,
+      minCost: impNum(g(r, idx.min)),
+      maxCost: impNum(g(r, idx.max)),
+      setupFee: g(r, idx.setup) || null,
+      yardiGL: g(r, idx.yardi) || null,
+      onesiteGL: g(r, idx.onesite) || null,
+      paceGL: g(r, idx.pace) || null,
+      description: g(r, idx.details) || null,
+    });
+  }
+  return out;
+}
+
+function ingestImport(rows) {
+  importRows = mapImportRows(rows);
+  const status  = document.getElementById('imp-status');
+  const preview = document.getElementById('imp-preview');
+  const commit  = document.getElementById('imp-commit');
+  if (!importRows.length) {
+    status.textContent = 'No programs found. Make sure the header row is included (Department, Cost Name, Cost Basis, …).';
+    preview.innerHTML = '';
+    commit.disabled = true;
+    return;
+  }
+  status.textContent = `${importRows.length} program(s) ready to import.`;
+  commit.disabled = false;
+  preview.innerHTML = `<table class="imp-table">
+    <thead><tr><th>Program</th><th>Dept</th><th>Cost basis → part</th><th>Billing</th></tr></thead>
+    <tbody>${importRows.map(p => `<tr>
+      <td>${esc(p.name)}</td><td>${esc(p.department)}</td>
+      <td>${esc(p.costBasis)} → ${p.components.length ? p.components[0].kind : 'manual'}</td>
+      <td>${esc(p.billingPeriod)}</td></tr>`).join('')}</tbody></table>`;
+}
+
+async function commitImport() {
+  const overwrite = document.getElementById('imp-overwrite').checked;
+  const commit = document.getElementById('imp-commit');
+  commit.disabled = true; commit.textContent = 'Importing…';
+  let existing = {};
+  try { existing = await fetchRawPrograms(); } catch {}
+  const slugs = new Set(Object.keys(existing));
+  let added = 0, skipped = 0;
+  for (const p of importRows) {
+    let id = slugify(p.name);
+    if (slugs.has(id) && !overwrite) { skipped++; continue; }
+    if (!slugs.has(id)) { let base = id, k = 2; while (slugs.has(id)) id = `${base}-${k++}`; }
+    const data = {
+      ...p,
+      rate: p.components?.[0]?.rate ?? null,
+      itemLabel: p.components?.find(c => c.kind === 'perItem')?.itemLabel || null,
+      baseFee: null, baseQty: 0, options: [], additive: false, customFormula: null,
+      setupAmount: 0, setupMonth: 0, defaultMonths: null, monthsFixed: false,
+      systems: ['Yardi', 'OneSite', 'PaceOneSite'],
+      inputNote: null, priorYearNote: null, resourceUrl: null,
+      lastEditedBy: adminName || 'Import', lastEditedAt: new Date().toISOString(),
+    };
+    try { await saveProgram(id, data); slugs.add(id); added++; }
+    catch (e) { console.error('Import save failed for', p.name, e); }
+  }
+  commit.textContent = 'Import';
+  closeModal('modal-import');
+  if (afterSave) await afterSave();
+  window.dispatchEvent(new CustomEvent('rpm-programs-changed'));
+  alert(`Imported ${added} program(s)${skipped ? `, skipped ${skipped} existing` : ''}.`);
 }
