@@ -52,6 +52,7 @@ export function initAdmin() {
   });
   document.getElementById('imp-commit')?.addEventListener('click', commitImport);
   document.getElementById('imp-template')?.addEventListener('click', downloadImportTemplate);
+  document.getElementById('imp-export')?.addEventListener('click', exportProgramsCsv);
   document.getElementById('imp-guide-toggle')?.addEventListener('click', () => {
     const g = document.getElementById('imp-guide');
     g.style.display = g.style.display === 'none' ? 'block' : 'none';
@@ -687,6 +688,55 @@ function downloadImportTemplate() {
   URL.revokeObjectURL(url);
 }
 
+// Derive a Cost Basis label + cost text from a program (for export round-trip)
+function basisFromProgram(p) {
+  if (p.costBasis) return p.costBasis;
+  const c = (p.components || [])[0];
+  if (!c) return 'Manual';
+  if (c.kind === 'flat')    return 'Flat Fee';
+  if (c.kind === 'perUnit') return 'Per Unit';
+  if (c.kind === 'perItem') return 'Per ' + (c.itemLabel || 'Item');
+  if (c.kind === 'percent') return '% of ' + (c.base === 'capex' ? 'CapEx' : 'Income');
+  if (c.kind === 'options') return 'Tiered';
+  return 'Manual';
+}
+function costTextFromProgram(p) {
+  if (p.costRaw) return p.costRaw;
+  const c = (p.components || [])[0];
+  if (!c) return '';
+  if (c.kind === 'flat')    return '$' + (c.amount ?? 0);
+  if (c.kind === 'perUnit' || c.kind === 'perItem') return '$' + (c.rate ?? 0);
+  if (c.kind === 'percent') return (c.pct ?? 0) + '%';
+  if (c.kind === 'options') return (c.options || []).map(o => `${o.label} $${o.rate}`).join(' / ');
+  return '';
+}
+
+async function exportProgramsCsv() {
+  let existing = {};
+  try { existing = await fetchRawPrograms(); } catch (e) { alert('Could not load programs: ' + e.message); return; }
+  const list = Object.values(existing).filter(Boolean)
+    .sort((a, b) => (a.department || '').localeCompare(b.department || '') || (a.name || '').localeCompare(b.name || ''));
+  const rows = [IMPORT_HEADERS];
+  list.forEach(p => {
+    rows.push([
+      p.department || '', p.name || '', p.owner || '',
+      p.elective === false ? 'Non-elective' : 'Elective',
+      costTextFromProgram(p), basisFromProgram(p),
+      p.setupFee || '', p.billingPeriod || '', p.billingStart || '',
+      p.minCost ?? '', p.maxCost ?? '',
+      p.yardiGL || '', p.onesiteGL || '', p.paceGL || '',
+      p.priorYearNote || '', p.description || '',
+    ]);
+  });
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `RPM_Programs_Export_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
 function openImport() {
   importRows = [];
   document.getElementById('imp-file-name').textContent = '';
@@ -869,11 +919,19 @@ async function commitImport() {
     }
     // When updating, keep the existing program's fields we don't import (don't wipe them)
     const prev = isUpdate ? (existing[id] || {}) : {};
+    // If the cost basis + cost text are unchanged, keep the existing (possibly multi-part)
+    // components instead of flattening them to the single starter part.
+    const costUnchanged = isUpdate &&
+      (prev.costBasis || '') === (p.costBasis || '') &&
+      (prev.costRaw || '')   === (p.costRaw || '');
+    const comps = (costUnchanged && Array.isArray(prev.components) && prev.components.length)
+      ? prev.components : p.components;
     const data = {
       ...prev,
       ...p,
-      rate: p.components?.[0]?.rate ?? null,
-      itemLabel: p.components?.find(c => c.kind === 'perItem')?.itemLabel || null,
+      components: comps,
+      rate: comps?.[0]?.rate ?? null,
+      itemLabel: comps?.find(c => c.kind === 'perItem')?.itemLabel || null,
       baseFee: null, baseQty: 0, options: [], additive: false, customFormula: null,
       setupAmount: prev.setupAmount ?? 0, setupMonth: prev.setupMonth ?? 0,
       defaultMonths: prev.defaultMonths ?? null, monthsFixed: prev.monthsFixed ?? false,
