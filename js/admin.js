@@ -202,6 +202,7 @@ const PART_KINDS = [
   ['perItem', 'Per item (× a count)'],
   ['percent', '% of income / CapEx'],
   ['options', 'Options (pick one or multiple)'],
+  ['manual',  'Manual (PM estimates the $)'],
   ['formula', 'Custom formula'],
 ];
 
@@ -249,6 +250,8 @@ function partFields(part, i) {
              L('How does the PM choose?', `<select class="ae-pf" data-i="${i}" data-k="selectMode"><option value="one"${part.selectMode !== 'multiple' ? ' selected' : ''}>Pick just one</option><option value="multiple"${part.selectMode === 'multiple' ? ' selected' : ''}>Pick one or more (with quantities)</option></select>`) +
              `<div class="ae-field ae-wide"><span>Options</span><div class="ae-popts">${rows}</div><button class="ae-popt-add" data-i="${i}">+ Add option</button></div>`;
     }
+    case 'manual':
+      return L('What are they budgeting?', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Estimated travel">`);
     case 'formula':
       return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Custom">`) +
              `<label class="ae-field ae-wide"><span>Formula <span class="label-soft">— use <code>units</code> &amp; <code>qty</code></span></span><input class="ae-pf" data-i="${i}" data-k="expr" type="text" value="${esc(part.expr)}" placeholder="e.g. 40 + 12 * (qty - 1)"></label>`;

@@ -305,6 +305,8 @@ function partPeriodCost(program, part, idx, prefix = '') {
       const sel = S.compSel[key] ?? 0;
       return num(opts[sel]?.rate);
     }
+    case 'manual':
+      return part.locked ? 0 : num(S.compInputs[key]);
     case 'formula':
       return safeFormula(part.expr, S.unitCount, num(S.compInputs[key]));
     default:
@@ -852,6 +854,7 @@ function buildInfoCard(program) {
         case 'perItem': return `<div class="info-tier-row"><span class="tier-label">${part.label || part.itemLabel || 'Per item'}</span><span class="tier-rate">${formatRate(num(part.rate))}/${(part.itemLabel || 'item').toLowerCase()}</span></div>`;
         case 'percent': return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Percentage'}</span><span class="tier-rate">${num(part.pct)}% of ${part.base === 'capex' ? 'CapEx' : 'income'}</span></div>`;
         case 'options': return (part.options || []).map(o => `<div class="info-tier-row"><span class="tier-label">${o.label}</span><span class="tier-rate">${formatRate(num(o.rate))}</span></div>`).join('');
+        case 'manual':  return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Estimated amount'}</span><span class="tier-rate">PM estimates</span></div>`;
         case 'formula': return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Custom'}</span></div>`;
         default: return '';
       }
@@ -1023,6 +1026,13 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
             <span class="tier-label">${o.label} <span class="tier-rate">(${formatRate(num(o.rate))})</span></span>
           </label>`).join('');
         return `<div class="tier-select-label">${part.label || 'Select one'}</div><div class="tier-options">${orows}</div>${sepUI(part, i)}`;
+      }
+      case 'manual': {
+        const v = S.compInputs[key] != null ? S.compInputs[key] : '';
+        return `<div class="card-calc">
+          <span class="calc-rate">${part.label || 'Estimated amount'}:</span>
+          <div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="$ estimate" value="${v}"></div>
+        </div>`;
       }
       case 'formula': {
         if (part.locked || !/\bqty\b/.test(part.expr || '')) return '';
