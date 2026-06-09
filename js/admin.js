@@ -669,13 +669,13 @@ function esc(v) {
 // ── Import ──────────────────────────────────────────────────────────────────────
 let importRows = [];
 
-const IMPORT_HEADERS = ['Department', 'Cost Name', 'Program Owner', 'Elective/Non-elective', '2027 Cost', 'Cost Basis', 'Setup Fee', 'Billing Frequency', 'Billing Start', 'Min', 'Max', 'Yardi GL', 'Onesite GL', 'Pace GL', 'Details'];
+const IMPORT_HEADERS = ['Department', 'Cost Name', 'Program Owner', 'Elective/Non-elective', '2027 Cost', 'Cost Basis', 'Setup Fee', 'Billing Frequency', 'Billing Start', 'Min', 'Max', 'Yardi GL', 'Onesite GL', 'Pace GL', 'Prior Year Cost', 'Details'];
 
 function downloadImportTemplate() {
   const examples = [
-    ['Technology', 'Computer Support', 'mariana.estrada@rpmliving.com', 'Non-elective', '$1.50', 'Per Unit', '', 'Monthly', 'January', '250', '500', '50560007', '52240', '80211000', 'Includes Yardi maintenance fee'],
-    ['Procurement', 'Elevator Management Services', 'shone.richardson@rpmliving.com', 'Non-elective', '$20', 'Per Elevator', '', 'Monthly', 'January', '', '', '52150004', '57540', '60410000', 'Standardized elevator maintenance program'],
-    ['Marketing & Sales', 'Digital Advertising: SEO', 'sam.winn@rpmliving.com', 'Elective', 'Lite $100 / Standard $800 / Premium $1300', 'Tiered', '', 'Monthly', 'January', '', '', '51000000', '51150', '', 'Tiered SEO packages — build options in editor'],
+    ['Technology', 'Computer Support', 'mariana.estrada@rpmliving.com', 'Non-elective', '$1.50', 'Per Unit', '', 'Monthly', 'January', '250', '500', '50560007', '52240', '80211000', 'No change from prior year', 'Includes Yardi maintenance fee'],
+    ['Procurement', 'Elevator Management Services', 'shone.richardson@rpmliving.com', 'Non-elective', '$20', 'Per Elevator', '', 'Monthly', 'January', '', '', '52150004', '57540', '60410000', 'New program for 2027', 'Standardized elevator maintenance program'],
+    ['Marketing & Sales', 'Digital Advertising: SEO', 'sam.winn@rpmliving.com', 'Elective', 'Lite $100 / Standard $800 / Premium $1300', 'Tiered', '', 'Monthly', 'January', '', '', '51000000', '51150', '', 'Up from $750 last year', 'Tiered SEO packages — build options in editor'],
   ];
   const rows = [IMPORT_HEADERS, ...examples];
   const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
@@ -788,6 +788,7 @@ function mapImportRows(rows) {
     yardi:   col('yardi'),
     onesite: col('onesite'),
     pace:    col('pace'),
+    prior:   col('prior'),
     details: col('details', 'description'),
   };
   const g = (r, i) => (i >= 0 && r[i] != null) ? String(r[i]).trim() : '';
@@ -815,6 +816,7 @@ function mapImportRows(rows) {
       yardiGL: g(r, idx.yardi) || null,
       onesiteGL: g(r, idx.onesite) || null,
       paceGL: g(r, idx.pace) || null,
+      priorYearNote: g(r, idx.prior) || null,
       description: g(r, idx.details) || null,
     });
   }
@@ -861,7 +863,8 @@ async function commitImport() {
       baseFee: null, baseQty: 0, options: [], additive: false, customFormula: null,
       setupAmount: 0, setupMonth: 0, defaultMonths: null, monthsFixed: false,
       systems: ['Yardi', 'OneSite', 'PaceOneSite'],
-      inputNote: null, priorYearNote: null, resourceUrl: null,
+      inputNote: null, resourceUrl: null,
+      priorYearNote: p.priorYearNote || null,
       lastEditedBy: adminName || 'Import', lastEditedAt: new Date().toISOString(),
     };
     try { await saveProgram(id, data); slugs.add(id); added++; }
