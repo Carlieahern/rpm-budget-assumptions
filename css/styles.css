@@ -615,11 +615,11 @@ body {
 
 .main-hdr-prop {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 38px;
+  font-size: 52px;
   font-weight: 700;
   color: #ffffff;
-  letter-spacing: -0.8px;
-  line-height: 1.05;
+  letter-spacing: -1px;
+  line-height: 1.02;
 }
 
 .main-hdr-meta {
