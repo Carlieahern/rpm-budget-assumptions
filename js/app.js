@@ -488,13 +488,38 @@ function naturalMonthCount(program) {
   return 1; // annual / one-time
 }
 
-// Annual cost after proration for active months (transitions, partial years).
+// Per-program 12-month spend array. Single source of truth — both the annual
+// total and the monthly breakdown derive from this, so they can't disagree.
+// Each part is charged its per-month "hit" in each of its billing months;
+// "billed separately" parts use their own months and are excluded from the default.
+function programMonths12(program) {
+  const arr = Array(12).fill(0);
+
+  if (!hasComponents(program)) {
+    const base = resolvedCost(program);
+    const nat  = naturalMonthCount(program);
+    if (base && nat > 0) { const per = base / nat; activeMonthsFor(program).forEach(m => arr[m] += per); }
+    return arr;
+  }
+
+  const mo  = program.billingPeriod === 'monthly';
+  const nat = naturalMonthCount(program) || 1;
+  const progMonths = activeMonthsFor(program);
+  (program.components || []).forEach((c, i) => {
+    const per = partPeriodCost(program, c, i);
+    if (!per) return;
+    const hit = mo ? per : per / nat;            // amount charged per billing month
+    const key = `${program.id}:${i}`;
+    const sep = S.partSeparate[key] && (S.partMonths[key] || []).length;
+    const ms  = sep ? S.partMonths[key] : progMonths;
+    ms.forEach(m => arr[m] += hit);
+  });
+  return arr;
+}
+
+// Annual cost = sum of the monthly spend (respects transitions + separate billing).
 function proratedAnnual(program) {
-  const base = resolvedCost(program);
-  if (!base) return 0;
-  const nat = naturalMonthCount(program);
-  if (nat <= 0) return base;
-  return base * (activeMonthsFor(program).length / nat);
+  return programMonths12(program).reduce((s, v) => s + v, 0);
 }
 
 function getMonthlyBreakdown() {
@@ -512,31 +537,9 @@ function getMonthlyBreakdown() {
       if (st > 0) { const sm = S.setupMonth[p.id] ?? (p.setupMonth ?? 0); months[sm] += st; }
     }
 
-    const progMonths = activeMonthsFor(p);
-
-    // Component programs: distribute each part, honoring "billed separately" months
-    if (hasComponents(p)) {
-      const mo = p.billingPeriod === 'monthly';
-      (p.components || []).forEach((c, i) => {
-        const partPer    = partPeriodCost(p, c, i);
-        const partAnnual = mo ? partPer * 12 : partPer;
-        if (!partAnnual) return;
-        const key = `${p.id}:${i}`;
-        const sepMonths = (S.partSeparate[key] && (S.partMonths[key] || []).length) ? S.partMonths[key] : null;
-        const ms = sepMonths || progMonths;
-        if (!ms.length) return;
-        const each = partAnnual / ms.length;
-        ms.forEach(m => months[m] += each);
-      });
-      return;
-    }
-
-    const base = resolvedCost(p);
-    if (!base) return;
-    const nat = naturalMonthCount(p);
-    if (nat <= 0) return;
-    const per = base / nat;                  // amount per billing hit
-    progMonths.forEach(m => months[m] += per);
+    // Same source of truth as the annual total
+    const arr = programMonths12(p);
+    for (let m = 0; m < 12; m++) months[m] += arr[m];
   });
   return months;
 }
@@ -1397,7 +1400,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       const idx = arr.indexOf(m);
       if (idx >= 0) arr.splice(idx, 1); else arr.push(m);
       S.partMonths[key] = arr;
-      persistParts(); chip.classList.toggle('on'); updateBudgetTotal();
+      persistParts(); updateBudgetTotal(); refreshCard(program.id);
     });
   });
 
