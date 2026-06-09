@@ -1219,13 +1219,28 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
         <div class="incur-chips">${monthChipStrip(S.incurMonths[program.id] || [], false)}</div>
       </div>`;
   } else if (isRecurring) {
-    const note = locked ? ' · 🔒 fixed' : (S.transitionMonth != null ? ' · transition applied' : '');
-    const directive = locked ? '' : ' <span class="incur-directive">(select applicable months)</span>';
-    bodyHtml += `
-      <div class="incur-months">
-        <div class="incur-label">Default billing months${note}${directive}</div>
-        <div class="incur-chips">${monthChipStrip(activeMonthsFor(program), locked)}</div>
-      </div>`;
+    // If every billable part is billed separately, the default months no longer
+    // apply to anything — hide the strip so it doesn't look double-counted.
+    const billableParts = hasComponents(program)
+      ? program.components.filter(c => c.kind !== 'formula' || /\bqty\b/.test(c.expr || ''))
+      : [];
+    const allSeparate = hasComponents(program) && billableParts.length > 0 &&
+      program.components.every((c, i) => {
+        const k = `${program.id}:${i}`;
+        return S.partSeparate[k] && (S.partMonths[k] || []).length;
+      });
+    if (!allSeparate) {
+      const anySeparate = hasComponents(program) &&
+        program.components.some((c, i) => S.partSeparate[`${program.id}:${i}`] && (S.partMonths[`${program.id}:${i}`] || []).length);
+      const note = locked ? ' · 🔒 fixed' : (S.transitionMonth != null ? ' · transition applied' : '');
+      const directive = locked ? '' : ' <span class="incur-directive">(select applicable months)</span>';
+      const sepNote = anySeparate ? ' <span class="incur-directive">(items billed separately are excluded)</span>' : '';
+      bodyHtml += `
+        <div class="incur-months">
+          <div class="incur-label">Default billing months${note}${directive}${sepNote}</div>
+          <div class="incur-chips">${monthChipStrip(activeMonthsFor(program), locked)}</div>
+        </div>`;
+    }
   }
 
   // Setup fee — one-time charge with its own cost builder + month, shown in blue
