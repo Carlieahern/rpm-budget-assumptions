@@ -798,6 +798,16 @@ function updateColumnCounts() {
   const sideEl = document.getElementById('side-elective-count');
   if (sideNE) sideNE.textContent = `${ackCount} of ${req.length}`;
   if (sideEl) sideEl.textContent = `${incCount} of ${elec.length}`;
+
+  // Quick-reference lists of what's acknowledged / included
+  const ackNames = req.filter(p => S.decisions[p.id]?.decision === 'acknowledged').map(p => p.name);
+  const incNames = elec.filter(p => S.decisions[p.id]?.decision === 'in').map(p => p.name);
+  const fill = (id, names) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = names.map(n => `<div class="side-ref-item">${n}</div>`).join('');
+  };
+  fill('side-nonelective-list', ackNames);
+  fill('side-elective-list', incNames);
 }
 
 // ── Info-mode card — matches the interactive design, read-only ────────────────
