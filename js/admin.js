@@ -51,6 +51,11 @@ export function initAdmin() {
     ingestImport(parseTable(document.getElementById('imp-paste').value || ''));
   });
   document.getElementById('imp-commit')?.addEventListener('click', commitImport);
+  document.getElementById('imp-template')?.addEventListener('click', downloadImportTemplate);
+  document.getElementById('imp-guide-toggle')?.addEventListener('click', () => {
+    const g = document.getElementById('imp-guide');
+    g.style.display = g.style.display === 'none' ? 'block' : 'none';
+  });
 }
 
 // Open the login modal; on success run cb (used for inline dashboard admin mode)
@@ -663,6 +668,24 @@ function esc(v) {
 
 // ── Import ──────────────────────────────────────────────────────────────────────
 let importRows = [];
+
+const IMPORT_HEADERS = ['Department', 'Cost Name', 'Program Owner', 'Elective/Non-elective', '2027 Cost', 'Cost Basis', 'Setup Fee', 'Billing Frequency', 'Billing Start', 'Min', 'Max', 'Yardi GL', 'Onesite GL', 'Pace GL', 'Details'];
+
+function downloadImportTemplate() {
+  const examples = [
+    ['Technology', 'Computer Support', 'mariana.estrada@rpmliving.com', 'Non-elective', '$1.50', 'Per Unit', '', 'Monthly', 'January', '250', '500', '50560007', '52240', '80211000', 'Includes Yardi maintenance fee'],
+    ['Procurement', 'Elevator Management Services', 'shone.richardson@rpmliving.com', 'Non-elective', '$20', 'Per Elevator', '', 'Monthly', 'January', '', '', '52150004', '57540', '60410000', 'Standardized elevator maintenance program'],
+    ['Marketing & Sales', 'Digital Advertising: SEO', 'sam.winn@rpmliving.com', 'Elective', 'Lite $100 / Standard $800 / Premium $1300', 'Tiered', '', 'Monthly', 'January', '', '', '51000000', '51150', '', 'Tiered SEO packages — build options in editor'],
+  ];
+  const rows = [IMPORT_HEADERS, ...examples];
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'Budget_Assumptions_Import_Template.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
 
 function openImport() {
   importRows = [];

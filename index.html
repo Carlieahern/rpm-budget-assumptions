@@ -8,7 +8,7 @@
   <title>RPM Budget Assumptions</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=44">
+  <link rel="stylesheet" href="css/styles.css?v=45">
 </head>
 <body>
 <div id="app">
@@ -269,6 +269,26 @@
       <button class="admin-editor-close" id="imp-close">✕</button>
     </div>
     <p class="imp-hint">Upload the Budget Assumptions spreadsheet (.xlsx or .csv), or paste rows below. We map the columns, build a starter cost part from the Cost Basis, and keep the original cost text as the summary — you refine specifics in the editor.</p>
+    <div class="imp-links">
+      <button class="imp-link" id="imp-template">⬇ Download CSV template</button>
+      <button class="imp-link" id="imp-guide-toggle">ⓘ Which data goes where?</button>
+    </div>
+    <div class="imp-guide" id="imp-guide" style="display:none;">
+      <ul>
+        <li><b>Department</b> — groups the program (Accounting, Marketing, Technology…).</li>
+        <li><b>Cost Name</b> — the program name. <i>Required.</i></li>
+        <li><b>Program Owner</b> — name/email shown under the title on the card.</li>
+        <li><b>Elective/Non-elective</b> — type "Non-elective" for required programs; anything else is treated as elective.</li>
+        <li><b>2027 Cost</b> — the cost as written. The first $ amount becomes the starter rate; the full text is kept as the card's cost summary.</li>
+        <li><b>Cost Basis</b> — builds the starter cost part: <b>Flat Fee</b>, <b>Per Unit</b>, <b>Per [thing]</b> (Per Elevator, Per Associate, Per Aff Unit…), or <b>% of income / % of CapEx</b>. Tiered or multi-rate costs import as <b>manual</b> for you to build in the editor.</li>
+        <li><b>Setup Fee</b> — description of any one-time setup fee.</li>
+        <li><b>Billing Frequency</b> — Monthly · Quarterly · Bi-annual · Annual · As incurred · One-time.</li>
+        <li><b>Billing Start</b> — the month it bills (e.g. January), or "When Implemented" to follow the property's transition.</li>
+        <li><b>Min / Max</b> — optional per-period floor/ceiling on the cost (e.g. $250 min, $500 max).</li>
+        <li><b>Yardi GL / Onesite GL / Pace GL</b> — GL codes for each system.</li>
+        <li><b>Details</b> — description shown in the card's Details panel.</li>
+      </ul>
+    </div>
     <div class="imp-controls">
       <label class="imp-file-btn">
         <input type="file" id="imp-file" accept=".xlsx,.xls,.csv" hidden>
@@ -402,6 +422,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=44"></script>
+<script type="module" src="js/app.js?v=45"></script>
 </body>
 </html>
