@@ -1058,6 +1058,9 @@ body {
 .prog-card.is-elective .tier-option,
 .prog-card.is-elective .addrow { background: #faf3ec; border-color: #e3c4a3; }
 .prog-card.is-elective .tier-option.is-selected { background: #f5e6d6; border-color: var(--copper); }
+/* Selected option text — navy + bold so it's clearly legible on the highlight */
+.tier-option.is-selected .tier-label,
+.tier-option.is-selected .tier-rate { color: var(--navy); font-weight: 700; font-style: normal; }
 .prog-card.is-elective .incur-chip { background: #faf3ec; border-color: #e3c4a3; color: #9a7350; }
 .prog-card.is-elective .incur-chip.on { background: var(--copper); border-color: var(--copper); color: #fff; }
 /* buttons on white */

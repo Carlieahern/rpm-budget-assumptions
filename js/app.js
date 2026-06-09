@@ -279,8 +279,12 @@ function partPeriodCost(program, part, idx) {
   switch (part.kind) {
     case 'flat':
       return num(part.amount);
-    case 'perUnit':
-      return num(part.rate) * (S.unitCount + num(part.baseQty));
+    case 'perUnit': {
+      // Editable box defaults to the property unit count; PM can override (unless locked)
+      const count = part.locked ? S.unitCount
+                  : (S.compInputs[key] != null ? num(S.compInputs[key]) : S.unitCount);
+      return num(part.rate) * count;
+    }
     case 'perItem': {
       // The editable box shows the count (defaults to baseQty). Cost = rate × count.
       const count = part.locked ? num(part.baseQty)
@@ -927,8 +931,15 @@ function buildComponentBody(program) {
     switch (part.kind) {
       case 'flat':
         return `<div class="comp-line"><span class="comp-label">${part.label || 'Flat fee'}</span><span class="comp-val">${formatCost(num(part.amount))}</span></div>`;
-      case 'perUnit':
-        return `<div class="comp-line"><span class="comp-label">${part.label || 'Per unit'}</span><span class="comp-val">${formatRate(num(part.rate))}/unit × ${S.unitCount} units</span></div>`;
+      case 'perUnit': {
+        if (part.locked) return `<div class="comp-line"><span class="comp-label">${part.label || 'Per unit'}</span><span class="comp-val">${formatRate(num(part.rate))}/unit × ${S.unitCount} units</span></div>`;
+        const v = S.compInputs[key] != null ? num(S.compInputs[key]) : S.unitCount;
+        return `<div class="card-calc">
+          <span class="calc-rate">${formatRate(num(part.rate))}</span><span class="calc-x">×</span>
+          <div class="qty-field"><input class="comp-input" data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="0" value="${v || ''}"></div>
+          <span class="qty-label">units</span>
+        </div>`;
+      }
       case 'perItem': {
         const item = (part.itemLabel || 'item');
         if (part.locked) return `<div class="comp-line"><span class="comp-label">${part.label || item}</span><span class="comp-val">${formatRate(num(part.rate))} × ${num(part.baseQty)}</span></div>`;
