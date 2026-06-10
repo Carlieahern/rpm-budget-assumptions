@@ -2096,8 +2096,8 @@ document.getElementById('mi-change-property').addEventListener('click', () => {
 });
 document.getElementById('mi-logout').addEventListener('click', () => {
   closeModal('modal-menu');
-  // Return to the RPM Budget Hub
-  window.location.href = '../';
+  // Return to the RPM Living Budget Hub (its own domain keeps the existing session)
+  window.location.href = 'https://rpm-living-budget-hub.vercel.app/';
 });
 
 document.getElementById('mi-reset').addEventListener('click', () => {
