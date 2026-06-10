@@ -3025,6 +3025,20 @@ body {
 .input-note { font-size: 12px; font-style: italic; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.4; }
 .min-note { font-size: 12px; font-weight: 700; color: #ff6b6b; margin-top: 8px; line-height: 1.4; }
 
+/* Min/Max shown on the card face */
+.minmax-line {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgba(255,255,255,0.85);
+  background: rgba(0,0,0,0.16);
+  border-radius: 6px;
+  padding: 4px 9px;
+  margin-top: 8px;
+  display: inline-block;
+}
+.prog-card.is-elective .minmax-line { color: var(--copper2); background: #f4e7d8; }
+
 /* ── Import modal ── */
 .admin-bar-actions { display: flex; gap: 10px; }
 .imp-hint { font-size: 13px; color: var(--text2); line-height: 1.5; margin-bottom: 12px; }

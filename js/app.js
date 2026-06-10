@@ -205,6 +205,16 @@ function minMaxNote(p) {
   return `<div class="card-prioryear">${parts.join(' · ')}</div>`;
 }
 
+// Visible Min/Max line shown on the card face
+function minMaxLine(p) {
+  if (p.minCost == null && p.maxCost == null) return '';
+  const per = p.billingPeriod === 'monthly' ? '/mo' : '/yr';
+  const parts = [];
+  if (p.minCost != null) parts.push(`Min ${formatCost(p.minCost)}${per}`);
+  if (p.maxCost != null) parts.push(`Max ${formatCost(p.maxCost)}${per}`);
+  return `<div class="minmax-line">${parts.join(' · ')}</div>`;
+}
+
 // ── Safe formula evaluator ────────────────────────────────────────────────────
 // Only digits, math operators, parentheses, and the variables `units` and `qty`
 // are allowed. Anything else → returns 0 (no arbitrary code execution).
@@ -938,6 +948,7 @@ function buildInfoCard(program) {
     bodyHtml = `<div class="info-cost-manual">${program.costRaw || 'See program details'}</div>`;
   }
   if (program.inputNote) bodyHtml += `<div class="input-note">${program.inputNote}</div>`;
+  bodyHtml += minMaxLine(program);
 
   // Billing timing as plain text — "Billed monthly" or the specific months
   const freqStr = (program.billingFreq || program.billingPeriod || '').toLowerCase();
@@ -1319,6 +1330,9 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   }
   // Optional clarification note shown by the entry box
   if (program.inputNote) bodyHtml += `<div class="input-note">${program.inputNote}</div>`;
+
+  // Min/Max shown on the card face
+  bodyHtml += minMaxLine(program);
 
   // Minimum-not-met warning (shown until the entry meets the monthly/annual minimum)
   if (program.minCost != null) {
