@@ -8,7 +8,7 @@
   <title>RPM Budget Assumptions</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=82">
+  <link rel="stylesheet" href="css/styles.css?v=83">
 </head>
 <body>
 <div id="app">
@@ -399,6 +399,59 @@
   </div>
 </div>
 
+<!-- ── Modal: How to Use ── -->
+<div class="overlay" id="modal-help">
+  <div class="sheet sheet-wide help-sheet">
+    <h3>How to Use This App</h3>
+    <div class="help-body">
+      <p class="help-lead">This tool helps you build your property's annual budget assumptions, program by program. Here's the quick tour.</p>
+
+      <div class="help-step">
+        <div class="help-step-num">1</div>
+        <div>
+          <div class="help-step-title">Pick your property &amp; system</div>
+          <p>On the start screen, choose your property and your Property Management System (Yardi, OneSite, or Pace + OneSite). Enter your unit count — it pre-fills per-unit costs throughout. If the site transitioned mid-year, set the transition month so recurring costs only count from then on.</p>
+        </div>
+      </div>
+
+      <div class="help-step">
+        <div class="help-step-num">2</div>
+        <div>
+          <div class="help-step-title">Choose a view mode</div>
+          <p><strong>Interactive</strong> lets you build the budget — acknowledge costs, select programs, and track totals. <strong>Info Only</strong> is a read-only reference of every program and its cost.</p>
+        </div>
+      </div>
+
+      <div class="help-step">
+        <div class="help-step-num">3</div>
+        <div>
+          <div class="help-step-title">Work through the cards</div>
+          <p><strong>Non-Elective</strong> programs (left) are budgeted by default — review and acknowledge them. Opting out requires division president approval. <strong>Elective</strong> programs (right) are yours to include or skip. Use the editable boxes (unit counts, quantities, options) to match your property; the card total updates as you go.</p>
+        </div>
+      </div>
+
+      <div class="help-step">
+        <div class="help-step-num">4</div>
+        <div>
+          <div class="help-step-title">Billing months &amp; setup fees</div>
+          <p>Where a program lets you, pick which months it bills, or mark a part as billed separately. One-time setup fees can be toggled on and assigned to a month. The left panel shows your month-by-month breakdown; the right shows the running annual estimate.</p>
+        </div>
+      </div>
+
+      <div class="help-step">
+        <div class="help-step-num">5</div>
+        <div>
+          <div class="help-step-title">Search, review &amp; export</div>
+          <p>Use the search bar at the top to jump to a department, program, or setup fee by name. When you're done, open <strong>View Summary</strong> to review every decision and export it to Excel. Your inputs save automatically for this property and year.</p>
+        </div>
+      </div>
+
+      <p class="help-foot">Need to switch sites? Use <strong>Change Property/System</strong> in this menu. Everything you entered is saved per property, so you can come back anytime.</p>
+    </div>
+    <button class="sheet-close" id="help-close">Got it</button>
+  </div>
+</div>
+
 <!-- ── Modal: Edit Unit Count ── -->
 <div class="overlay" id="modal-units">
   <div class="sheet">
@@ -450,6 +503,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=82"></script>
+<script type="module" src="js/app.js?v=83"></script>
 </body>
 </html>

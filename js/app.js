@@ -2063,6 +2063,11 @@ document.getElementById('btn-menu').addEventListener('click', () => {
 });
 
 document.getElementById('menu-close').addEventListener('click',    () => closeModal('modal-menu'));
+document.getElementById('mi-how-to-use').addEventListener('click', () => {
+  closeModal('modal-menu');
+  openModal('modal-help');
+});
+document.getElementById('help-close').addEventListener('click', () => closeModal('modal-help'));
 document.getElementById('mi-refresh-data').addEventListener('click', async () => {
   closeModal('modal-menu');
   clearMondayCache();
