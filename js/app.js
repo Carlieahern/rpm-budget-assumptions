@@ -2113,8 +2113,9 @@ document.getElementById('mi-change-property').addEventListener('click', () => {
   loadPropertyScreen();
 });
 const goToHub = () => {
-  // Return to the RPM Living Budget Hub (its own domain keeps the existing session)
-  window.location.href = 'https://rpm-living-budget-hub.vercel.app/';
+  // Return to the RPM Living Budget Hub. The ?return=1 flag tells the hub this is
+  // a return trip so it reuses the existing session instead of showing the login.
+  window.location.href = 'https://rpm-living-budget-hub.vercel.app/?return=1';
 };
 document.getElementById('mi-logout').addEventListener('click', () => {
   closeModal('modal-menu');
