@@ -236,6 +236,27 @@ body {
   justify-content: space-between;
   margin-bottom: 32px;
 }
+.setup-top-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.btn-hub-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1.5px solid var(--copper);
+  color: var(--copper);
+  border-radius: 20px;
+  padding: 7px 14px 7px 11px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-hub-back:hover { background: var(--copper); color: #fff; }
 
 .setup-body {
   display: flex;

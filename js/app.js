@@ -2099,11 +2099,15 @@ document.getElementById('mi-change-property').addEventListener('click', () => {
   closeModal('modal-menu');
   loadPropertyScreen();
 });
-document.getElementById('mi-logout').addEventListener('click', () => {
-  closeModal('modal-menu');
+const goToHub = () => {
   // Return to the RPM Living Budget Hub (its own domain keeps the existing session)
   window.location.href = 'https://rpm-living-budget-hub.vercel.app/';
+};
+document.getElementById('mi-logout').addEventListener('click', () => {
+  closeModal('modal-menu');
+  goToHub();
 });
+document.getElementById('btn-setup-hub')?.addEventListener('click', goToHub);
 
 document.getElementById('mi-reset').addEventListener('click', () => {
   closeModal('modal-menu');
