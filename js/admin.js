@@ -248,7 +248,8 @@ function partFields(part, i) {
         </div>`).join('');
       return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Select a package">`) +
              L('How does the PM choose?', `<select class="ae-pf" data-i="${i}" data-k="selectMode"><option value="one"${part.selectMode !== 'multiple' ? ' selected' : ''}>Pick just one</option><option value="multiple"${part.selectMode === 'multiple' ? ' selected' : ''}>Pick one or more (with quantities)</option></select>`) +
-             `<div class="ae-field ae-wide"><span>Options</span><div class="ae-popts">${rows}</div><button class="ae-popt-add" data-i="${i}">+ Add option</button></div>`;
+             `<div class="ae-field ae-wide"><span>Options</span><div class="ae-popts">${rows}</div><button class="ae-popt-add" data-i="${i}">+ Add option</button></div>` +
+             `<label class="ae-follows"><input type="checkbox" class="ae-pf" data-i="${i}" data-k="perUnit"${part.perUnit ? ' checked' : ''}> Multiply the selected option's rate by the unit count</label>`;
     }
     case 'manual':
       return L('What are they budgeting?', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Estimated travel">`);
@@ -525,7 +526,7 @@ function wireEditor() {
   document.querySelectorAll('.ae-pf').forEach(el =>
     el.addEventListener('input', e => {
       const arr = arrOf(el), i = +el.dataset.i, k = el.dataset.k;
-      form[arr][i][k] = e.target.value;
+      form[arr][i][k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
       if (k === 'selectMode' || k === 'base') { buildEditor(); return; }
       if (k === 'itemLabel') {
         const span = el.closest('.ae-part')?.querySelector('.ae-pf[data-k="rate"]')?.closest('.ae-field')?.querySelector('span');
@@ -615,7 +616,10 @@ function cleanParts(arr) {
       case 'perItem': c.rate = cleanNum(p.rate) || 0; c.itemLabel = p.itemLabel || 'item'; if (cleanNum(p.baseQty)) c.baseQty = cleanNum(p.baseQty); break;
       case 'percent': c.pct = cleanNum(p.pct) || 0; c.base = p.base || 'income'; if (cleanNum(p.baseDefault)) c.baseDefault = cleanNum(p.baseDefault); break;
       case 'options': c.selectMode = p.selectMode === 'multiple' ? 'multiple' : 'one';
+                      if (p.perUnit) c.perUnit = true;
                       c.options = (p.options || []).filter(o => o.label || o.rate).map(o => ({ label: o.label || '', rate: cleanNum(o.rate) || 0 })); break;
+      case 'tax':     c.pct = cleanNum(p.pct) || 0; break;
+      case 'manual':  break; // label only
       case 'formula': c.expr = p.expr || ''; break;
       case 'tax':     c.pct = cleanNum(p.pct) || 0; break;
     }

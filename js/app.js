@@ -298,12 +298,13 @@ function partPeriodCost(program, part, idx, prefix = '') {
     }
     case 'options': {
       const opts = part.options || [];
+      const mult = part.perUnit ? S.unitCount : 1;   // optionally × property unit count
       if (part.selectMode === 'multiple') {
         const qtys = S.compSel[key] || [];
-        return opts.reduce((s, o, i) => s + num(o.rate) * (qtys[i] || 0), 0);
+        return opts.reduce((s, o, i) => s + num(o.rate) * (qtys[i] || 0), 0) * mult;
       }
       const sel = S.compSel[key] ?? 0;
-      return num(opts[sel]?.rate);
+      return num(opts[sel]?.rate) * mult;
     }
     case 'manual':
       return part.locked ? 0 : num(S.compInputs[key]);
@@ -316,11 +317,17 @@ function partPeriodCost(program, part, idx, prefix = '') {
   }
 }
 
+// Effective tax rate: PM override (editable on the card) falls back to the admin default
+function taxPctFor(program, part, idx, prefix = '') {
+  const v = S.compInputs[`${prefix}${program.id}:${idx}`];
+  return (v != null && v !== '') ? num(v) : num(part.pct);
+}
+
 // Sum a parts array, adding any "tax" part as a % of the non-tax (taxable) total.
 function sumPartsWithTax(program, parts, prefix = '') {
   let taxable = 0, taxPct = 0;
   (parts || []).forEach((part, i) => {
-    if (part.kind === 'tax') taxPct += num(part.pct);
+    if (part.kind === 'tax') taxPct += taxPctFor(program, part, i, prefix);
     else taxable += partPeriodCost(program, part, i, prefix);
   });
   return taxable + taxable * taxPct / 100;
@@ -521,15 +528,18 @@ function programMonths12(program) {
   const mo  = program.billingPeriod === 'monthly';
   const nat = naturalMonthCount(program) || 1;
   const progMonths = activeMonthsFor(program);
+  // Months a true-monthly cost recurs in (every month, minus any pre-transition months)
+  const monthlyMonths = [0,1,2,3,4,5,6,7,8,9,10,11].filter(m => S.transitionMonth == null || m >= S.transitionMonth);
   let taxPct = 0;
   (program.components || []).forEach((c, i) => {
-    if (c.kind === 'tax') { taxPct += num(c.pct); return; }
+    if (c.kind === 'tax') { taxPct += taxPctFor(program, c, i, ''); return; }
     const per = partPeriodCost(program, c, i);
     if (!per) return;
-    const hit = mo ? per : per / nat;            // amount charged per billing month
     const key = `${program.id}:${i}`;
-    // Checked "billed separately" → excluded from default months (uses its own, even if none picked yet)
-    const ms = S.partSeparate[key] ? (S.partMonths[key] || []) : progMonths;
+    // Manual estimate is a MONTHLY amount → bills every month (×12), regardless of program frequency
+    const isManual = c.kind === 'manual';
+    const hit = (isManual || mo) ? per : per / nat;
+    const ms = S.partSeparate[key] ? (S.partMonths[key] || []) : (isManual ? monthlyMonths : progMonths);
     ms.forEach(m => arr[m] += hit);
   });
   // Tax applies on top of each month's taxable spend
@@ -871,6 +881,7 @@ function buildInfoCard(program) {
         case 'percent': return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Percentage'}</span><span class="tier-rate">${num(part.pct)}% of ${part.base === 'capex' ? 'CapEx' : 'income'}</span></div>`;
         case 'options': return (part.options || []).map(o => `<div class="info-tier-row"><span class="tier-label">${o.label}</span><span class="tier-rate">${formatRate(num(o.rate))}</span></div>`).join('');
         case 'manual':  return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Estimated amount'}</span><span class="tier-rate">PM estimates</span></div>`;
+        case 'tax':     return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Tax'}</span><span class="tier-rate">${num(part.pct)}%</span></div>`;
         case 'tax':     return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Tax'}</span><span class="tier-rate">+${num(part.pct)}%</span></div>`;
         case 'formula': return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Custom'}</span></div>`;
         default: return '';
@@ -1037,18 +1048,34 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
           return `<div class="tier-select-label">${part.label || 'Select all that apply'}</div><div class="addrows">${orows}</div>${sepUI(part, i)}`;
         }
         const sel = S.compSel[key] ?? 0;
+        const perUnitTag = part.perUnit ? ` <span class="tier-rate">/unit</span>` : '';
         const orows = opts.map((o, oi) => `
           <label class="tier-option${oi === sel ? ' is-selected' : ''}">
             <input type="radio" class="comp-optradio" ${pfx} name="copt_${prefix}${program.id}_${i}" data-pid="${program.id}" data-idx="${i}" data-oi="${oi}"${oi === sel ? ' checked' : ''}>
-            <span class="tier-label">${o.label} <span class="tier-rate">(${formatRate(num(o.rate))})</span></span>
+            <span class="tier-label">${o.label} <span class="tier-rate">(${formatRate(num(o.rate))}${part.perUnit ? '/unit' : ''})</span></span>
           </label>`).join('');
-        return `<div class="tier-select-label">${part.label || 'Select one'}</div><div class="tier-options">${orows}</div>${sepUI(part, i)}`;
+        const unitLine = part.perUnit
+          ? `<div class="card-calc"><span class="calc-rate">${formatRate(num(opts[sel]?.rate))}/unit</span><span class="calc-x">×</span><span class="qty-label">${S.unitCount} units</span><span class="qty-equals">= <strong>${formatCost(num(opts[sel]?.rate) * S.unitCount)}</strong></span></div>`
+          : '';
+        return `<div class="tier-select-label">${part.label || 'Select one'}</div><div class="tier-options">${orows}</div>${unitLine}${sepUI(part, i)}`;
       }
       case 'manual': {
         const v = S.compInputs[key] != null ? S.compInputs[key] : '';
         return `<div class="card-calc">
           <span class="calc-rate">${part.label || 'Estimated amount'}:</span>
-          <div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="$ estimate" value="${v}"></div>
+          <div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="$ / month" value="${v}"></div>
+        </div>`;
+      }
+      case 'tax': {
+        // Tax % is editable on the card, defaulting to the admin value
+        const pctVal = S.compInputs[key] != null && S.compInputs[key] !== '' ? S.compInputs[key] : (part.pct ?? '');
+        const taxable = (parts || []).reduce((s, c2, j) => c2.kind === 'tax' ? s : s + partPeriodCost(program, c2, j, prefix), 0);
+        const amt = num(pctVal) / 100 * taxable;
+        return `<div class="card-calc">
+          <span class="calc-rate">${part.label || 'Tax'}:</span>
+          <div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}" type="number" min="0" step="0.01" placeholder="%" value="${pctVal}"></div>
+          <span class="calc-x">%</span>
+          ${amt > 0 ? `<span class="qty-equals">= <strong>${formatCost(amt)}</strong></span>` : ''}
         </div>`;
       }
       case 'tax': {
