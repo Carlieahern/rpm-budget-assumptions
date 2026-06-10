@@ -2059,8 +2059,6 @@ document.getElementById('btn-menu').addEventListener('click', () => {
   document.getElementById('menu-ctx-property').textContent = S.property || '—';
   document.getElementById('menu-ctx-meta').textContent =
     `${S.systemType} · FY ${S.budgetYear}`;
-  document.getElementById('mi-prior-year-label').textContent =
-    S.viewingPrior ? `Hide ${S.budgetYear - 1} Comparison` : `Compare with ${S.budgetYear - 1}`;
   openModal('modal-menu');
 });
 
@@ -2100,13 +2098,6 @@ document.getElementById('mi-logout').addEventListener('click', () => {
   closeModal('modal-menu');
   // Return to the RPM Budget Hub
   window.location.href = '../';
-});
-
-document.getElementById('mi-prior-year').addEventListener('click', () => {
-  closeModal('modal-menu');
-  S.viewingPrior = !S.viewingPrior;
-  // Re-render cards with prior year indicators
-  renderMainScreen();
 });
 
 document.getElementById('mi-reset').addEventListener('click', () => {
