@@ -2551,6 +2551,17 @@ body {
 .prog-card.is-elective .sep-bill-toggle { color: #9a7350; }
 .prog-card.is-elective .sep-bill-toggle input { accent-color: var(--navy); }
 .sep-bill-label { margin-top: 8px; }
+
+/* "Split evenly across the year" toggle */
+.spread-toggle {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.75);
+  margin-top: 10px; cursor: pointer;
+}
+.spread-toggle input { accent-color: #fff; }
+.prog-card.is-elective .spread-toggle { color: #9a7350; }
+.prog-card.is-elective .spread-toggle input { accent-color: var(--navy); }
+.incur-chips.is-dimmed { opacity: 0.4; }
 .sep-bill-chips { margin-top: 6px; }
 
 /* Setup fee block — one-time, blue, with its own month */

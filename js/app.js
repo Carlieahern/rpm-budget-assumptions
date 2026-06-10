@@ -26,6 +26,7 @@ const S = {
   compSel:         {},    // "programId:partIdx" → option selection (index for one, [qty] for multiple)
   partSeparate:    {},    // "programId:partIdx" → bool: this part is billed in its own months
   partMonths:      {},    // "programId:partIdx" → [month indices] when billed separately
+  spreadMonthly:   {},    // programId → bool: split the annual evenly across the year in the breakdown
   setupOn:         {},    // programId → include the one-time setup fee?
   setupMonth:      {},    // programId → month index the setup fee is charged
   budgetAmounts:   {},    // programId → manual dollar amount (fallback for complex costs)
@@ -158,6 +159,7 @@ async function launchMain() {
     try { S.compSel       = JSON.parse(localStorage.getItem(`rpm_compsel_${S.property}_${S.budgetYear}`)) || {}; } catch { S.compSel       = {}; }
     try { S.partSeparate  = JSON.parse(localStorage.getItem(`rpm_partsep_${S.property}_${S.budgetYear}`)) || {}; } catch { S.partSeparate  = {}; }
     try { S.partMonths    = JSON.parse(localStorage.getItem(`rpm_partmo_${S.property}_${S.budgetYear}`)) || {}; } catch { S.partMonths    = {}; }
+    try { S.spreadMonthly = JSON.parse(localStorage.getItem(`rpm_spread_${S.property}_${S.budgetYear}`)) || {}; } catch { S.spreadMonthly = {}; }
     try { S.setupOn       = JSON.parse(localStorage.getItem(`rpm_setupon_${S.property}_${S.budgetYear}`)) || {}; } catch { S.setupOn       = {}; }
     try { S.setupMonth    = JSON.parse(localStorage.getItem(`rpm_setupmonth_${S.property}_${S.budgetYear}`)) || {}; } catch { S.setupMonth    = {}; }
     try { S.budgetAmounts = JSON.parse(localStorage.getItem(`rpm_budget_${S.property}_${S.budgetYear}`)) || {}; } catch { S.budgetAmounts = {}; }
@@ -544,6 +546,17 @@ function programMonths12(program) {
   });
   // Tax applies on top of each month's taxable spend
   if (taxPct) for (let m = 0; m < 12; m++) arr[m] += arr[m] * taxPct / 100;
+
+  // PM chose to view this split evenly across the year — same annual, spread monthly
+  if (S.spreadMonthly[program.id]) {
+    const total = arr.reduce((s, v) => s + v, 0);
+    const out = Array(12).fill(0);
+    if (total && monthlyMonths.length) {
+      const each = total / monthlyMonths.length;
+      monthlyMonths.forEach(m => out[m] = each);
+    }
+    return out;
+  }
   return arr;
 }
 
@@ -1308,10 +1321,17 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       const note = locked ? ' · 🔒 fixed' : (S.transitionMonth != null && !isAsIncurred ? ' · transition applied' : '');
       const directive = locked ? '' : ' <span class="incur-directive">(select applicable months)</span>';
       const sepNote = anySeparate ? ' <span class="incur-directive">(items billed separately are excluded)</span>' : '';
+      const spreadOn = !!S.spreadMonthly[program.id];
+      // Offer "split evenly" only for lump billing (fewer than 12 active months)
+      const lumps = activeMonthsFor(program).length > 0 && activeMonthsFor(program).length < 12;
+      const spreadToggle = (lumps || spreadOn)
+        ? `<label class="spread-toggle"><input type="checkbox" class="spread-check" data-pid="${program.id}"${spreadOn ? ' checked' : ''}> Split evenly across the year (view monthly)</label>`
+        : '';
       bodyHtml += `
         <div class="incur-months">
           <div class="incur-label">${label}${note}${directive}${sepNote}</div>
-          <div class="incur-chips">${monthChipStrip(activeMonthsFor(program), locked)}</div>
+          <div class="incur-chips${spreadOn ? ' is-dimmed' : ''}">${monthChipStrip(activeMonthsFor(program), locked || spreadOn)}</div>
+          ${spreadToggle}
         </div>`;
     }
   }
@@ -1478,6 +1498,13 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       S.partSeparate[`${program.id}:${chk.dataset.idx}`] = chk.checked;
       persistParts(); updateBudgetTotal(); refreshCard(program.id);
     });
+  });
+  el.querySelector('.spread-check')?.addEventListener('change', e => {
+    e.stopPropagation();
+    S.spreadMonthly[program.id] = e.target.checked;
+    localStorage.setItem(`rpm_spread_${S.property}_${S.budgetYear}`, JSON.stringify(S.spreadMonthly));
+    updateBudgetTotal();
+    refreshCard(program.id);
   });
   el.querySelectorAll('.part-sep-chip').forEach(chip => {
     chip.addEventListener('click', e => {
@@ -2015,6 +2042,7 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
     S.compSel        = {};
     S.partSeparate   = {};
     S.partMonths     = {};
+    S.spreadMonthly  = {};
     S.setupOn        = {};
     S.setupMonth     = {};
     S.budgetAmounts  = {};
@@ -2026,6 +2054,7 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
     localStorage.removeItem(`rpm_compsel_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_partsep_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_partmo_${S.property}_${S.budgetYear}`);
+    localStorage.removeItem(`rpm_spread_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_setupon_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_setupmonth_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_budget_${S.property}_${S.budgetYear}`);
