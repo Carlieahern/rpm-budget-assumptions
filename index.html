@@ -8,7 +8,7 @@
   <title>RPM Budget Assumptions</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=78">
+  <link rel="stylesheet" href="css/styles.css?v=79">
 </head>
 <body>
 <div id="app">
@@ -147,6 +147,10 @@
           <span class="mode-badge" id="hdr-mode-badge"></span>
           <span class="admin-badge" id="hdr-admin-badge"></span>
         </div>
+        <div class="hdr-search-wrap">
+          <svg class="hdr-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" id="card-search" class="hdr-search" placeholder="Search department, program, or setup fee…" autocomplete="off">
+        </div>
       </div>
       <div class="main-hdr-side main-hdr-right">
         <button class="btn-summary-link" id="btn-view-summary">View Summary</button>
@@ -256,6 +260,10 @@
       <span class="lb-saved" id="lb-saved"></span>
     </details>
 
+    <div class="admin-search-wrap">
+      <svg class="admin-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="search" id="admin-search" class="admin-search" placeholder="Search by department or program name…" autocomplete="off">
+    </div>
     <div id="admin-list"></div>
   </div>
 
@@ -446,6 +454,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=78"></script>
+<script type="module" src="js/app.js?v=79"></script>
 </body>
 </html>

@@ -33,6 +33,7 @@ const S = {
   incurMonths:     {},    // programId → [month indices] for as-incurred programs
   currentOptOutId: null,
   viewingPrior:    false,
+  search:          '',    // dashboard search filter (department / program name / setup fee name)
 };
 
 // "Looking for 2026?" floating box — shown only if admin enabled it
@@ -802,16 +803,32 @@ function renderDeptRows() {
     body.appendChild(bar);
   }
 
+  // Search filter — match on department, program name, or setup fee name
+  const q = (S.search || '').trim().toLowerCase();
+  const matchesSearch = p => {
+    if (!q) return true;
+    return (p.group || '').toLowerCase().includes(q)
+        || (p.name  || '').toLowerCase().includes(q)
+        || (p.setupName || '').toLowerCase().includes(q);
+  };
+  const visible = S.programs.filter(matchesSearch);
+
+  if (q && !visible.length) {
+    body.innerHTML = `<p class="search-empty">No programs match “${S.search.trim()}”.</p>`;
+    updateColumnCounts();
+    return;
+  }
+
   // Collect departments in the order they first appear
   const deptOrder = [];
   const seen = new Set();
-  S.programs.forEach(p => {
+  visible.forEach(p => {
     if (!seen.has(p.group)) { seen.add(p.group); deptOrder.push(p.group); }
   });
 
   deptOrder.forEach(dept => {
-    const nonElective = S.programs.filter(p => p.group === dept &&  p.required);
-    const elective    = S.programs.filter(p => p.group === dept && !p.required);
+    const nonElective = visible.filter(p => p.group === dept &&  p.required);
+    const elective    = visible.filter(p => p.group === dept && !p.required);
     if (!nonElective.length && !elective.length) return;
 
     const gs = groupStyle(dept);
@@ -1860,6 +1877,17 @@ document.getElementById('btn-admin-entry').addEventListener('click', () => {
   if (isAdminAuthed()) openAdmin();
   else promptAdminLogin(openAdmin);
 });
+
+// ── Dashboard search — filter cards by department, program name, or setup fee name
+{
+  const searchEl = document.getElementById('card-search');
+  if (searchEl) {
+    searchEl.addEventListener('input', () => {
+      S.search = searchEl.value;
+      renderDeptRows();
+    });
+  }
+}
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 document.getElementById('btn-view-summary').addEventListener('click', openSummary);

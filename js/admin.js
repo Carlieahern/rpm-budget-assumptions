@@ -20,6 +20,7 @@ const SYSTEMS    = [['Yardi', 'Yardi'], ['OneSite', 'OneSite'], ['PaceOneSite', 
 const MONTHS     = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 let adminName     = '';
+let adminSearch   = '';    // admin list filter (department / program name)
 let rawCache      = {};    // id → raw program object
 let editingId     = null;  // null = new program
 let form          = {};    // working copy being edited
@@ -52,6 +53,7 @@ export function initAdmin() {
   });
   document.getElementById('imp-commit')?.addEventListener('click', commitImport);
   document.getElementById('lb-save')?.addEventListener('click', saveLegacyBannerSettings);
+  document.getElementById('admin-search')?.addEventListener('input', e => { adminSearch = e.target.value; renderList(true); });
   document.getElementById('imp-template')?.addEventListener('click', downloadImportTemplate);
   document.getElementById('imp-export')?.addEventListener('click', exportProgramsCsv);
   document.getElementById('imp-guide-toggle')?.addEventListener('click', () => {
@@ -141,19 +143,33 @@ async function saveLegacyBannerSettings() {
   catch (e) { if (note) note.textContent = ' Save failed: ' + e.message; }
 }
 
-async function renderList() {
+async function renderList(skipFetch = false) {
   const list = document.getElementById('admin-list');
   const scroller = document.getElementById('screen-admin');
   const keepY = scroller ? scroller.scrollTop : 0;          // remember place across re-render
-  if (!Object.keys(rawCache).length) list.innerHTML = '<p class="admin-loading">Loading programs…</p>';
-  try {
-    rawCache = await fetchRawPrograms();
-  } catch (e) {
-    list.innerHTML = `<p class="admin-loading">Error loading: ${e.message}</p>`;
+  if (!skipFetch) {
+    if (!Object.keys(rawCache).length) list.innerHTML = '<p class="admin-loading">Loading programs…</p>';
+    try {
+      rawCache = await fetchRawPrograms();
+    } catch (e) {
+      list.innerHTML = `<p class="admin-loading">Error loading: ${e.message}</p>`;
+      return;
+    }
+  }
+
+  const q = adminSearch.trim().toLowerCase();
+  const entries = Object.entries(rawCache).filter(([, p]) => {
+    if (!q) return true;
+    return (p.department || '').toLowerCase().includes(q)
+        || (p.name || '').toLowerCase().includes(q);
+  });
+
+  if (q && !entries.length) {
+    list.innerHTML = `<p class="admin-loading">No programs match “${adminSearch.trim()}”.</p>`;
+    if (scroller) requestAnimationFrame(() => { scroller.scrollTop = keepY; });
     return;
   }
 
-  const entries = Object.entries(rawCache);
   // Group by department
   const byDept = {};
   entries.forEach(([id, p]) => {
