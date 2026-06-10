@@ -1431,6 +1431,75 @@ body {
 .prog-card.is-elective .info-cost-manual { color: #9a7350; }
 .prog-card.is-elective .info-tier-row { border-bottom-color: #eedcc9; }
 
+/* ── Info "flashcard" body — big, prominent reference layout ── */
+.flash-body { display: flex; flex-direction: column; gap: 18px; }
+.flash-section-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 8px;
+}
+.flash-cost {
+  font-family: 'Oswald', sans-serif;
+  font-size: 23px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #fff;
+}
+.flash-billing {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  margin-top: 10px;
+}
+.flash-setup-name {
+  font-family: 'Oswald', sans-serif;
+  font-size: 19px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 10px;
+}
+.flash-rows { display: flex; flex-direction: column; gap: 7px; margin-bottom: 8px; }
+.flash-row { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; font-size: 15px; }
+.flash-row-label { color: rgba(255,255,255,0.85); }
+.flash-row-val { color: #fff; font-weight: 700; white-space: nowrap; }
+.flash-setup-total { font-size: 15px; font-weight: 700; color: #fff; }
+.flash-desc { font-size: 15px; line-height: 1.6; color: rgba(255,255,255,0.92); }
+.flash-note { font-size: 14px; line-height: 1.55; color: rgba(255,255,255,0.8); font-style: italic; margin-top: 8px; }
+.flash-note strong { font-style: normal; font-weight: 700; color: #fff; }
+.flash-guide-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Separators between the later sections */
+.flash-setup, .flash-details {
+  border-top: 1px solid rgba(255,255,255,0.18);
+  padding-top: 18px;
+}
+
+/* Elective theme (white card) → copper / warm-brown text */
+.prog-card.is-elective .flash-section-label { color: #b08355; }
+.prog-card.is-elective .flash-cost,
+.prog-card.is-elective .flash-setup-name,
+.prog-card.is-elective .flash-setup-total,
+.prog-card.is-elective .flash-row-val,
+.prog-card.is-elective .flash-note strong,
+.prog-card.is-elective .flash-guide-link { color: var(--copper); }
+.prog-card.is-elective .flash-row-label,
+.prog-card.is-elective .flash-desc { color: #6b5640; }
+.prog-card.is-elective .flash-billing,
+.prog-card.is-elective .flash-note { color: #9a7350; }
+.prog-card.is-elective .flash-setup,
+.prog-card.is-elective .flash-details { border-top-color: #eedcc9; }
+
 .info-tier-row {
   display: flex;
   justify-content: space-between;

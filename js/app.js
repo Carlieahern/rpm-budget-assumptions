@@ -216,6 +216,23 @@ function minMaxLine(p) {
   return `<div class="minmax-line">${parts.join(' · ')}</div>`;
 }
 
+// Human-readable rows for a parts array (used for the setup-fee breakdown on info cards)
+function partsSummaryRows(parts) {
+  const row = (label, val) => `<div class="flash-row"><span class="flash-row-label">${label}</span><span class="flash-row-val">${val}</span></div>`;
+  return (parts || []).map(part => {
+    switch (part.kind) {
+      case 'flat':    return row(part.label || 'Flat fee', formatCost(num(part.amount)));
+      case 'perUnit': return row(part.label || 'Per unit', `${formatRate(num(part.rate))}/unit`);
+      case 'perItem': return row(part.label || part.itemLabel || 'Per item', `${formatRate(num(part.rate))}/${(part.itemLabel || 'item').toLowerCase()}`);
+      case 'percent': return row(part.label || 'Percentage', `${num(part.pct)}% of ${part.base === 'capex' ? 'CapEx' : 'income'}`);
+      case 'options': return (part.options || []).map(o => row(o.label, formatRate(num(o.rate)))).join('');
+      case 'manual':  return row(part.label || 'Estimated amount', 'Varies');
+      case 'tax':     return row(part.label || 'Tax', `+${num(part.pct)}%`);
+      default: return '';
+    }
+  }).join('');
+}
+
 // ── Safe formula evaluator ────────────────────────────────────────────────────
 // Only digits, math operators, parentheses, and the variables `units` and `qty`
 // are allowed. Anything else → returns 0 (no arbitrary code execution).
@@ -936,43 +953,37 @@ function buildInfoCard(program) {
     hero = '—';
   }
 
-  // Body — static cost detail
-  let bodyHtml = '';
-  if (hasComponents(program)) {
-    const lines = (program.components || []).map(part => {
-      switch (part.kind) {
-        case 'flat':    return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Flat fee'}</span><span class="tier-rate">${formatCost(num(part.amount))}</span></div>`;
-        case 'perUnit': return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Per unit'}</span><span class="tier-rate">${formatRate(num(part.rate))}/unit</span></div>`;
-        case 'perItem': return `<div class="info-tier-row"><span class="tier-label">${part.label || part.itemLabel || 'Per item'}</span><span class="tier-rate">${formatRate(num(part.rate))}/${(part.itemLabel || 'item').toLowerCase()}</span></div>`;
-        case 'percent': return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Percentage'}</span><span class="tier-rate">${num(part.pct)}% of ${part.base === 'capex' ? 'CapEx' : 'income'}</span></div>`;
-        case 'options': return (part.options || []).map(o => `<div class="info-tier-row"><span class="tier-label">${o.label}</span><span class="tier-rate">${formatRate(num(o.rate))}</span></div>`).join('');
-        case 'manual':  return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Estimated amount'}</span><span class="tier-rate">PM estimates</span></div>`;
-        case 'tax':     return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Tax'}</span><span class="tier-rate">${num(part.pct)}%</span></div>`;
-        case 'tax':     return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Tax'}</span><span class="tier-rate">+${num(part.pct)}%</span></div>`;
-        case 'formula': return `<div class="info-tier-row"><span class="tier-label">${part.label || 'Custom'}</span></div>`;
-        default: return '';
-      }
-    }).join('');
-    bodyHtml = `<div class="tier-select-label">Cost detail</div><div class="info-tier-list">${lines}</div>`;
-  } else if (info.type === 'tiered' && info.tiers?.length) {
-    const perSuffix = info.isPerUnit ? (info.period === 'month' ? '/unit/mo' : '/unit/yr')
-                    : (info.tiers[0]?.type === 'per-item' ? `/${(program.itemLabel || 'item').toLowerCase()}` : suffix);
-    bodyHtml = `
-      <div class="tier-select-label">Options</div>
-      <div class="info-tier-list">
-        ${info.tiers.map(t => `<div class="info-tier-row"><span class="tier-label">${t.label}</span><span class="tier-rate">${formatRate(t.rate)}${perSuffix}</span></div>`).join('')}
+  // ── Flashcard body — narrative reference, NOT the cost-builder breakdown ──
+  // Big, prominent presentation of: the Cost Summary note, the Setup Fee details
+  // (from the setup cost builder), and everything that lived in the Details drop-down.
+
+  // Cost Summary — the admin "Cost summary" note; fall back to the rate basis.
+  const costSummaryText = program.costRaw || subtitle || (hero !== '—' ? hero + (info.type === 'flat' ? ' ' + suffix : '') : '');
+  const costSummaryHtml = costSummaryText
+    ? `<div class="flash-section">
+         <div class="flash-section-label">Cost Summary</div>
+         <div class="flash-cost">${costSummaryText}</div>
+         ${minMaxLine(program)}
+       </div>`
+    : minMaxLine(program);
+
+  // Setup Fee — sourced from the setup cost builder (name + parts + total + note).
+  let setupHtml = '';
+  if (hasSetupBuilder(program) || program.setupFee || program.setupName) {
+    const rows  = hasSetupBuilder(program) ? partsSummaryRows(program.setupComponents) : '';
+    const total = hasSetupBuilder(program) ? setupTotal(program) : 0;
+    setupHtml = `
+      <div class="flash-section flash-setup">
+        <div class="flash-section-label">Setup / One-Time Fee</div>
+        ${program.setupName ? `<div class="flash-setup-name">${program.setupName}</div>` : ''}
+        ${rows ? `<div class="flash-rows">${rows}</div>` : ''}
+        ${hasSetupBuilder(program) ? `<div class="flash-setup-total">One-time total: ${formatCost(total)}</div>` : ''}
+        ${program.setupFee ? `<div class="flash-note">${program.setupFee}</div>` : ''}
       </div>`;
-  } else if (info.type === 'per-item') {
-    bodyHtml = `<div class="info-cost-manual">${formatRate(info.rate)} per ${(program.itemLabel || 'item').toLowerCase()}</div>`;
-  } else if (info.type === 'manual') {
-    bodyHtml = `<div class="info-cost-manual">${program.costRaw || 'See program details'}</div>`;
   }
-  if (program.inputNote) bodyHtml += `<div class="input-note">${program.inputNote}</div>`;
-  bodyHtml += minMaxLine(program);
 
   // Billing timing as plain text — "Billed monthly" or the specific months
   const freqStr = (program.billingFreq || program.billingPeriod || '').toLowerCase();
-  let monthsHtml = '';
   let timingText = '';
   if (freqStr.includes('monthly')) {
     timingText = 'Billed monthly';
@@ -987,45 +998,47 @@ function buildInfoCard(program) {
     else if (freqStr.includes('bi-'))       timingText = 'Billed twice a year';
     else                                    timingText = 'Billed annually';
   }
-  if (timingText) monthsHtml = `<div class="info-billing-text">${timingText}</div>`;
+  const timingHtml = timingText ? `<div class="flash-billing">${timingText}</div>` : '';
 
   const resourceLink = program.resourceUrl
-    ? `<a class="card-guide-link" href="${program.resourceUrl}" target="_blank" rel="noopener">Click here for the program guide →</a>`
-    : `<a class="card-guide-link is-placeholder" href="#" onclick="return false;">Program guide coming soon</a>`;
+    ? `<a class="flash-guide-link" href="${program.resourceUrl}" target="_blank" rel="noopener">Click here for the program guide →</a>`
+    : '';
+
+  // Details — everything from the old drop-down, now shown in full on the card.
+  const detailBits = [
+    program.description   ? `<div class="flash-desc">${program.description}</div>` : '',
+    program.priorYearNote ? `<div class="flash-note"><strong>Prior year:</strong> ${program.priorYearNote}</div>` : '',
+    program.inputNote     ? `<div class="flash-note">${program.inputNote}</div>` : '',
+    resourceLink,
+  ].filter(Boolean).join('');
+  const detailsHtml = detailBits
+    ? `<div class="flash-section flash-details">
+         <div class="flash-section-label">Details</div>
+         ${detailBits}
+       </div>`
+    : '';
 
   el.innerHTML = `
     <div class="card-head">
       <div class="card-head-main">
         <h3 class="prog-card-name">${program.name}</h3>
         ${program.programOwner ? `<div class="card-owner">${program.programOwner}</div>` : ''}
-        ${subtitle ? `<div class="card-rate-basis">${subtitle}</div>` : ''}
       </div>
       <div class="card-head-side">
         <div class="card-gl">GL: ${program.glCode}</div>
         ${program.billingFreq ? `<div class="card-billing">${program.billingFreq}</div>` : ''}
-        <div class="card-cost-hero"><span class="cost-hero-num">${hero}</span><span class="cost-hero-period">${info.type === 'flat' ? suffix : ''}</span></div>
       </div>
     </div>
-    ${(bodyHtml || monthsHtml) ? '<div class="card-divider"></div>' : ''}
-    ${bodyHtml}
-    ${monthsHtml}
-    <div class="card-foot">
-      <button class="details-toggle" type="button">▾ Details</button>
-      ${S.admin ? `<button class="card-edit-btn" type="button">✎ Edit</button>` : ''}
+    <div class="card-divider"></div>
+    <div class="flash-body">
+      ${costSummaryHtml}
+      ${timingHtml}
+      ${setupHtml}
+      ${detailsHtml}
     </div>
-    <div class="card-details-panel">
-      ${resourceLink}
-      ${program.description ? `<div class="prog-card-desc">${program.description}</div>` : ''}
-      ${program.setupFee ? `<div class="card-setup-fee">Setup: ${program.setupFee}</div>` : ''}
-      ${minMaxNote(program)}
-      ${program.priorYearNote ? `<div class="card-prioryear">Prior year: ${program.priorYearNote}</div>` : ''}
-    </div>
+    ${S.admin ? `<div class="card-foot"><button class="card-edit-btn" type="button">✎ Edit</button></div>` : ''}
   `;
 
-  el.querySelector('.details-toggle')?.addEventListener('click', e => {
-    e.stopPropagation();
-    el.classList.toggle('details-open');
-  });
   el.querySelector('.card-edit-btn')?.addEventListener('click', e => {
     e.stopPropagation();
     editProgram(program.id, refreshDashboard);
