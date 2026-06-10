@@ -158,11 +158,16 @@ document.getElementById('btn-skip').addEventListener('click', () => {
 async function launchMain() {
   showScreen('screen-loading');
   try {
+    // System-only mode (no property chosen) always starts fresh — nothing is
+    // loaded or remembered, so units, acknowledgments and all inputs reset to
+    // their defaults each time. Only the admin program data is kept.
+    const noProp = !S.property;
+
     // Fetch everything in parallel
     const [programs, decisions, priorDecisions] = await Promise.all([
       fetchPrograms(),
-      loadDecisions(S.property, S.budgetYear),
-      loadPriorYearDecisions(S.property, S.budgetYear),
+      noProp ? Promise.resolve({}) : loadDecisions(S.property, S.budgetYear),
+      noProp ? Promise.resolve({}) : loadPriorYearDecisions(S.property, S.budgetYear),
     ]);
 
     S.allPrograms = programs;
@@ -170,22 +175,32 @@ async function launchMain() {
     S.decisions      = decisions;
     S.priorDecisions = priorDecisions;
 
-    // Load saved input values
-    S.unitCount    = parseInt(localStorage.getItem(`rpm_units_${S.property}`)) || 0;
-    const savedTrans = localStorage.getItem(`rpm_transition_${S.property}`);
-    S.transitionMonth = (savedTrans === null || savedTrans === '') ? null : parseInt(savedTrans);
-    try { S.quantities    = JSON.parse(localStorage.getItem(`rpm_qty_${S.property}_${S.budgetYear}`))   || {}; } catch { S.quantities    = {}; }
-    try { S.selectedTiers = JSON.parse(localStorage.getItem(`rpm_tiers_${S.property}_${S.budgetYear}`)) || {}; } catch { S.selectedTiers = {}; }
-    try { S.optionQty     = JSON.parse(localStorage.getItem(`rpm_optqty_${S.property}_${S.budgetYear}`)) || {}; } catch { S.optionQty     = {}; }
-    try { S.compInputs    = JSON.parse(localStorage.getItem(`rpm_compin_${S.property}_${S.budgetYear}`)) || {}; } catch { S.compInputs    = {}; }
-    try { S.compSel       = JSON.parse(localStorage.getItem(`rpm_compsel_${S.property}_${S.budgetYear}`)) || {}; } catch { S.compSel       = {}; }
-    try { S.partSeparate  = JSON.parse(localStorage.getItem(`rpm_partsep_${S.property}_${S.budgetYear}`)) || {}; } catch { S.partSeparate  = {}; }
-    try { S.partMonths    = JSON.parse(localStorage.getItem(`rpm_partmo_${S.property}_${S.budgetYear}`)) || {}; } catch { S.partMonths    = {}; }
-    try { S.spreadMonthly = JSON.parse(localStorage.getItem(`rpm_spread_${S.property}_${S.budgetYear}`)) || {}; } catch { S.spreadMonthly = {}; }
-    try { S.setupOn       = JSON.parse(localStorage.getItem(`rpm_setupon_${S.property}_${S.budgetYear}`)) || {}; } catch { S.setupOn       = {}; }
-    try { S.setupMonth    = JSON.parse(localStorage.getItem(`rpm_setupmonth_${S.property}_${S.budgetYear}`)) || {}; } catch { S.setupMonth    = {}; }
-    try { S.budgetAmounts = JSON.parse(localStorage.getItem(`rpm_budget_${S.property}_${S.budgetYear}`)) || {}; } catch { S.budgetAmounts = {}; }
-    try { S.incurMonths   = JSON.parse(localStorage.getItem(`rpm_incur_${S.property}_${S.budgetYear}`))  || {}; } catch { S.incurMonths   = {}; }
+    if (noProp) {
+      // Reset every PM input to default — no saved state in system-only mode.
+      S.unitCount = 0;
+      S.transitionMonth = null;
+      S.quantities = {}; S.selectedTiers = {}; S.optionQty = {};
+      S.compInputs = {}; S.compSel = {}; S.partSeparate = {}; S.partMonths = {};
+      S.spreadMonthly = {}; S.setupOn = {}; S.setupMonth = {};
+      S.budgetAmounts = {}; S.incurMonths = {};
+    } else {
+      // Load saved input values for this property + year
+      S.unitCount    = parseInt(localStorage.getItem(`rpm_units_${S.property}`)) || 0;
+      const savedTrans = localStorage.getItem(`rpm_transition_${S.property}`);
+      S.transitionMonth = (savedTrans === null || savedTrans === '') ? null : parseInt(savedTrans);
+      try { S.quantities    = JSON.parse(localStorage.getItem(`rpm_qty_${S.property}_${S.budgetYear}`))   || {}; } catch { S.quantities    = {}; }
+      try { S.selectedTiers = JSON.parse(localStorage.getItem(`rpm_tiers_${S.property}_${S.budgetYear}`)) || {}; } catch { S.selectedTiers = {}; }
+      try { S.optionQty     = JSON.parse(localStorage.getItem(`rpm_optqty_${S.property}_${S.budgetYear}`)) || {}; } catch { S.optionQty     = {}; }
+      try { S.compInputs    = JSON.parse(localStorage.getItem(`rpm_compin_${S.property}_${S.budgetYear}`)) || {}; } catch { S.compInputs    = {}; }
+      try { S.compSel       = JSON.parse(localStorage.getItem(`rpm_compsel_${S.property}_${S.budgetYear}`)) || {}; } catch { S.compSel       = {}; }
+      try { S.partSeparate  = JSON.parse(localStorage.getItem(`rpm_partsep_${S.property}_${S.budgetYear}`)) || {}; } catch { S.partSeparate  = {}; }
+      try { S.partMonths    = JSON.parse(localStorage.getItem(`rpm_partmo_${S.property}_${S.budgetYear}`)) || {}; } catch { S.partMonths    = {}; }
+      try { S.spreadMonthly = JSON.parse(localStorage.getItem(`rpm_spread_${S.property}_${S.budgetYear}`)) || {}; } catch { S.spreadMonthly = {}; }
+      try { S.setupOn       = JSON.parse(localStorage.getItem(`rpm_setupon_${S.property}_${S.budgetYear}`)) || {}; } catch { S.setupOn       = {}; }
+      try { S.setupMonth    = JSON.parse(localStorage.getItem(`rpm_setupmonth_${S.property}_${S.budgetYear}`)) || {}; } catch { S.setupMonth    = {}; }
+      try { S.budgetAmounts = JSON.parse(localStorage.getItem(`rpm_budget_${S.property}_${S.budgetYear}`)) || {}; } catch { S.budgetAmounts = {}; }
+      try { S.incurMonths   = JSON.parse(localStorage.getItem(`rpm_incur_${S.property}_${S.budgetYear}`))  || {}; } catch { S.incurMonths   = {}; }
+    }
 
     renderMainScreen();
     showScreen('screen-main');
