@@ -811,11 +811,19 @@ function renderMainScreen() {
     adminBadge.className   = `admin-badge${S.admin ? ' on' : ''}`;
   }
 
+  // Mode toggle button — shows the mode you'd switch TO
+  const modeToggle = document.getElementById('btn-mode-toggle');
+  if (modeToggle) modeToggle.textContent = S.mode === 'info' ? '✏️ Interactive' : '📋 Info View';
+
   // Hide side panels + budget total in info mode (no selections = no totals)
   const sideLeft  = document.querySelector('.side-left');
   const sideRight = document.querySelector('.side-right');
   if (sideLeft)  sideLeft.style.visibility  = S.mode === 'info' ? 'hidden' : 'visible';
   if (sideRight) sideRight.style.visibility = S.mode === 'info' ? 'hidden' : 'visible';
+
+  // View Summary only applies to the interactive build
+  const summaryBtn = document.getElementById('btn-view-summary');
+  if (summaryBtn) summaryBtn.style.display = S.mode === 'info' ? 'none' : '';
 
   renderDeptRows();
   updateBudgetTotal();
@@ -1916,6 +1924,15 @@ document.getElementById('btn-admin-entry').addEventListener('click', () => {
     });
   }
 }
+
+// ── Mode toggle — flip between Interactive and Info Only without leaving the screen
+document.getElementById('btn-mode-toggle').addEventListener('click', () => {
+  S.mode = S.mode === 'info' ? 'interactive' : 'info';
+  // Keep the setup-screen mode tiles in sync for when they return there
+  document.querySelectorAll('.mode-tile').forEach(b =>
+    b.classList.toggle('selected', b.dataset.mode === S.mode));
+  renderMainScreen();
+});
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 document.getElementById('btn-view-summary').addEventListener('click', openSummary);

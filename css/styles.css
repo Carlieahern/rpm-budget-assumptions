@@ -793,6 +793,21 @@ body {
 }
 .btn-summary-link:hover { background: var(--copper); color: #fff; }
 
+.btn-mode-toggle {
+  background: var(--copper);
+  border: 1.5px solid var(--copper);
+  color: #fff;
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.btn-mode-toggle:hover { opacity: 0.88; }
+
 /* ─── 3-Column Main Layout ─── */
 :root {
   --col-hdr-height: 74px;
