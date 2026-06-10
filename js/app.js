@@ -321,7 +321,9 @@ function partPeriodCost(program, part, idx, prefix = '') {
     }
     case 'options': {
       const opts = part.options || [];
-      const mult = part.perUnit ? S.unitCount : 1;   // optionally × property unit count
+      // For per-unit options the editable unit box (compInputs) overrides the property unit count
+      const units = (S.compInputs[key] != null && S.compInputs[key] !== '') ? num(S.compInputs[key]) : S.unitCount;
+      const mult = part.perUnit ? units : 1;
       if (part.selectMode === 'multiple') {
         const qtys = S.compSel[key] || [];
         return opts.reduce((s, o, i) => s + num(o.rate) * (qtys[i] || 0), 0) * mult;
@@ -1088,8 +1090,13 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
             <input type="radio" class="comp-optradio" ${pfx} name="copt_${prefix}${program.id}_${i}" data-pid="${program.id}" data-idx="${i}" data-oi="${oi}"${oi === sel ? ' checked' : ''}>
             <span class="tier-label">${o.label} <span class="tier-rate">(${formatRate(num(o.rate))}${part.perUnit ? '/unit' : ''})</span></span>
           </label>`).join('');
+        const units = (S.compInputs[key] != null && S.compInputs[key] !== '') ? S.compInputs[key] : S.unitCount;
         const unitLine = part.perUnit
-          ? `<div class="card-calc"><span class="calc-rate">${formatRate(num(opts[sel]?.rate))}/unit</span><span class="calc-x">×</span><span class="qty-label">${S.unitCount} units</span><span class="qty-equals">= <strong>${formatCost(num(opts[sel]?.rate) * S.unitCount)}</strong></span></div>`
+          ? `<div class="card-calc">
+               <span class="calc-rate">${formatRate(num(opts[sel]?.rate))}/unit</span><span class="calc-x">×</span>
+               <div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="0" value="${units}"></div>
+               <span class="qty-label">units</span>
+             </div>`
           : '';
         return `<div class="tier-select-label">${part.label || 'Select one'}</div><div class="tier-options">${orows}</div>${unitLine}${sepUI(part, i)}`;
       }
@@ -1479,8 +1486,13 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   el.querySelectorAll('.comp-optradio').forEach(r => {
     r.addEventListener('change', e => {
       e.stopPropagation();
+      const idx = parseInt(r.dataset.idx);
       S.compSel[pfxKey(r.dataset)] = parseInt(r.dataset.oi);
       persistComp(); updateBudgetTotal();
+      // Per-unit options show a rate line that must update with the new selection → re-render
+      const parts = r.dataset.prefix === 'setup:' ? (program.setupComponents || []) : (program.components || []);
+      const part = parts[idx];
+      if (part && part.kind === 'options' && part.perUnit) { refreshCard(program.id); return; }
       el.querySelectorAll(`.comp-optradio[data-prefix="${r.dataset.prefix || ''}"][data-idx="${r.dataset.idx}"]`).forEach(rr =>
         rr.closest('.tier-option').classList.toggle('is-selected', rr === r));
       refreshHero();
