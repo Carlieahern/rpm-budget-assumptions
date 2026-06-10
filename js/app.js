@@ -322,7 +322,10 @@ function partPeriodCost(program, part, idx, prefix = '') {
       // The editable box shows the count (defaults to baseQty). Cost = rate × count.
       const count = part.locked ? num(part.baseQty)
                   : (S.compInputs[key] != null ? num(S.compInputs[key]) : num(part.baseQty));
-      return num(part.rate) * count;
+      // Rate may be PM-editable (override stored under ":rate"), else the admin default
+      const rOv = S.compInputs[`${key}:rate`];
+      const rate = (part.rateEditable && rOv != null && rOv !== '') ? num(rOv) : num(part.rate);
+      return rate * count;
     }
     case 'percent': {
       const base = part.locked ? num(part.baseDefault)
@@ -1060,8 +1063,13 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
         const item = (part.itemLabel || 'item');
         if (part.locked) return `<div class="comp-line"><span class="comp-label">${part.label || item}</span><span class="comp-val">${formatRate(num(part.rate))} × ${num(part.baseQty)}</span></div>`;
         const v = S.compInputs[key] != null ? num(S.compInputs[key]) : num(part.baseQty);
+        const rOv = S.compInputs[`${key}:rate`];
+        const rateVal = (rOv != null && rOv !== '') ? rOv : (part.rate ?? '');
+        const rateCell = part.rateEditable
+          ? `<div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}:rate" type="number" min="0" step="0.01" placeholder="$" value="${rateVal}"></div><span class="qty-label">/${item.toLowerCase()}</span>`
+          : `<span class="calc-rate">${formatRate(num(part.rate))}</span>`;
         return `<div class="card-calc">
-          <span class="calc-rate">${formatRate(num(part.rate))}</span><span class="calc-x">×</span>
+          ${rateCell}<span class="calc-x">×</span>
           <div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="0" value="${v || ''}"></div>
           <span class="qty-label">${item}</span>
         </div>${sepUI(part, i)}`;

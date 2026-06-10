@@ -259,7 +259,8 @@ function partFields(part, i) {
     case 'perItem':
       return L("What's counted?", `<input class="ae-pf" data-i="${i}" data-k="itemLabel" type="text" value="${esc(part.itemLabel)}" placeholder="e.g. Elevator, Associate">`) +
              L(`Rate per ${(part.itemLabel || 'item').toLowerCase()} ($)`, `<input class="ae-pf" data-i="${i}" data-k="rate" type="number" step="0.01" value="${esc(part.rate)}" placeholder="0.00">`) +
-             L('Default / included qty', `<input class="ae-pf" data-i="${i}" data-k="baseQty" type="number" step="1" value="${esc(part.baseQty)}" placeholder="0">`);
+             L('Default / included qty', `<input class="ae-pf" data-i="${i}" data-k="baseQty" type="number" step="1" value="${esc(part.baseQty)}" placeholder="0">`) +
+             `<label class="ae-follows"><input type="checkbox" class="ae-pf" data-i="${i}" data-k="rateEditable"${part.rateEditable ? ' checked' : ''}> Let the PM edit the rate (the above is the default)</label>`;
     case 'percent':
       return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Oversight">`) +
              L('Percentage (%)', `<input class="ae-pf" data-i="${i}" data-k="pct" type="number" step="0.01" value="${esc(part.pct)}" placeholder="e.g. 1.25">`) +
@@ -641,7 +642,7 @@ function cleanParts(arr) {
     switch (p.kind) {
       case 'flat':    c.amount = cleanNum(p.amount) || 0; break;
       case 'perUnit': c.rate = cleanNum(p.rate) || 0; if (cleanNum(p.baseQty)) c.baseQty = cleanNum(p.baseQty); break;
-      case 'perItem': c.rate = cleanNum(p.rate) || 0; c.itemLabel = p.itemLabel || 'item'; if (cleanNum(p.baseQty)) c.baseQty = cleanNum(p.baseQty); break;
+      case 'perItem': c.rate = cleanNum(p.rate) || 0; c.itemLabel = p.itemLabel || 'item'; if (cleanNum(p.baseQty)) c.baseQty = cleanNum(p.baseQty); if (p.rateEditable) c.rateEditable = true; break;
       case 'percent': c.pct = cleanNum(p.pct) || 0; c.base = p.base || 'income'; if (cleanNum(p.baseDefault)) c.baseDefault = cleanNum(p.baseDefault); break;
       case 'options': c.selectMode = p.selectMode === 'multiple' ? 'multiple' : 'one';
                       if (p.perUnit) c.perUnit = true;
