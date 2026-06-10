@@ -3002,17 +3002,54 @@ body {
   border-radius: 10px;
   padding: 1px 8px;
 }
+/* Two-column admin layout — mirrors the dashboard cards */
+.admin-dept-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+@media (max-width: 720px) {
+  .admin-dept-cols { grid-template-columns: 1fr; }
+}
+.admin-col-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text2);
+  margin-bottom: 8px;
+}
+.admin-col-drop { min-height: 44px; }
+.admin-col-empty {
+  font-size: 13px;
+  color: var(--text2);
+  padding: 10px 4px;
+  font-style: italic;
+}
+
 .admin-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 12px 16px;
+  padding: 12px 14px;
   margin-bottom: 8px;
 }
+.admin-row.dragging { opacity: 0.45; border-style: dashed; border-color: var(--copper); }
+.admin-row-main { flex: 1; min-width: 0; }
+.admin-row-grip {
+  cursor: grab;
+  color: var(--text2);
+  font-size: 14px;
+  letter-spacing: -2px;
+  user-select: none;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.admin-row-grip:active { cursor: grabbing; }
 .admin-row-name { font-size: 14px; font-weight: 600; color: var(--navy); }
 .admin-row-meta { font-size: 12px; color: var(--text2); margin-top: 2px; }
 .btn-admin-edit {

@@ -177,33 +177,126 @@ async function renderList(skipFetch = false) {
     (byDept[d] = byDept[d] || []).push([id, p]);
   });
 
+  // Sort within a column by saved order (nulls last), then name
+  const byOrder = (a, b) => {
+    const oa = Number.isFinite(a[1].order) ? a[1].order : Infinity;
+    const ob = Number.isFinite(b[1].order) ? b[1].order : Infinity;
+    return oa - ob || (a[1].name || '').localeCompare(b[1].name || '');
+  };
+  const rowHtml = ([id, p]) => `
+    <div class="admin-row" data-id="${id}" draggable="true">
+      <span class="admin-row-grip" title="Drag to reorder">⋮⋮</span>
+      <div class="admin-row-main">
+        <div class="admin-row-name">${p.name || '(unnamed)'}</div>
+        <div class="admin-row-meta">${p.costBasis || 'Manual'} · ${p.billingPeriod || '—'}</div>
+      </div>
+      <button class="btn-admin-edit" data-id="${id}">Edit</button>
+    </div>`;
+
   const depts = Object.keys(byDept).sort();
-  list.innerHTML = depts.map(dept => `
+  list.innerHTML = depts.map(dept => {
+    const items = byDept[dept];
+    const nonElective = items.filter(([, p]) => p.elective === false).sort(byOrder);
+    const elective    = items.filter(([, p]) => p.elective !== false).sort(byOrder);
+    return `
     <div class="admin-dept">
-      <div class="admin-dept-title">${dept} <span class="admin-dept-count">${byDept[dept].length}</span></div>
-      ${byDept[dept]
-        .sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''))
-        .map(([id, p]) => `
-        <div class="admin-row" data-id="${id}">
-          <div class="admin-row-main">
-            <div class="admin-row-name">${p.name || '(unnamed)'}</div>
-            <div class="admin-row-meta">${p.costBasis || 'Manual'} · ${p.elective === false ? 'Non-elective' : 'Elective'} · ${p.billingPeriod || '—'}</div>
+      <div class="admin-dept-title">${dept} <span class="admin-dept-count">${items.length}</span></div>
+      <div class="admin-dept-cols">
+        <div class="admin-col">
+          <div class="admin-col-label">Non-Elective</div>
+          <div class="admin-col-drop" data-dept="${esc(dept)}" data-elective="false">
+            ${nonElective.map(rowHtml).join('') || '<p class="admin-col-empty">None</p>'}
           </div>
-          <button class="btn-admin-edit" data-id="${id}">Edit</button>
-        </div>`).join('')}
-    </div>`).join('');
+        </div>
+        <div class="admin-col">
+          <div class="admin-col-label">Elective</div>
+          <div class="admin-col-drop" data-dept="${esc(dept)}" data-elective="true">
+            ${elective.map(rowHtml).join('') || '<p class="admin-col-empty">None</p>'}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 
   list.querySelectorAll('.btn-admin-edit').forEach(btn =>
     btn.addEventListener('click', () => { afterSave = renderList; openEditor(btn.dataset.id); }));
+
+  wireDragReorder(list);
 
   // Restore scroll position so saving doesn't jump you back to the top
   if (scroller) requestAnimationFrame(() => { scroller.scrollTop = keepY; });
 }
 
+// ── Drag-to-reorder within a column (persists order → drives card order) ─────────
+let dragEl = null;
+
+function wireDragReorder(list) {
+  list.querySelectorAll('.admin-row').forEach(row => {
+    row.addEventListener('dragstart', e => {
+      dragEl = row;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      dragEl = null;
+    });
+  });
+
+  list.querySelectorAll('.admin-col-drop').forEach(col => {
+    col.addEventListener('dragover', e => {
+      if (!dragEl) return;
+      // Only allow dropping within the same column the drag started in
+      if (dragEl.parentElement !== col) return;
+      e.preventDefault();
+      const after = rowAfterPoint(col, e.clientY);
+      if (after == null) col.appendChild(dragEl);
+      else col.insertBefore(dragEl, after);
+    });
+    col.addEventListener('drop', e => {
+      if (!dragEl || dragEl.parentElement !== col) return;
+      e.preventDefault();
+      persistColumnOrder(col);
+    });
+  });
+}
+
+// Find the row that the cursor is currently above (for insert position)
+function rowAfterPoint(col, y) {
+  const rows = [...col.querySelectorAll('.admin-row:not(.dragging)')];
+  for (const r of rows) {
+    const box = r.getBoundingClientRect();
+    if (y < box.top + box.height / 2) return r;
+  }
+  return null;
+}
+
+// Write the new order (row index in this column) back to each program in Firebase.
+async function persistColumnOrder(col) {
+  const ids = [...col.querySelectorAll('.admin-row')].map(r => r.dataset.id);
+  const writes = [];
+  ids.forEach((id, idx) => {
+    const p = rawCache[id];
+    if (!p) return;
+    if (p.order !== idx) {
+      p.order = idx;                       // update local cache immediately
+      writes.push(saveProgram(id, { ...p, order: idx }));
+    }
+  });
+  if (!writes.length) return;
+  try {
+    await Promise.all(writes);
+    window.dispatchEvent(new CustomEvent('rpm-programs-changed'));
+  } catch (e) {
+    alert('Reorder save failed: ' + e.message);
+    renderList();
+  }
+}
+
 // ── Editor ─────────────────────────────────────────────────────────────────────
 function blankProgram() {
   return {
-    name: '', department: '', elective: true, costBasis: 'Flat Fee',
+    name: '', department: '', elective: true, order: null, costBasis: 'Flat Fee',
     rate: '', itemLabel: '', baseFee: '', baseQty: '', minCost: '', maxCost: '', options: [], additive: false, customFormula: '',
     billingPeriod: 'monthly', billingStart: 'January',
     defaultMonths: [], monthsFixed: false,
@@ -679,6 +772,7 @@ async function save() {
     name: form.name.trim(),
     department: form.department.trim() || 'Other',
     elective: form.elective === true,
+    order: Number.isFinite(form.order) ? form.order : null,
     costBasis: form.costBasis,
     rate: cleanNum(form.rate),
     itemLabel: form.itemLabel || null,

@@ -66,6 +66,7 @@ export async function fetchPrograms(forceRefresh = false) {
       name:          p.name          || '',
       group:         p.department    || 'General',
       required:      p.elective === false,
+      order:         Number.isFinite(p.order) ? p.order : null,
       costBasis:     p.costBasis     || 'Manual',
       customFormula: p.customFormula || null,
       components:    Array.isArray(p.components) ? p.components : null,  // new universal cost builder
@@ -100,10 +101,14 @@ export async function fetchPrograms(forceRefresh = false) {
     };
   });
 
-  // Sort by department then name for consistent ordering
-  programs.sort((a, b) =>
-    a.group.localeCompare(b.group) || a.name.localeCompare(b.name)
-  );
+  // Sort by department, then by admin-set order (nulls last), then name.
+  // The `order` is the row index within its (department + elective) column in admin,
+  // so within each card column the relative order is preserved.
+  programs.sort((a, b) => {
+    const oa = Number.isFinite(a.order) ? a.order : Infinity;
+    const ob = Number.isFinite(b.order) ? b.order : Infinity;
+    return a.group.localeCompare(b.group) || (oa - ob) || a.name.localeCompare(b.name);
+  });
 
   cacheSet(programs);
   return programs;
