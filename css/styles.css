@@ -184,6 +184,52 @@ body {
   margin: auto;
 }
 
+/* "Looking for 2026?" floating box above the setup card */
+.legacy-box {
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto 18px;
+  background: #ffffff;
+  border: 2px solid var(--copper);
+  border-radius: 18px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.legacy-box-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--navy);
+}
+.legacy-box-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.legacy-btn {
+  background: var(--copper);
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.legacy-btn:hover { background: var(--copper2); }
+.legacy-btn.hidden { display: none; }
+
+/* Admin: legacy-banner settings panel */
+.admin-settings { background: #faf6f0; border: 1px solid #f0d9bb; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; }
+.admin-settings summary { font-size: 14px; font-weight: 700; color: var(--navy); cursor: pointer; }
+.admin-settings .lb-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); margin: 12px 0; font-weight: 600; }
+.admin-settings .lb-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.admin-settings .lb-field span { font-size: 12px; color: var(--text2); font-weight: 600; }
+.admin-settings .lb-field input { padding: 8px 12px; font-size: 13px; border: 1.5px solid var(--border); border-radius: 8px; font-family: inherit; }
+.lb-saved { font-size: 12px; font-weight: 700; color: var(--green); margin-left: 8px; }
+
 .setup-top {
   display: flex;
   align-items: center;

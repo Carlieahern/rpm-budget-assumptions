@@ -8,7 +8,7 @@
   <title>RPM Budget Assumptions</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=68">
+  <link rel="stylesheet" href="css/styles.css?v=69">
 </head>
 <body>
 <div id="app">
@@ -24,6 +24,14 @@
 
 <!-- ── Setup ── -->
   <div id="screen-setup" class="screen screen-setup">
+    <div class="legacy-box" id="legacy-box" style="display:none;">
+      <div class="legacy-box-title" id="legacy-box-title">Looking for 2026?</div>
+      <div class="legacy-box-btns">
+        <a class="legacy-btn" id="legacy-yardi" target="_blank" rel="noopener">Yardi</a>
+        <a class="legacy-btn" id="legacy-onesite" target="_blank" rel="noopener">OneSite</a>
+        <a class="legacy-btn" id="legacy-pace" target="_blank" rel="noopener">Pace + OneSite</a>
+      </div>
+    </div>
     <div class="setup-card">
     <div class="setup-top">
       <img src="RPMLivingLogo__Copper.jpg" alt="RPM Living" class="rpm-logo-img rpm-logo-sm">
@@ -236,6 +244,18 @@
       </div>
     </div>
     <div class="admin-user-note" id="admin-user-note"></div>
+
+    <details class="admin-settings">
+      <summary>Home screen: "Looking for 2026?" box</summary>
+      <label class="lb-row"><input type="checkbox" id="lb-show"> Show the box on the home screen</label>
+      <label class="lb-field"><span>Box title</span><input id="lb-title" type="text" placeholder="Looking for 2026?"></label>
+      <label class="lb-field"><span>Yardi link</span><input id="lb-yardi" type="text" placeholder="https://…"></label>
+      <label class="lb-field"><span>OneSite link</span><input id="lb-onesite" type="text" placeholder="https://…"></label>
+      <label class="lb-field"><span>Pace + OneSite link</span><input id="lb-pace" type="text" placeholder="https://…"></label>
+      <button class="btn-primary" id="lb-save" style="margin-top:10px;">Save box settings</button>
+      <span class="lb-saved" id="lb-saved"></span>
+    </details>
+
     <div id="admin-list"></div>
   </div>
 
@@ -426,6 +446,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=68"></script>
+<script type="module" src="js/app.js?v=69"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 import CONFIG from './config.js';
 import { fetchProperties, clearMondayCache } from './monday.js';
-import { fetchPrograms, filterBySystem, clearFirebaseCache } from './firebase.js';
+import { fetchPrograms, filterBySystem, clearFirebaseCache, fetchLegacyBanner } from './firebase.js';
 import { loadDecisions, saveDecision, deleteDecision, resetDecisions, loadPriorYearDecisions } from './sharepoint.js';
 import { showScreen, openModal, closeModal, groupStyle, formatCost, formatRate,
          renderSummary, populatePropertySelect } from './ui.js';
@@ -35,6 +35,25 @@ const S = {
   viewingPrior:    false,
 };
 
+// "Looking for 2026?" floating box — shown only if admin enabled it
+async function applyLegacyBanner() {
+  const box = document.getElementById('legacy-box');
+  if (!box) return;
+  let cfg = null;
+  try { cfg = await fetchLegacyBanner(); } catch {}
+  if (!cfg || !cfg.show) { box.style.display = 'none'; return; }
+  document.getElementById('legacy-box-title').textContent = cfg.title || 'Looking for 2026?';
+  const setLink = (id, url) => {
+    const a = document.getElementById(id);
+    if (url) { a.href = url; a.classList.remove('hidden'); }
+    else a.classList.add('hidden');
+  };
+  setLink('legacy-yardi', cfg.yardi);
+  setLink('legacy-onesite', cfg.onesite);
+  setLink('legacy-pace', cfg.pace);
+  box.style.display = 'flex';
+}
+
 // ── Bootstrap ───────────────────────────────────────────────────────────────
 async function boot() {
   showScreen('screen-loading');
@@ -63,6 +82,8 @@ async function loadPropertyScreen() {
   // Show full top row (un-skip if previously skipped)
   const topRow = document.getElementById('setup-top-row');
   if (topRow) topRow.style.display = '';
+
+  applyLegacyBanner();
 
   try {
     const props = await fetchProperties();

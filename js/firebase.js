@@ -153,6 +153,23 @@ export async function addCostBasisType(name) {
   return updated;
 }
 
+// "Looking for 2026?" home-screen banner config (shown/hidden + links per system)
+export async function fetchLegacyBanner() {
+  try {
+    const res = await fetch(`${CONFIG.firebase.url}/meta/legacyBanner.json`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
+}
+
+export async function saveLegacyBanner(data) {
+  const res = await fetch(`${CONFIG.firebase.url}/meta/legacyBanner.json`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Save failed: ${res.status}`);
+  return true;
+}
+
 // ── Filter programs by selected system type ────────────────────────────────────
 // Programs with no cost (Manual) are shown for every system.
 // Programs with a cost only show for systems where it's non-zero.

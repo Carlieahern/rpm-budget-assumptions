@@ -2,7 +2,7 @@
 // Light-touch gated editor for the Firebase program catalog.
 // Login = any name + passcode "Budgets". Edits write straight to Firebase.
 
-import { fetchRawPrograms, saveProgram, deleteProgram, fetchCostBasisTypes, addCostBasisType } from './firebase.js';
+import { fetchRawPrograms, saveProgram, deleteProgram, fetchCostBasisTypes, addCostBasisType, fetchLegacyBanner, saveLegacyBanner } from './firebase.js';
 import { showScreen, openModal, closeModal } from './ui.js';
 
 const PASSCODE = 'Budgets';
@@ -51,6 +51,7 @@ export function initAdmin() {
     ingestImport(parseTable(document.getElementById('imp-paste').value || ''));
   });
   document.getElementById('imp-commit')?.addEventListener('click', commitImport);
+  document.getElementById('lb-save')?.addEventListener('click', saveLegacyBannerSettings);
   document.getElementById('imp-template')?.addEventListener('click', downloadImportTemplate);
   document.getElementById('imp-export')?.addEventListener('click', exportProgramsCsv);
   document.getElementById('imp-guide-toggle')?.addEventListener('click', () => {
@@ -112,7 +113,32 @@ export async function openAdmin() {
   showScreen('screen-admin');
   document.getElementById('admin-user-note').textContent = `Signed in as ${adminName} · changes save to Firebase for everyone`;
   try { extraTypes = await fetchCostBasisTypes(); } catch { extraTypes = []; }
+  loadLegacyBannerSettings();
   await renderList();
+}
+
+async function loadLegacyBannerSettings() {
+  let cfg = {};
+  try { cfg = (await fetchLegacyBanner()) || {}; } catch {}
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  const showEl = document.getElementById('lb-show');
+  if (showEl) showEl.checked = !!cfg.show;
+  set('lb-title', cfg.title);
+  set('lb-yardi', cfg.yardi);
+  set('lb-onesite', cfg.onesite);
+  set('lb-pace', cfg.pace);
+}
+
+async function saveLegacyBannerSettings() {
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  const data = {
+    show: !!document.getElementById('lb-show')?.checked,
+    title: v('lb-title') || 'Looking for 2026?',
+    yardi: v('lb-yardi'), onesite: v('lb-onesite'), pace: v('lb-pace'),
+  };
+  const note = document.getElementById('lb-saved');
+  try { await saveLegacyBanner(data); if (note) note.textContent = ' ✓ Saved'; }
+  catch (e) { if (note) note.textContent = ' Save failed: ' + e.message; }
 }
 
 async function renderList() {
