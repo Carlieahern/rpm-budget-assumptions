@@ -192,7 +192,7 @@ function blankProgram() {
     billingPeriod: 'monthly', billingStart: 'January',
     defaultMonths: [], monthsFixed: false,
     systems: ['Yardi', 'OneSite', 'PaceOneSite'],
-    setupFee: '', setupAmount: '', setupMonth: 0, setupComponents: [], priorYearNote: '', inputNote: '', costRaw: '', description: '', resourceUrl: '',
+    setupFee: '', setupName: '', setupAmount: '', setupMonth: 0, setupComponents: [], priorYearNote: '', inputNote: '', costRaw: '', description: '', resourceUrl: '',
     yardiGL: '', onesiteGL: '', paceGL: '', owner: '',
   };
 }
@@ -426,6 +426,7 @@ function buildEditor() {
       ${(form.setupComponents && form.setupComponents.length) ? `
         <div class="ae-tiers ae-builder ae-setup-builder">
           <div class="ae-tiers-head"><span>Setup fee builder</span><button class="ae-tier-add ae-part-add" data-arr="setupComponents">+ Add part</button></div>
+          <label class="ae-field" style="margin-bottom:12px;"><span>Setup Fee Name <span class="label-soft">— what it's called in our system, shown on the card</span></span><input id="ae-setupName" type="text" value="${esc(form.setupName)}" placeholder="e.g. CRM Mobile Leasing Set Up"></label>
           <p class="label-soft" style="margin:0 0 12px;">Built the same way as the cost — parts add together. Charged once.</p>
           ${form.setupComponents.map((p, i) => partRow(p, i, 'setupComponents')).join('')}
           <label class="ae-field" style="margin-top:10px;"><span>Default setup month</span><select id="ae-setupMonth">${MONTHS.map((m, i) => `<option value="${i}"${(form.setupMonth ?? 0) == i ? ' selected' : ''}>${m}</option>`).join('')}</select></label>
@@ -473,6 +474,7 @@ function wireEditor() {
   bind('ae-paceGL', 'paceGL');
   bind('ae-owner', 'owner');
   bind('ae-setupFee', 'setupFee');
+  bind('ae-setupName', 'setupName');
   bind('ae-priorYearNote', 'priorYearNote');
   bind('ae-inputNote', 'inputNote');
   bind('ae-resourceUrl', 'resourceUrl');
@@ -680,6 +682,7 @@ async function save() {
     monthsFixed: !!form.monthsFixed,
     systems: (Array.isArray(form.systems) && form.systems.length) ? form.systems : ['Yardi', 'OneSite', 'PaceOneSite'],
     setupFee: form.setupFee || null,
+    setupName: form.setupName || null,
     setupMonth: Number.isInteger(form.setupMonth) ? form.setupMonth : 0,
     priorYearNote: form.priorYearNote || null,
     inputNote: form.inputNote || null,

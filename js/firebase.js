@@ -82,6 +82,7 @@ export async function fetchPrograms(forceRefresh = false) {
       defaultMonths: Array.isArray(p.defaultMonths) ? p.defaultMonths : null,
       monthsFixed:   !!p.monthsFixed,
       setupFee:      p.setupFee      || null,
+      setupName:     p.setupName     || null,
       setupAmount:   p.setupAmount   ?? 0,
       setupMonth:    p.setupMonth    ?? 0,
       setupComponents: Array.isArray(p.setupComponents) ? p.setupComponents : null,

@@ -1375,6 +1375,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       : '';
     bodyHtml += `
       <div class="setup-fee-block${on ? ' on' : ''}">
+        ${program.setupName ? `<div class="setup-fee-name">${program.setupName}</div>` : ''}
         <label class="setup-fee-head">
           <input type="checkbox" class="setup-include" data-pid="${program.id}"${on ? ' checked' : ''}>
           <span class="setup-fee-amount">Setup fee: ${formatCost(tot)} <span class="setup-once">· one-time</span></span>

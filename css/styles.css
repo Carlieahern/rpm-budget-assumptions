@@ -2616,6 +2616,17 @@ body {
   padding-top: 12px;
   border-top: 1px solid rgba(255,255,255,0.18);
 }
+/* Setup fee name — the system name, prominent like a sub-title */
+.setup-fee-name {
+  font-family: 'Oswald', sans-serif;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #fff;
+  margin-bottom: 8px;
+  line-height: 1.15;
+}
+.prog-card.is-elective .setup-fee-name { color: var(--navy); }
 .setup-fee-head { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .setup-fee-head input { width: 16px; height: 16px; accent-color: #fff; flex-shrink: 0; }
 .setup-fee-amount {
