@@ -321,15 +321,15 @@ function partPeriodCost(program, part, idx, prefix = '') {
     }
     case 'options': {
       const opts = part.options || [];
-      // For per-unit options the editable unit box (compInputs) overrides the property unit count
-      const units = (S.compInputs[key] != null && S.compInputs[key] !== '') ? num(S.compInputs[key]) : S.unitCount;
-      const mult = part.perUnit ? units : 1;
       if (part.selectMode === 'multiple') {
+        // Each checked option's box is its count (= units when perUnit) × that option's rate
         const qtys = S.compSel[key] || [];
-        return opts.reduce((s, o, i) => s + num(o.rate) * (qtys[i] || 0), 0) * mult;
+        return opts.reduce((s, o, i) => s + num(o.rate) * (qtys[i] || 0), 0);
       }
+      // Pick one: optionally × the editable unit box (defaults to the property unit count)
+      const units = (S.compInputs[key] != null && S.compInputs[key] !== '') ? num(S.compInputs[key]) : S.unitCount;
       const sel = S.compSel[key] ?? 0;
-      return num(opts[sel]?.rate) * mult;
+      return num(opts[sel]?.rate) * (part.perUnit ? units : 1);
     }
     case 'manual':
       return part.locked ? 0 : num(S.compInputs[key]);
@@ -1076,9 +1076,10 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
             const on = (qtys[oi] || 0) > 0;
             return `<div class="addrow">
               <label class="addrow-check"><input type="checkbox" class="comp-optchk" ${pfx} data-pid="${program.id}" data-idx="${i}" data-oi="${oi}"${on ? ' checked' : ''}>
-                <span class="addrow-label">${o.label} <span class="tier-rate">${formatRate(num(o.rate))}</span></span></label>
+                <span class="addrow-label">${o.label} <span class="tier-rate">${formatRate(num(o.rate))}${part.perUnit ? '/unit' : ''}</span></span></label>
               <span class="qty-sep">×</span>
               <div class="qty-field"><input class="comp-optqty" ${pfx} data-pid="${program.id}" data-idx="${i}" data-oi="${oi}" type="number" min="0" value="${qtys[oi] || ''}"${on ? '' : ' disabled'}></div>
+              ${part.perUnit ? `<span class="qty-label">units</span>` : ''}
             </div>`;
           }).join('');
           return `<div class="tier-select-label">${part.label || 'Select all that apply'}</div><div class="addrows">${orows}</div>${sepUI(part, i)}`;
@@ -1503,8 +1504,11 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       e.stopPropagation();
       const key = pfxKey(chk.dataset);
       const oi  = parseInt(chk.dataset.oi);
+      const idx = parseInt(chk.dataset.idx);
+      const parts = chk.dataset.prefix === 'setup:' ? (program.setupComponents || []) : (program.components || []);
+      const dflt  = parts[idx]?.perUnit ? (S.unitCount || 1) : 1;   // per-unit → default the box to unit count
       const arr = S.compSel[key] || [];
-      arr[oi] = chk.checked ? (arr[oi] > 0 ? arr[oi] : 1) : 0;
+      arr[oi] = chk.checked ? (arr[oi] > 0 ? arr[oi] : dflt) : 0;
       S.compSel[key] = arr;
       persistComp(); updateBudgetTotal(); refreshCard(program.id);
     });
