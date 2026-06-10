@@ -1066,7 +1066,7 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
         const rOv = S.compInputs[`${key}:rate`];
         const rateVal = (rOv != null && rOv !== '') ? rOv : (part.rate ?? '');
         const rateCell = part.rateEditable
-          ? `<div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}:rate" type="number" min="0" step="0.01" placeholder="$" value="${rateVal}"></div><span class="qty-label">/${item.toLowerCase()}</span>`
+          ? `<span class="qty-label">Cost</span><div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}:rate" type="number" min="0" step="0.01" placeholder="$" value="${rateVal}"></div>`
           : `<span class="calc-rate">${formatRate(num(part.rate))}</span>`;
         return `<div class="card-calc">
           ${rateCell}<span class="calc-x">×</span>
