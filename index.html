@@ -8,7 +8,7 @@
   <title>RPM Budget Assumptions</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=74">
+  <link rel="stylesheet" href="css/styles.css?v=75">
 </head>
 <body>
 <div id="app">
@@ -247,6 +247,19 @@
 
     <details class="admin-settings">
       <summary>Home screen: "Looking for 2026?" box</summary>
+      <label class="ae-follows"><input type="checkbox" id="lb-show"> Show the box on the home screen</label>
+      <div class="ae-grid" style="margin-top:10px;">
+        <label class="ae-field ae-wide"><span>Box title</span><input id="lb-title" type="text" placeholder="Looking for 2026?"></label>
+        <label class="ae-field"><span>Yardi link</span><input id="lb-yardi" type="text" placeholder="https://…"></label>
+        <label class="ae-field"><span>OneSite link</span><input id="lb-onesite" type="text" placeholder="https://…"></label>
+        <label class="ae-field"><span>Pace + OneSite link</span><input id="lb-pace" type="text" placeholder="https://…"></label>
+      </div>
+      <button class="btn-primary" id="lb-save" style="margin-top:10px;">Save box settings</button>
+      <span class="lb-saved" id="lb-saved"></span>
+    </details>
+
+    <details class="admin-settings">
+      <summary>Home screen: "Looking for 2026?" box</summary>
       <label class="lb-row"><input type="checkbox" id="lb-show"> Show the box on the home screen</label>
       <label class="lb-field"><span>Box title</span><input id="lb-title" type="text" placeholder="Looking for 2026?"></label>
       <label class="lb-field"><span>Yardi link</span><input id="lb-yardi" type="text" placeholder="https://…"></label>
@@ -446,6 +459,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=74"></script>
+<script type="module" src="js/app.js?v=75"></script>
 </body>
 </html>
