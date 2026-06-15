@@ -31,6 +31,7 @@ const S = {
   setupMonth:      {},    // programId → month index the setup fee is charged
   budgetAmounts:   {},    // programId → manual dollar amount (fallback for complex costs)
   incurMonths:     {},    // programId → [month indices] for as-incurred programs
+  capexMonths:     {},    // "programId:partIdx" → [12 amounts] CapEx project cost per month (% of CapEx parts)
   currentOptOutId: null,
   viewingPrior:    false,
   search:          '',    // dashboard search filter (department / program name / setup fee name)
@@ -182,7 +183,7 @@ async function launchMain() {
       S.quantities = {}; S.selectedTiers = {}; S.optionQty = {};
       S.compInputs = {}; S.compSel = {}; S.partSeparate = {}; S.partMonths = {};
       S.spreadMonthly = {}; S.setupOn = {}; S.setupMonth = {};
-      S.budgetAmounts = {}; S.incurMonths = {};
+      S.budgetAmounts = {}; S.incurMonths = {}; S.capexMonths = {};
     } else {
       // Load saved input values for this property + year
       S.unitCount    = parseInt(localStorage.getItem(`rpm_units_${S.property}`)) || 0;
@@ -200,6 +201,7 @@ async function launchMain() {
       try { S.setupMonth    = JSON.parse(localStorage.getItem(`rpm_setupmonth_${S.property}_${S.budgetYear}`)) || {}; } catch { S.setupMonth    = {}; }
       try { S.budgetAmounts = JSON.parse(localStorage.getItem(`rpm_budget_${S.property}_${S.budgetYear}`)) || {}; } catch { S.budgetAmounts = {}; }
       try { S.incurMonths   = JSON.parse(localStorage.getItem(`rpm_incur_${S.property}_${S.budgetYear}`))  || {}; } catch { S.incurMonths   = {}; }
+      try { S.capexMonths   = JSON.parse(localStorage.getItem(`rpm_capex_${S.property}_${S.budgetYear}`))  || {}; } catch { S.capexMonths   = {}; }
     }
 
     renderMainScreen();
@@ -361,6 +363,14 @@ function partPeriodCost(program, part, idx, prefix = '') {
       return rate * count;
     }
     case 'percent': {
+      // % of CapEx: PM enters a project cost per month; the rate applies to each.
+      // partPeriodCost returns the annual sum (the months are placed individually
+      // in programMonths12 so each lands in its own month).
+      if (part.base === 'capex' && !part.locked) {
+        const months = S.capexMonths[key] || [];
+        const total  = months.reduce((s, v) => s + num(v), 0);
+        return num(part.pct) / 100 * total;
+      }
       const base = part.locked ? num(part.baseDefault)
                  : (S.compInputs[key] != null ? num(S.compInputs[key]) : num(part.baseDefault));
       return num(part.pct) / 100 * base;
@@ -604,9 +614,17 @@ function programMonths12(program) {
   let taxPct = 0;
   (program.components || []).forEach((c, i) => {
     if (c.kind === 'tax') { taxPct += taxPctFor(program, c, i, ''); return; }
+    const key = `${program.id}:${i}`;
+    // % of CapEx with per-month entry: each month gets pct% of that month's CapEx,
+    // landing in the month it was entered (no even spread across active months).
+    if (c.kind === 'percent' && c.base === 'capex' && !c.locked) {
+      const cm  = S.capexMonths[key] || [];
+      const pct = num(c.pct) / 100;
+      for (let m = 0; m < 12; m++) arr[m] += num(cm[m]) * pct;
+      return;
+    }
     const per = partPeriodCost(program, c, i);
     if (!per) return;
-    const key = `${program.id}:${i}`;
     // Manual estimate is a MONTHLY amount → bills every month (×12), regardless of program frequency
     const isManual = c.kind === 'manual';
     const hit = (isManual || mo) ? per : per / nat;
@@ -1094,6 +1112,8 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
   // sense in "pick one or more" mode (a single pick has nothing to split off).
   const sepUI = (part, i) => {
     if (prefix !== '' || part.kind === 'tax') return '';
+    // Per-month CapEx already places its cost in specific months — no separate billing.
+    if (part.kind === 'percent' && part.base === 'capex' && !part.locked) return '';
     if (part.kind === 'options') return part.selectMode === 'multiple' ? partSeparateUI(program, i) : '';
     return multiParts ? partSeparateUI(program, i) : '';
   };
@@ -1130,6 +1150,23 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
       case 'percent': {
         const baseLabel = part.base === 'capex' ? 'Total CapEx' : 'Total income';
         if (part.locked) return `<div class="comp-line"><span class="comp-label">${part.label || `${num(part.pct)}% of ${baseLabel.toLowerCase()}`}</span></div>`;
+        // % of CapEx → per-month entry: CapEx projects vary by month and amount, so
+        // the PM enters each month's project cost and we apply the rate to each.
+        if (part.base === 'capex') {
+          const cm = S.capexMonths[key] || [];
+          const totalCx = cm.reduce((s, x) => s + num(x), 0);
+          const result  = num(part.pct) / 100 * totalCx;
+          return `<div class="capex-block" data-key="${key}">
+            <div class="capex-grid-label">Enter each CapEx project's cost in the month it lands — we apply <strong>${num(part.pct)}%</strong> to each.</div>
+            <div class="capex-grid">
+              ${MONTH_NAMES.map((m, mi) => `<label class="capex-cell">
+                <span class="capex-cell-m">${m.slice(0,3)}</span>
+                <input class="capex-input" ${pfx} data-pid="${program.id}" data-idx="${i}" data-month="${mi}" type="number" min="0" placeholder="$" value="${cm[mi] || ''}">
+              </label>`).join('')}
+            </div>
+            <div class="capex-total">Total CapEx: ${formatCost(totalCx)} × ${num(part.pct)}% = <strong>${formatCost(result)}</strong></div>
+          </div>`;
+        }
         const v = S.compInputs[key] != null ? S.compInputs[key] : (part.baseDefault || '');
         const result = num(part.pct) / 100 * num(v);
         return `<div class="card-calc">
@@ -1558,6 +1595,25 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       e.stopPropagation();
       S.compInputs[pfxKey(inp.dataset)] = parseFloat(e.target.value) || 0;
       persistComp(); updateBudgetTotal(); refreshHero();
+    });
+  });
+  const persistCapex = () =>
+    localStorage.setItem(`rpm_capex_${S.property}_${S.budgetYear}`, JSON.stringify(S.capexMonths));
+  el.querySelectorAll('.capex-input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      e.stopPropagation();
+      const key = pfxKey(inp.dataset);
+      const arr = S.capexMonths[key] || Array(12).fill(0);
+      arr[parseInt(inp.dataset.month)] = parseFloat(e.target.value) || 0;
+      S.capexMonths[key] = arr;
+      // Update the running total in place so typing keeps focus
+      const block = inp.closest('.capex-block');
+      const parts = inp.dataset.prefix === 'setup:' ? (program.setupComponents || []) : (program.components || []);
+      const pct   = num(parts[parseInt(inp.dataset.idx)]?.pct);
+      const total = arr.reduce((s, v) => s + num(v), 0);
+      const totEl = block?.querySelector('.capex-total');
+      if (totEl) totEl.innerHTML = `Total CapEx: ${formatCost(total)} × ${pct}% = <strong>${formatCost(total * pct / 100)}</strong>`;
+      persistCapex(); updateBudgetTotal(); refreshHero();
     });
   });
   el.querySelectorAll('.comp-optradio').forEach(r => {
@@ -2181,6 +2237,7 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
     S.setupMonth     = {};
     S.budgetAmounts  = {};
     S.incurMonths    = {};
+    S.capexMonths    = {};
     localStorage.removeItem(`rpm_qty_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_tiers_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_optqty_${S.property}_${S.budgetYear}`);
@@ -2193,6 +2250,7 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
     localStorage.removeItem(`rpm_setupmonth_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_budget_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_incur_${S.property}_${S.budgetYear}`);
+    localStorage.removeItem(`rpm_capex_${S.property}_${S.budgetYear}`);
     renderMainScreen();
     showScreen('screen-main');
   } catch (e) {

@@ -2697,6 +2697,48 @@ body {
   font-weight: 600;
   color: #fff;
 }
+/* Per-month CapEx entry grid (% of CapEx parts) */
+.capex-block { margin-top: 6px; }
+/* Default card = copper bg → light text; elective card = white bg → dark text */
+.capex-grid-label { font-size: 12px; color: rgba(255,255,255,0.85); margin-bottom: 8px; line-height: 1.4; }
+.capex-grid-label strong { color: #fff; }
+.capex-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.capex-cell { display: flex; flex-direction: column; gap: 2px; }
+.capex-cell-m {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255,255,255,0.75);
+}
+.capex-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1.5px solid rgba(255,255,255,0.5);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy);
+  background: #fff;
+  outline: none;
+}
+.capex-input:focus { border-color: #fff; }
+.capex-total { margin-top: 10px; font-size: 13px; color: rgba(255,255,255,0.85); }
+.capex-total strong { color: #fff; font-size: 15px; }
+/* Elective (white) cards — flip to dark text */
+.prog-card.is-elective .capex-grid-label,
+.prog-card.is-elective .capex-cell-m,
+.prog-card.is-elective .capex-total { color: var(--text2); }
+.prog-card.is-elective .capex-grid-label strong,
+.prog-card.is-elective .capex-total strong { color: var(--navy); }
+.prog-card.is-elective .capex-input { border-color: var(--border); }
+
 .calc-x {
   font-size: 15px;
   color: rgba(255,255,255,0.5);
