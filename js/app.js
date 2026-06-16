@@ -1287,7 +1287,9 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   let actionHtml;
   if (isRequired) {
     if (dec === 'not-applicable') {
-      actionHtml = `<span class="card-status-badge status-not-applicable">Does Not Apply</span>`;
+      actionHtml = `
+        <span class="card-status-badge status-not-applicable">Does Not Apply</span>
+        <button class="btn-card-ghost btn-undo-dna" data-pid="${program.id}">Undo</button>`;
     } else if (dec === 'opted-out') {
       actionHtml = `
         <span class="card-status-badge status-opted-out">Opted Out${decision.optOutApproval ? ' ✓' : ''}</span>
@@ -1315,8 +1317,11 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       <button class="btn-card-fill btn-include${inSel ? ' is-on' : ''}" data-pid="${program.id}">${inSel ? '✓ Included' : 'Include'}</button>`;
   }
 
-  // Excluded elective cards collapse to a slim bar to save space
-  const collapsed = !isRequired && dec === 'out';
+  // Cards in a "not counted" state collapse to a slim bar to save space:
+  //  · elective → Do Not Include
+  //  · non-elective → Opted Out or Does Not Apply
+  const collapsed = (!isRequired && dec === 'out')
+    || (isRequired && (dec === 'opted-out' || dec === 'not-applicable'));
   if (collapsed) el.classList.add('is-collapsed');
   const excludedOverlay = '';
 
@@ -1576,6 +1581,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   el.addEventListener('click', e => {
     if (e.target.closest('.btn-opt-out-trigger'))  openOptOutModal(program.id);
     if (e.target.closest('.btn-undo-optout'))      undoOptOut(program.id);
+    if (e.target.closest('.btn-undo-dna'))         clearDecision(program.id);
     if (e.target.closest('.btn-acknowledge'))      handleAcknowledge(program.id);
     if (e.target.closest('.btn-undo-acknowledge')) handleUndoAcknowledge(program.id);
     if (e.target.closest('.btn-include'))          handleElectiveInclude(program.id);

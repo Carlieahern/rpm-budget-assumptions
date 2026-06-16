@@ -3097,6 +3097,10 @@ body {
 }
 .prog-card.is-not-applicable .dna-corner { opacity: 1; }
 
+/* Collapsed bars stay readable enough to see the name + undo */
+.prog-card.is-collapsed { opacity: 0.7; }
+.prog-card.is-collapsed:hover { opacity: 1; }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    ADMIN PANEL
    ═══════════════════════════════════════════════════════════════════════════ */
