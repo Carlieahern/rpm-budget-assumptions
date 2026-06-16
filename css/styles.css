@@ -1165,14 +1165,12 @@ body {
   line-height: 1.1;
 }
 
-/* "*Must select Include..." reminder on pending elective cards */
-.include-reminder {
-  font-size: 11px;
+/* "*Must select Include..." reminder in the Elective column header */
+.col-sub-note {
+  font-weight: 700;
   font-style: italic;
-  color: rgba(255,255,255,0.85);
-  margin-top: 8px;
+  color: var(--copper);
 }
-.prog-card.is-elective .include-reminder { color: var(--copper); }
 
 /* ── Elective cards: white with copper outline + copper text ── */
 .prog-card.is-elective {

@@ -1319,9 +1319,6 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   const collapsed = !isRequired && dec === 'out';
   if (collapsed) el.classList.add('is-collapsed');
   const excludedOverlay = '';
-  // Reminder for pending elective cards — easy to forget to hit Include
-  const includeNote = (!isRequired && dec !== 'in' && dec !== 'out')
-    ? `<div class="include-reminder">*Must select "Include" to add this expense to the totals</div>` : '';
 
   // ── Cost descriptor ───────────────────────────────────────────────────────
   const info    = parseCostBasisInfo(program);
@@ -1555,7 +1552,6 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       ${S.admin ? `<button class="card-edit-btn" type="button">✎ Edit</button>` : ''}
       <div class="prog-card-action">${actionHtml}</div>
     </div>
-    ${includeNote}
     <div class="card-details-panel">
       ${program.priorYearNote ? `<div class="detail-row"><span class="detail-k">Prior year cost:</span> ${program.priorYearNote}</div>` : ''}
       ${program.resourceUrl ? `<div class="detail-row"><span class="detail-k">Program guide:</span> <a class="card-guide-link" href="${program.resourceUrl}" target="_blank" rel="noopener">Open link →</a></div>` : ''}
