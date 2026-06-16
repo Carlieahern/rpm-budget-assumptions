@@ -156,6 +156,17 @@ document.getElementById('btn-skip').addEventListener('click', () => {
 });
 
 // ── Launch main app ───────────────────────────────────────────────────────────
+// Remove any state written while no property was selected (system-only browsing).
+// System-only sessions are ephemeral — nothing should carry over between visits.
+function clearEphemeralKeys() {
+  const yr = S.budgetYear;
+  ['rpm_qty','rpm_tiers','rpm_optqty','rpm_compin','rpm_compsel','rpm_partsep',
+   'rpm_partmo','rpm_spread','rpm_setupon','rpm_setupmonth','rpm_budget','rpm_incur','rpm_capex']
+    .forEach(k => localStorage.removeItem(`${k}_null_${yr}`));
+  localStorage.removeItem('rpm_units_null');
+  localStorage.removeItem('rpm_transition_null');
+}
+
 async function launchMain() {
   showScreen('screen-loading');
   try {
@@ -178,6 +189,7 @@ async function launchMain() {
 
     if (noProp) {
       // Reset every PM input to default — no saved state in system-only mode.
+      clearEphemeralKeys();
       S.unitCount = 0;
       S.transitionMonth = null;
       S.quantities = {}; S.selectedTiers = {}; S.optionQty = {};
@@ -1299,12 +1311,17 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     const inSel  = dec === 'in';
     const outSel = dec === 'out';
     actionHtml = `
-      <button class="btn-card-ghost btn-exclude${outSel ? ' is-on-out' : ''}" data-pid="${program.id}">${outSel ? '✓ Removed' : 'Remove'}</button>
+      <button class="btn-card-ghost btn-exclude${outSel ? ' is-on-out' : ''}" data-pid="${program.id}">${outSel ? '✓ Do Not Include' : 'Do Not Include'}</button>
       <button class="btn-card-fill btn-include${inSel ? ' is-on' : ''}" data-pid="${program.id}">${inSel ? '✓ Included' : 'Include'}</button>`;
   }
 
-  const excludedOverlay = (!isRequired && dec === 'out')
-    ? `<div class="excluded-overlay">Not Including</div>` : '';
+  // Excluded elective cards collapse to a slim bar to save space
+  const collapsed = !isRequired && dec === 'out';
+  if (collapsed) el.classList.add('is-collapsed');
+  const excludedOverlay = '';
+  // Reminder for pending elective cards — easy to forget to hit Include
+  const includeNote = (!isRequired && dec !== 'in' && dec !== 'out')
+    ? `<div class="include-reminder">*Must select "Include" to add this expense to the totals</div>` : '';
 
   // ── Cost descriptor ───────────────────────────────────────────────────────
   const info    = parseCostBasisInfo(program);
@@ -1507,7 +1524,14 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
 
   const heroV = heroCost(program);
 
-  el.innerHTML = `
+  el.innerHTML = collapsed ? `
+    <div class="card-head card-head-collapsed">
+      <div class="card-head-main">
+        <h3 class="prog-card-name">${program.name}</h3>
+      </div>
+      <div class="prog-card-action">${actionHtml}</div>
+    </div>
+  ` : `
     ${excludedOverlay}
     <div class="card-head">
       <div class="card-head-main">
@@ -1531,6 +1555,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       ${S.admin ? `<button class="card-edit-btn" type="button">✎ Edit</button>` : ''}
       <div class="prog-card-action">${actionHtml}</div>
     </div>
+    ${includeNote}
     <div class="card-details-panel">
       ${program.priorYearNote ? `<div class="detail-row"><span class="detail-k">Prior year cost:</span> ${program.priorYearNote}</div>` : ''}
       ${program.resourceUrl ? `<div class="detail-row"><span class="detail-k">Program guide:</span> <a class="card-guide-link" href="${program.resourceUrl}" target="_blank" rel="noopener">Open link →</a></div>` : ''}
@@ -1853,13 +1878,18 @@ async function setDecision(programId, newDec) {
   const program  = S.programs.find(p => p.id === programId);
   if (!program) return;
   const existing = S.decisions[programId];
-  try {
-    const itemId = await saveDecision(S.property, program, newDec, S.budgetYear, {
-      itemId: existing?.itemId,
-    });
-    S.decisions[programId] = { ...(existing || {}), itemId, decision: newDec };
-  } catch (e) {
-    console.error('Failed to save decision', e);
+  if (!S.property) {
+    // System-only browsing — decisions live in memory only, never persisted.
+    S.decisions[programId] = { ...(existing || {}), decision: newDec };
+  } else {
+    try {
+      const itemId = await saveDecision(S.property, program, newDec, S.budgetYear, {
+        itemId: existing?.itemId,
+      });
+      S.decisions[programId] = { ...(existing || {}), itemId, decision: newDec };
+    } catch (e) {
+      console.error('Failed to save decision', e);
+    }
   }
   refreshCard(programId);
   updateColumnCounts();
@@ -2004,7 +2034,7 @@ function programStatus(p) {
     return { label: 'Not yet acknowledged', cls: 'st-pending', included: true };
   }
   if (dec === 'in')  return { label: 'Included', cls: 'st-ack',     included: true  };
-  if (dec === 'out') return { label: 'Removed',  cls: 'st-out',     included: false };
+  if (dec === 'out') return { label: 'Do Not Include',  cls: 'st-out',     included: false };
   return { label: 'Not selected', cls: 'st-pending', included: false };
 }
 
@@ -2184,6 +2214,9 @@ document.getElementById('btn-refresh').addEventListener('click', async () => {
   clearFirebaseCache();
   try { await launchMain(); } finally { btn.classList.remove('spinning'); }
 });
+
+// Leaving the page with no property selected → wipe the ephemeral system-only state
+window.addEventListener('pagehide', () => { if (!S.property) clearEphemeralKeys(); });
 
 // A program was saved/deleted in admin → silently pull fresh data into the dashboard
 window.addEventListener('rpm-programs-changed', async () => {
