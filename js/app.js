@@ -851,9 +851,11 @@ function renderMainScreen() {
   if (sideLeft)  sideLeft.style.visibility  = S.mode === 'info' ? 'hidden' : 'visible';
   if (sideRight) sideRight.style.visibility = S.mode === 'info' ? 'hidden' : 'visible';
 
-  // View Summary only applies to the interactive build
+  // View Summary only applies to the interactive build; Excel export only in info mode
   const summaryBtn = document.getElementById('btn-view-summary');
   if (summaryBtn) summaryBtn.style.display = S.mode === 'info' ? 'none' : '';
+  const infoExportBtn = document.getElementById('btn-info-export');
+  if (infoExportBtn) infoExportBtn.style.display = S.mode === 'info' ? '' : 'none';
 
   renderDeptRows();
   updateBudgetTotal();
@@ -2174,6 +2176,61 @@ function exportSummaryCsv() {
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
 }
+
+// ── Info-mode reference export (Excel) ────────────────────────────────────────
+function partsSummaryText(parts) {
+  return (parts || []).map(part => {
+    switch (part.kind) {
+      case 'flat':    return `${part.label || 'Flat'}: ${formatCost(num(part.amount))}`;
+      case 'perUnit': return `${part.label || 'Per unit'}: ${formatRate(num(part.rate))}/unit`;
+      case 'perItem': return `${part.label || part.itemLabel || 'Per item'}: ${formatRate(num(part.rate))}/${(part.itemLabel || 'item').toLowerCase()}`;
+      case 'percent': return `${part.label || 'Percent'}: ${num(part.pct)}% of ${part.base === 'capex' ? 'CapEx' : 'income'}`;
+      case 'options': return (part.options || []).map(o => `${o.label}: ${formatRate(num(o.rate))}`).join('; ');
+      case 'manual':  return `${part.label || 'Estimate'}: varies`;
+      case 'tax':     return `${part.label || 'Tax'}: +${num(part.pct)}%`;
+      default: return '';
+    }
+  }).filter(Boolean).join(' + ');
+}
+function setupDetailText(program) {
+  if (hasSetupBuilder(program)) {
+    const parts = partsSummaryText(program.setupComponents);
+    const total = setupTotal(program);
+    return [parts, total ? `One-time total: ${formatCost(total)}` : '', program.setupFee || '']
+      .filter(Boolean).join(' · ');
+  }
+  const amt = num(program.setupAmount);
+  return [amt ? `One-time: ${formatCost(amt)}` : '', program.setupFee || ''].filter(Boolean).join(' · ');
+}
+async function exportInfoExcel() {
+  const rows = [['Department', 'Program', 'Owner', 'GL', 'Billing', 'Cost Summary',
+    'Setup Fee Name', 'Setup Fee Details', 'Min', 'Max', 'Prior Year Note', 'Details', 'Program Guide']];
+  S.programs.forEach(p => {
+    rows.push([
+      p.group, p.name, p.programOwner || '', p.glCode || '', p.billingFreq || '',
+      (p.costRaw || '').replace(/[\r\n]+/g, ' '),
+      p.setupName || '',
+      setupDetailText(p),
+      p.minCost != null ? p.minCost : '',
+      p.maxCost != null ? p.maxCost : '',
+      (p.priorYearNote || '').replace(/[\r\n]+/g, ' '),
+      (p.description || '').replace(/[\r\n]+/g, ' '),
+      p.resourceUrl || '',
+    ]);
+  });
+  try {
+    const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.mjs');
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{wch:18},{wch:28},{wch:20},{wch:12},{wch:12},{wch:32},{wch:22},{wch:38},{wch:8},{wch:8},{wch:28},{wch:42},{wch:30}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Program Info');
+    XLSX.writeFile(wb, `${(S.property || S.systemType || 'Programs').replace(/[^a-z0-9]+/gi, '_')}_FY${S.budgetYear}_Reference.xlsx`);
+  } catch (e) {
+    console.error('Excel export failed', e);
+    alert('Export failed: ' + e.message);
+  }
+}
+document.getElementById('btn-info-export')?.addEventListener('click', exportInfoExcel);
 
 document.getElementById('btn-summary-back').addEventListener('click', () => showScreen('screen-main'));
 
