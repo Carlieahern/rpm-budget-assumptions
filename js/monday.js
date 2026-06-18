@@ -33,6 +33,13 @@ export function clearMondayCache() {
   localStorage.removeItem('rpm_monday_programs');
 }
 
+// One-time: drop any property cache saved before pagination so the full list
+// (not just the first 500 / A–S) loads on the next visit after this deploy.
+if (localStorage.getItem('rpm_props_paginated') !== '1') {
+  localStorage.removeItem('rpm_monday_properties');
+  localStorage.setItem('rpm_props_paginated', '1');
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function query(gqlQuery, variables = {}) {
@@ -55,17 +62,39 @@ export async function fetchProperties(forceRefresh = false) {
     if (cached) return cached;
   }
 
-  const data = await query(`
+  // Monday returns at most 500 items per page — page through with the cursor so
+  // boards with more than 500 properties come back in full (not just A–S).
+  const result = [];
+  const first = await query(`
     query ($boardId: ID!) {
       boards(ids: [$boardId]) {
         items_page(limit: 500) {
+          cursor
           items { id name }
         }
       }
     }
   `, { boardId: CONFIG.monday.propertyBoardId });
 
-  const result = data.boards[0].items_page.items.map(i => ({ id: i.id, name: i.name }));
+  let page = first.boards[0].items_page;
+  result.push(...page.items.map(i => ({ id: i.id, name: i.name })));
+
+  let guard = 0;
+  while (page.cursor && guard++ < 50) {
+    const next = await query(`
+      query ($cursor: String!) {
+        next_items_page(limit: 500, cursor: $cursor) {
+          cursor
+          items { id name }
+        }
+      }
+    `, { cursor: page.cursor });
+    page = next.next_items_page;
+    result.push(...page.items.map(i => ({ id: i.id, name: i.name })));
+  }
+
+  // Alphabetical for a predictable dropdown
+  result.sort((a, b) => a.name.localeCompare(b.name));
   cacheSet('properties', result);
   return result;
 }
