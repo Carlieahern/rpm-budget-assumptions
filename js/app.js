@@ -585,9 +585,20 @@ function activeMonthsFor(program) {
     months = monthsForFrequency(freq, start);
   }
 
-  // Fixed calendar months: a hit before the transition was missed — drop it.
+  // Fixed calendar months + a mid-year transition:
+  //  · Annual / bi-annual → a charge scheduled before go-live moves up to the
+  //    transition month (the earliest missed hit); later hits stay in place.
+  //  · Quarterly / monthly → pre-transition hits are simply skipped (not owed).
   if (!followsTransition && S.transitionMonth != null) {
-    months = months.filter(m => m >= S.transitionMonth);
+    const t = S.transitionMonth;
+    const pushesForward = freq.includes('annual');   // matches "annual" and "bi-annual"
+    if (pushesForward) {
+      const post = months.filter(m => m >= t);
+      if (months.some(m => m < t)) post.push(t);      // earliest missed charge → transition month
+      months = [...new Set(post)];
+    } else {
+      months = months.filter(m => m >= t);
+    }
   }
   return months.sort((a, b) => a - b);
 }
