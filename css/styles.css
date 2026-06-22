@@ -2858,7 +2858,7 @@ body {
 .sep-bill-toggle input { accent-color: #fff; }
 .prog-card.is-elective .sep-bill-toggle { color: #9a7350; }
 .prog-card.is-elective .sep-bill-toggle input { accent-color: var(--navy); }
-.sep-bill-label { margin-top: 8px; }
+.sep-bill-label { margin-top: 12px; }
 
 /* "Split evenly across the year" toggle */
 .spread-toggle {
@@ -2870,7 +2870,7 @@ body {
 .prog-card.is-elective .spread-toggle { color: #9a7350; }
 .prog-card.is-elective .spread-toggle input { accent-color: var(--navy); }
 .incur-chips.is-dimmed { opacity: 0.4; }
-.sep-bill-chips { margin-top: 6px; }
+.sep-bill-chips { margin-top: 6px; margin-bottom: 20px; }
 
 /* Setup fee block — one-time, blue, with its own month */
 .setup-fee-block {
