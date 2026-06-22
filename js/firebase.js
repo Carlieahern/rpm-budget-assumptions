@@ -40,6 +40,18 @@ export async function fetchPrograms(forceRefresh = false) {
   const raw = await res.json();
   if (!raw) return [];
 
+  // Components can come back from Firebase as a proper array, a numeric-keyed
+  // object, or (from older saves) a single bare part object — normalize to array.
+  const partsArray = (c) => {
+    if (Array.isArray(c)) { const a = c.filter(x => x && x.kind); return a.length ? a : null; }
+    if (c && typeof c === 'object') {
+      if (c.kind) return [c];
+      const a = Object.values(c).filter(x => x && typeof x === 'object' && x.kind);
+      return a.length ? a : null;
+    }
+    return null;
+  };
+
   const programs = Object.entries(raw).map(([id, p]) => {
     const rate = p.rate ?? 0;
 
@@ -70,7 +82,7 @@ export async function fetchPrograms(forceRefresh = false) {
       billedTogether: p.billedTogether !== false,   // false = each part has its own months
       costBasis:     p.costBasis     || 'Manual',
       customFormula: p.customFormula || null,
-      components:    Array.isArray(p.components) ? p.components : null,  // new universal cost builder
+      components:    partsArray(p.components),  // new universal cost builder (normalized to array)
       rate:          rate,
       systems,
       billingPeriod: p.billingPeriod || 'annual',
@@ -87,7 +99,7 @@ export async function fetchPrograms(forceRefresh = false) {
       setupName:     p.setupName     || null,
       setupAmount:   p.setupAmount   ?? 0,
       setupMonth:    p.setupMonth    ?? 0,
-      setupComponents: Array.isArray(p.setupComponents) ? p.setupComponents : null,
+      setupComponents: partsArray(p.setupComponents),
       costRaw:       p.costRaw       || '',
       description:   p.description   || '',
       resourceUrl:   p.resourceUrl   || null,

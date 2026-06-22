@@ -1196,12 +1196,13 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
       case 'flat':
         return `<div class="comp-line"><span class="comp-label">${part.label || 'Flat fee'}</span><span class="comp-val">${formatCost(num(part.amount))}</span></div>`;
       case 'perUnit': {
-        if (part.locked) return `<div class="comp-line"><span class="comp-label">${part.label || 'Per unit'}</span><span class="comp-val">${formatRate(num(part.rate))}/unit × ${S.unitCount} units</span></div>`;
+        const unitWord = part.label || 'units';
+        if (part.locked) return `<div class="comp-line"><span class="comp-label">${part.label || 'Per unit'}</span><span class="comp-val">${formatRate(num(part.rate))}/unit × ${S.unitCount} ${unitWord}</span></div>`;
         const v = S.compInputs[key] != null ? num(S.compInputs[key]) : S.unitCount;
         return `<div class="card-calc">
           <span class="calc-rate">${formatRate(num(part.rate))}</span><span class="calc-x">×</span>
           <div class="qty-field"><input class="comp-input" ${pfx} data-pid="${program.id}" data-idx="${i}" type="number" min="0" placeholder="0" value="${v || ''}"></div>
-          <span class="qty-label">units</span>
+          <span class="qty-label">${unitWord}</span>
         </div>${sepUI(part, i)}`;
       }
       case 'perItem': {

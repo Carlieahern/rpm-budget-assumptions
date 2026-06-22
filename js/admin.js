@@ -312,6 +312,11 @@ function openEditor(id) {
     ? { ...blankProgram(), ...structuredClone(rawCache[id]) }
     : blankProgram();
   if (!Array.isArray(form.options)) form.options = [];
+  // Normalize components/setupComponents that Firebase returned as a bare object or
+  // numeric-keyed object back into a proper array, so the builder loads them and
+  // saves them back correctly (older data was sometimes stored as a single object).
+  form.components = toPartsArray(form.components);
+  form.setupComponents = toPartsArray(form.setupComponents);
   // Legacy programs: if a saved value didn't exist, infer "billed together" unless a
   // part already carries its own months (then it's separate).
   if (id && rawCache[id] && rawCache[id].billedTogether === undefined) {
@@ -347,6 +352,17 @@ const PART_KINDS = [
 ];
 
 // Derive a starter set of parts from a legacy program so editing migrates it.
+// Normalize a components value (array, numeric-keyed object, or a single bare part
+// object from older saves) into a proper array.
+function toPartsArray(c) {
+  if (Array.isArray(c)) return c.filter(x => x && x.kind);
+  if (c && typeof c === 'object') {
+    if (c.kind) return [c];
+    return Object.values(c).filter(x => x && typeof x === 'object' && x.kind);
+  }
+  return [];
+}
+
 function deriveComponents(p) {
   if (Array.isArray(p.components) && p.components.length) return structuredClone(p.components);
   const rate = parseFloat(p.rate) || 0;
