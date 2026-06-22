@@ -84,6 +84,8 @@ async function loadPropertyScreen() {
   // Show full top row (un-skip if previously skipped)
   const topRow = document.getElementById('setup-top-row');
   if (topRow) topRow.style.display = '';
+  const skipBtn = document.getElementById('btn-skip');
+  if (skipBtn) skipBtn.textContent = 'Skip property selection — just browse by system';
 
   applyLegacyBanner();
 
@@ -147,12 +149,23 @@ document.querySelectorAll('.system-tile').forEach(btn => {
   });
 });
 
-// Skip — hides property + mode, lets them just pick a system
+// Skip / restore — toggles the property + mode section so they can go back to it
+const SKIP_LABEL = 'Skip property selection — just browse by system';
+const UNSKIP_LABEL = '← Back to property selection';
 document.getElementById('btn-skip').addEventListener('click', () => {
   const topRow = document.getElementById('setup-top-row');
-  if (topRow) topRow.style.display = 'none';
-  S.property = null;
-  S.mode     = 'interactive';
+  const btn    = document.getElementById('btn-skip');
+  const isSkipped = topRow && topRow.style.display === 'none';
+  if (isSkipped) {
+    // Restore the property + mode chooser
+    if (topRow) topRow.style.display = '';
+    btn.textContent = SKIP_LABEL;
+  } else {
+    if (topRow) topRow.style.display = 'none';
+    S.property = null;
+    S.mode     = 'interactive';
+    btn.textContent = UNSKIP_LABEL;
+  }
 });
 
 // ── Launch main app ───────────────────────────────────────────────────────────
@@ -2267,10 +2280,7 @@ document.getElementById('btn-menu').addEventListener('click', () => {
 });
 
 document.getElementById('menu-close').addEventListener('click',    () => closeModal('modal-menu'));
-document.getElementById('mi-how-to-use').addEventListener('click', () => {
-  closeModal('modal-menu');
-  openModal('modal-help');
-});
+document.getElementById('btn-hdr-help')?.addEventListener('click', () => openModal('modal-help'));
 document.getElementById('help-close').addEventListener('click', () => closeModal('modal-help'));
 document.getElementById('mi-refresh-data').addEventListener('click', async () => {
   closeModal('modal-menu');
@@ -2302,19 +2312,13 @@ window.addEventListener('rpm-programs-changed', async () => {
   } catch (e) { console.error('Auto-refresh failed', e); }
 });
 
-document.getElementById('mi-change-property').addEventListener('click', () => {
-  closeModal('modal-menu');
-  loadPropertyScreen();
-});
+document.getElementById('btn-hdr-change')?.addEventListener('click', () => loadPropertyScreen());
 const goToHub = () => {
   // Return to the RPM Living Budget Hub. The ?return=1 flag tells the hub this is
   // a return trip so it reuses the existing session instead of showing the login.
   window.location.href = 'https://rpm-living-budget-hub.vercel.app/?return=1';
 };
-document.getElementById('mi-logout').addEventListener('click', () => {
-  closeModal('modal-menu');
-  goToHub();
-});
+document.getElementById('btn-hdr-hub')?.addEventListener('click', goToHub);
 document.getElementById('btn-setup-hub')?.addEventListener('click', goToHub);
 
 document.getElementById('mi-reset').addEventListener('click', () => {

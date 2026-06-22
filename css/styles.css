@@ -702,6 +702,27 @@ body {
 
 .meta-sep { color: rgba(255,255,255,0.25); }
 
+/* Header nav buttons (Back to Hub / Change Property / How to Use) */
+.hdr-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hdr-nav-btn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.9);
+  border-radius: 16px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.hdr-nav-btn:hover { background: var(--copper); border-color: var(--copper); color: #fff; }
+
 /* Header search bar */
 .hdr-search-wrap {
   position: relative;
