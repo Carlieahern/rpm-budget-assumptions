@@ -867,6 +867,9 @@ function renderMainScreen() {
   if (summaryBtn) summaryBtn.style.display = S.mode === 'info' ? 'none' : '';
   const infoExportBtn = document.getElementById('btn-info-export');
   if (infoExportBtn) infoExportBtn.style.display = S.mode === 'info' ? '' : 'none';
+  // The "*Must select Include" note is meaningless in Info Only (nothing to select)
+  const includeNote = document.querySelector('.col-sub-note');
+  if (includeNote) includeNote.style.display = S.mode === 'info' ? 'none' : '';
 
   renderDeptRows();
   updateBudgetTotal();
