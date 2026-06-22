@@ -296,7 +296,7 @@ async function persistColumnOrder(col) {
 // ── Editor ─────────────────────────────────────────────────────────────────────
 function blankProgram() {
   return {
-    name: '', department: '', elective: true, order: null, costBasis: 'Flat Fee',
+    name: '', department: '', elective: true, order: null, billedTogether: true, costBasis: 'Flat Fee',
     rate: '', itemLabel: '', baseFee: '', baseQty: '', minCost: '', maxCost: '', options: [], additive: false, customFormula: '',
     billingPeriod: 'monthly', billingStart: 'January',
     defaultMonths: [], monthsFixed: false,
@@ -312,6 +312,11 @@ function openEditor(id) {
     ? { ...blankProgram(), ...structuredClone(rawCache[id]) }
     : blankProgram();
   if (!Array.isArray(form.options)) form.options = [];
+  // Legacy programs: if a saved value didn't exist, infer "billed together" unless a
+  // part already carries its own months (then it's separate).
+  if (id && rawCache[id] && rawCache[id].billedTogether === undefined) {
+    form.billedTogether = !(form.components || []).some(c => Array.isArray(c.months) && c.months.length);
+  }
   // Migrate legacy programs into cost parts so they're editable in the builder
   if (!Array.isArray(form.components) || !form.components.length) {
     form.components = deriveComponents(form);
@@ -412,9 +417,9 @@ function partRow(part, i, arr = 'components') {
         <button class="ae-part-del" data-i="${i}" title="Remove part">✕</button>
       </div>
       <div class="ae-part-fields">${partFields(part, i)}</div>
-      ${(arr === 'components' && part.kind !== 'tax') ? `
+      ${(arr === 'components' && part.kind !== 'tax' && form.billedTogether === false) ? `
       <div class="ae-part-months">
-        <span class="ae-part-months-label">Billing months <span class="label-soft">— optional; leave empty to use the program default. Set specific months to split this part out (e.g. spring &amp; fall).</span></span>
+        <span class="ae-part-months-label">Billing months for this part <span class="label-soft">— select the months this part is charged (e.g. spring &amp; fall).</span></span>
         <div class="ae-month-chips ae-part-mchips" data-i="${i}">
           ${MONTHS.map((m, mi) => `<button type="button" class="ae-mchip ae-part-mchip${(part.months || []).includes(mi) ? ' on' : ''}" data-i="${i}" data-m="${mi}">${m.slice(0,3)}</button>`).join('')}
         </div>
@@ -508,6 +513,11 @@ function buildEditor() {
     <div class="ae-tiers ae-builder">
       <div class="ae-tiers-head"><span>Cost builder — stack the parts</span><button class="ae-tier-add ae-part-add" data-arr="components">+ Add part</button></div>
       <p class="label-soft" style="margin:0 0 12px;">Parts add together. Each can be locked so PMs can't change it.</p>
+      <label class="ae-follows ae-billed-together">
+        <input type="checkbox" id="ae-billedTogether"${form.billedTogether !== false ? ' checked' : ''}>
+        All parts are billed together (one schedule)
+        <span class="label-soft"> — uncheck to give each part its own billing months (e.g. spring &amp; fall)</span>
+      </label>
       ${parts.length ? parts.map((p, i) => partRow(p, i, 'components')).join('') : '<p class="label-soft">No parts yet — add one to define the cost.</p>'}
     </div>
 
@@ -522,6 +532,7 @@ function buildEditor() {
       </label>
     </div>
 
+    ${form.billedTogether !== false ? `
     <div class="ae-field ae-wide">
       <span>Default billing months</span>
       <p class="label-soft" style="margin:2px 0 8px;">Leave all unselected for the standard schedule (monthly = every month). Select specific months to bill only then.</p>
@@ -536,7 +547,7 @@ function buildEditor() {
         <input type="checkbox" id="ae-monthsFixed"${form.monthsFixed ? ' checked' : ''}>
         Fixed — PMs can't change these months
       </label>
-    </div>
+    </div>` : ''}
 
     <div class="ae-section">
       <label class="ae-follows ae-setup-toggle"><input type="checkbox" id="ae-has-setup"${(form.setupComponents && form.setupComponents.length) ? ' checked' : ''}> This program has a setup / one-time fee</label>
@@ -640,6 +651,11 @@ function wireEditor() {
     chip.classList.toggle('on');
   }));
   document.getElementById('ae-monthsFixed')?.addEventListener('change', e => { form.monthsFixed = e.target.checked; });
+  document.getElementById('ae-billedTogether')?.addEventListener('change', e => {
+    form.billedTogether = e.target.checked;
+    if (e.target.checked) (form.components || []).forEach(c => { delete c.months; });  // collapse to one schedule
+    buildEditor();
+  });
 
   // Systems checkboxes
   document.querySelectorAll('.ae-sys').forEach(cb => cb.addEventListener('change', () => {
@@ -779,8 +795,11 @@ function cleanParts(arr) {
       case 'formula': c.expr = p.expr || ''; break;
       case 'tax':     c.pct = cleanNum(p.pct) || 0; break;
     }
-    // Optional per-part billing months (e.g. spring vs fall). Empty → use program default.
-    if (Array.isArray(p.months) && p.months.length) c.months = p.months.slice().sort((a, b) => a - b);
+    // Optional per-part billing months (e.g. spring vs fall) — only when the program
+    // is NOT billed together. When billed together, parts share one schedule.
+    if (form.billedTogether === false && Array.isArray(p.months) && p.months.length) {
+      c.months = p.months.slice().sort((a, b) => a - b);
+    }
     return c;
   }).filter(c => c.kind);
 }
@@ -793,6 +812,7 @@ async function save() {
     department: form.department.trim() || 'Other',
     elective: form.elective === true,
     order: Number.isFinite(form.order) ? form.order : null,
+    billedTogether: form.billedTogether !== false,
     costBasis: form.costBasis,
     rate: cleanNum(form.rate),
     itemLabel: form.itemLabel || null,

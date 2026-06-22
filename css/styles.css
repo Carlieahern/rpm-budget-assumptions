@@ -3371,6 +3371,8 @@ body {
 }
 .ae-mchip.on { background: var(--copper); color: #fff; border-color: var(--copper); }
 
+.ae-billed-together { margin: 4px 0 14px; }
+
 /* Per-part billing months in the cost builder */
 .ae-part-months { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
 .ae-part-months-label { display: block; font-size: 12px; font-weight: 600; color: var(--text2); margin-bottom: 4px; }

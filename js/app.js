@@ -1180,15 +1180,9 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
   // Separate billing only on the MAIN builder (setup fee has its own month)
   // Separate billing only on the MAIN builder. For options parts it only makes
   // sense in "pick one or more" mode (a single pick has nothing to split off).
-  const sepUI = (part, i) => {
-    if (prefix !== '' || part.kind === 'tax') return '';
-    // Per-month CapEx already places its cost in specific months — no separate billing.
-    if (part.kind === 'percent' && part.base === 'capex' && !part.locked) return '';
-    // Admin pre-set months for this part → show its own editable month strip.
-    if (Array.isArray(part.months) && part.months.length && !part.locked) return partMonthsUI(program, part, i);
-    if (part.kind === 'options') return part.selectMode === 'multiple' ? partSeparateUI(program, i) : '';
-    return multiParts ? partSeparateUI(program, i) : '';
-  };
+  // Billing timing is set entirely by admin (program schedule or per-part months) —
+  // no PM-facing "billed separately" control or per-part month strips on the card.
+  const sepUI = () => '';
   const pfx = `data-prefix="${prefix}"`;
   return parts.map((part, i) => {
     const key = `${prefix}${program.id}:${i}`;
