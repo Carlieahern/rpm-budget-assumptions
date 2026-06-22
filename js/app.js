@@ -1167,8 +1167,9 @@ function partSeparateUI(program, i) {
 function partMonthsUI(program, part, i) {
   const key = `${program.id}:${i}`;
   const sel = S.partMonths[key] || part.months || [];
+  const directive = sel.length ? '(set by the program — adjust if needed)' : '(select the months this part is billed)';
   return `
-    <div class="incur-label sep-bill-label">Billed in: <span class="incur-directive">(set by the program — adjust if needed)</span></div>
+    <div class="incur-label sep-bill-label">Billed in: <span class="incur-directive">${directive}</span></div>
     <div class="incur-chips sep-bill-chips">${MONTH_NAMES.map((m, mi) =>
       `<button type="button" class="incur-chip part-sep-chip${sel.includes(mi) ? ' on' : ''}" data-pid="${program.id}" data-idx="${i}" data-month="${mi}">${m}</button>`).join('')}</div>`;
 }
@@ -1183,7 +1184,9 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
   const sepUI = (part, i) => {
     if (prefix !== '' || part.kind === 'tax') return '';
     if (part.kind === 'percent' && part.base === 'capex' && !part.locked) return '';
-    if (Array.isArray(part.months) && part.months.length && !part.locked) return partMonthsUI(program, part, i);
+    // Billed separately → every part shows its own editable month strip, even if no
+    // months are pre-selected yet (so the PM can pick them).
+    if (program.billedTogether === false && !part.locked) return partMonthsUI(program, part, i);
     return '';
   };
   const pfx = `data-prefix="${prefix}"`;
@@ -1530,10 +1533,10 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     // anything — hide the strip so it isn't confusingly lit up.
     const allSeparate = hasComponents(program) && program.components.length > 0 &&
       program.components.every((c, i) => S.partSeparate[`${program.id}:${i}`]);
-    // Parts carry their own admin months → the program default no longer drives
-    // anything, so don't show a confusing extra strip.
-    const adminPerPartMonths = hasComponents(program) &&
-      program.components.some(c => Array.isArray(c.months) && c.months.length);
+    // Billed separately (or any part carries its own months) → the program default
+    // no longer drives anything, so don't show a confusing extra strip.
+    const adminPerPartMonths = program.billedTogether === false || (hasComponents(program) &&
+      program.components.some(c => Array.isArray(c.months) && c.months.length));
     if (!allSeparate && !adminPerPartMonths) {
       const anySeparate = hasComponents(program) &&
         program.components.some((c, i) => S.partSeparate[`${program.id}:${i}`]);

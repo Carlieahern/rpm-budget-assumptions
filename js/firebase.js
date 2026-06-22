@@ -67,6 +67,7 @@ export async function fetchPrograms(forceRefresh = false) {
       group:         p.department    || 'General',
       required:      p.elective === false,
       order:         Number.isFinite(p.order) ? p.order : null,
+      billedTogether: p.billedTogether !== false,   // false = each part has its own months
       costBasis:     p.costBasis     || 'Manual',
       customFormula: p.customFormula || null,
       components:    Array.isArray(p.components) ? p.components : null,  // new universal cost builder
