@@ -3483,6 +3483,8 @@ body {
 .prog-card.is-elective .comp-val { color: var(--copper2); }
 .card-calc + .card-calc, .comp-line + .card-calc, .card-calc + .comp-line, .comp-line + .comp-line { margin-top: 16px; }
 .card-calc { row-gap: 6px; }
+.part-billed-note { margin-top: 6px; font-size: 12px; font-style: italic; color: rgba(255,255,255,0.75); }
+.prog-card.is-elective .part-billed-note { color: var(--copper); }
 
 /* ── Inline admin editing ── */
 .admin-badge { display: none; }

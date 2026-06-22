@@ -521,17 +521,6 @@ function buildEditor() {
       ${parts.length ? parts.map((p, i) => partRow(p, i, 'components')).join('') : '<p class="label-soft">No parts yet — add one to define the cost.</p>'}
     </div>
 
-    <div class="ae-grid">
-      <label class="ae-field">
-        <span>Minimum (${per}) <span class="label-soft">— optional</span></span>
-        <input id="ae-minCost" type="number" step="0.01" min="0" value="${esc(form.minCost)}" placeholder="no minimum">
-      </label>
-      <label class="ae-field">
-        <span>Maximum (${per}) <span class="label-soft">— optional</span></span>
-        <input id="ae-maxCost" type="number" step="0.01" min="0" value="${esc(form.maxCost)}" placeholder="no maximum">
-      </label>
-    </div>
-
     ${form.billedTogether !== false ? `
     <div class="ae-field ae-wide">
       <span>Default billing months</span>
@@ -548,6 +537,17 @@ function buildEditor() {
         Fixed — PMs can't change these months
       </label>
     </div>` : ''}
+
+    <div class="ae-grid">
+      <label class="ae-field">
+        <span>Minimum (${per}) <span class="label-soft">— optional</span></span>
+        <input id="ae-minCost" type="number" step="0.01" min="0" value="${esc(form.minCost)}" placeholder="no minimum">
+      </label>
+      <label class="ae-field">
+        <span>Maximum (${per}) <span class="label-soft">— optional</span></span>
+        <input id="ae-maxCost" type="number" step="0.01" min="0" value="${esc(form.maxCost)}" placeholder="no maximum">
+      </label>
+    </div>
 
     <div class="ae-section">
       <label class="ae-follows ae-setup-toggle"><input type="checkbox" id="ae-has-setup"${(form.setupComponents && form.setupComponents.length) ? ' checked' : ''}> This program has a setup / one-time fee</label>

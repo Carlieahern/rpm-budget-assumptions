@@ -1177,12 +1177,16 @@ function partMonthsUI(program, part, i) {
 function buildComponentBody(program, parts = program.components, prefix = '') {
   parts = parts || [];
   const multiParts = parts.length > 1;
-  // Separate billing only on the MAIN builder (setup fee has its own month)
-  // Separate billing only on the MAIN builder. For options parts it only makes
-  // sense in "pick one or more" mode (a single pick has nothing to split off).
-  // Billing timing is set entirely by admin (program schedule or per-part months) —
-  // no PM-facing "billed separately" control or per-part month strips on the card.
-  const sepUI = () => '';
+  // Billing timing is admin-controlled. For a part with its own months (billed
+  // separately), show a clean read-only note so the PM can see when it bills.
+  const sepUI = (part) => {
+    if (prefix !== '') return '';
+    if (!Array.isArray(part.months) || !part.months.length) return '';
+    let ms = part.months.slice().sort((a, b) => a - b);
+    if (S.transitionMonth != null) ms = ms.filter(m => m >= S.transitionMonth);
+    if (!ms.length) return '';
+    return `<div class="part-billed-note">Billed in ${ms.map(m => MONTH_NAMES[m]).join(', ')}</div>`;
+  };
   const pfx = `data-prefix="${prefix}"`;
   return parts.map((part, i) => {
     const key = `${prefix}${program.id}:${i}`;
