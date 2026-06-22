@@ -1177,15 +1177,14 @@ function partMonthsUI(program, part, i) {
 function buildComponentBody(program, parts = program.components, prefix = '') {
   parts = parts || [];
   const multiParts = parts.length > 1;
-  // Billing timing is admin-controlled. For a part with its own months (billed
-  // separately), show a clean read-only note so the PM can see when it bills.
-  const sepUI = (part) => {
-    if (prefix !== '') return '';
-    if (!Array.isArray(part.months) || !part.months.length) return '';
-    let ms = part.months.slice().sort((a, b) => a - b);
-    if (S.transitionMonth != null) ms = ms.filter(m => m >= S.transitionMonth);
-    if (!ms.length) return '';
-    return `<div class="part-billed-note">Billed in ${ms.map(m => MONTH_NAMES[m]).join(', ')}</div>`;
+  // When billed separately (admin gave the part its own months), show an EDITABLE
+  // month strip per part — pre-filled with the admin months, PM can adjust.
+  // No "billed separately" checkbox: separation is the admin's call.
+  const sepUI = (part, i) => {
+    if (prefix !== '' || part.kind === 'tax') return '';
+    if (part.kind === 'percent' && part.base === 'capex' && !part.locked) return '';
+    if (Array.isArray(part.months) && part.months.length && !part.locked) return partMonthsUI(program, part, i);
+    return '';
   };
   const pfx = `data-prefix="${prefix}"`;
   return parts.map((part, i) => {
