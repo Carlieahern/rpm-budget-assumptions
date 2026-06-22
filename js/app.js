@@ -84,6 +84,8 @@ async function loadPropertyScreen() {
   // Show full top row (un-skip if previously skipped)
   const topRow = document.getElementById('setup-top-row');
   if (topRow) topRow.style.display = '';
+  const propSection = document.getElementById('setup-property-section');
+  if (propSection) propSection.style.display = '';
   const skipBtn = document.getElementById('btn-skip');
   if (skipBtn) skipBtn.textContent = 'Skip property selection — just browse by system';
 
@@ -153,17 +155,20 @@ document.querySelectorAll('.system-tile').forEach(btn => {
 const SKIP_LABEL = 'Skip property selection — just browse by system';
 const UNSKIP_LABEL = '← Back to property selection';
 document.getElementById('btn-skip').addEventListener('click', () => {
-  const topRow = document.getElementById('setup-top-row');
+  const propSection = document.getElementById('setup-property-section');
   const btn    = document.getElementById('btn-skip');
-  const isSkipped = topRow && topRow.style.display === 'none';
+  const isSkipped = propSection && propSection.style.display === 'none';
   if (isSkipped) {
-    // Restore the property + mode chooser
-    if (topRow) topRow.style.display = '';
+    // Restore the property chooser
+    if (propSection) propSection.style.display = '';
     btn.textContent = SKIP_LABEL;
   } else {
-    if (topRow) topRow.style.display = 'none';
+    // Hide only the property picker — keep View Mode so they can still pick Info Only
+    if (propSection) propSection.style.display = 'none';
+    const sel = document.getElementById('property-select');
+    if (sel) sel.value = '';
+    document.getElementById('unit-count-row')?.classList.add('hidden');
     S.property = null;
-    S.mode     = 'interactive';
     btn.textContent = UNSKIP_LABEL;
   }
 });
