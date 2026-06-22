@@ -412,6 +412,13 @@ function partRow(part, i, arr = 'components') {
         <button class="ae-part-del" data-i="${i}" title="Remove part">✕</button>
       </div>
       <div class="ae-part-fields">${partFields(part, i)}</div>
+      ${(arr === 'components' && part.kind !== 'tax') ? `
+      <div class="ae-part-months">
+        <span class="ae-part-months-label">Billing months <span class="label-soft">— optional; leave empty to use the program default. Set specific months to split this part out (e.g. spring &amp; fall).</span></span>
+        <div class="ae-month-chips ae-part-mchips" data-i="${i}">
+          ${MONTHS.map((m, mi) => `<button type="button" class="ae-mchip ae-part-mchip${(part.months || []).includes(mi) ? ' on' : ''}" data-i="${i}" data-m="${mi}">${m.slice(0,3)}</button>`).join('')}
+        </div>
+      </div>` : ''}
     </div>`;
 }
 
@@ -612,13 +619,24 @@ function wireEditor() {
     else { form.billingStart = ''; }
     buildEditor();
   });
-  document.querySelectorAll('.ae-mchip').forEach(chip => chip.addEventListener('click', () => {
+  document.querySelectorAll('#ae-month-chips .ae-mchip').forEach(chip => chip.addEventListener('click', () => {
     const m = +chip.dataset.m;
     const arr = form.defaultMonths || [];
     const idx = arr.indexOf(m);
     if (idx >= 0) arr.splice(idx, 1); else arr.push(m);
     form.defaultMonths = arr;
     if (arr.length) { form.billingStart = ''; const ft = document.getElementById('ae-followsTransition'); if (ft) ft.checked = false; }
+    chip.classList.toggle('on');
+  }));
+  // Per-part billing months (split a part out, e.g. spring vs fall)
+  document.querySelectorAll('.ae-part-mchip').forEach(chip => chip.addEventListener('click', () => {
+    const part = form[arrOf(chip)][+chip.dataset.i];
+    if (!part) return;
+    const m = +chip.dataset.m;
+    const arr = Array.isArray(part.months) ? part.months : [];
+    const idx = arr.indexOf(m);
+    if (idx >= 0) arr.splice(idx, 1); else arr.push(m);
+    part.months = arr;
     chip.classList.toggle('on');
   }));
   document.getElementById('ae-monthsFixed')?.addEventListener('change', e => { form.monthsFixed = e.target.checked; });
@@ -761,6 +779,8 @@ function cleanParts(arr) {
       case 'formula': c.expr = p.expr || ''; break;
       case 'tax':     c.pct = cleanNum(p.pct) || 0; break;
     }
+    // Optional per-part billing months (e.g. spring vs fall). Empty → use program default.
+    if (Array.isArray(p.months) && p.months.length) c.months = p.months.slice().sort((a, b) => a - b);
     return c;
   }).filter(c => c.kind);
 }

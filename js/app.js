@@ -666,10 +666,23 @@ function programMonths12(program) {
     }
     const per = partPeriodCost(program, c, i);
     if (!per) return;
-    // Manual estimate is a MONTHLY amount → bills every month (×12), regardless of program frequency
     const isManual = c.kind === 'manual';
-    const hit = (isManual || mo) ? per : per / nat;
-    const ms = S.partSeparate[key] ? (S.partMonths[key] || []) : (isManual ? monthlyMonths : progMonths);
+    // A part with its own admin months (e.g. spring & fall) is charged in FULL in
+    // each chosen month — each listed month is a separate charge, not a split of one.
+    const hasAdminMonths = Array.isArray(c.months) && c.months.length;
+    const hit = hasAdminMonths ? per : ((isManual || mo) ? per : per / nat);
+    // Months this part lands in, in priority order:
+    //  1. PM override ("billed separately" / adjusted chips)
+    //  2. Admin per-part months, respecting the transition
+    //  3. The program default (or every month, for manual)
+    let ms;
+    if (S.partSeparate[key]) {
+      ms = S.partMonths[key] || [];
+    } else if (hasAdminMonths) {
+      ms = c.months.filter(m => S.transitionMonth == null || m >= S.transitionMonth);
+    } else {
+      ms = isManual ? monthlyMonths : progMonths;
+    }
     ms.forEach(m => arr[m] += hit);
   });
   // Tax applies on top of each month's taxable spend
@@ -1149,6 +1162,17 @@ function partSeparateUI(program, i) {
       `<button type="button" class="incur-chip part-sep-chip${sel.includes(mi) ? ' on' : ''}" data-pid="${program.id}" data-idx="${i}" data-month="${mi}">${m}</button>`).join('')}</div>` : ''}`;
 }
 
+// Admin pre-set the months for this part (e.g. spring & fall) — show them as an
+// editable strip; the PM can adjust without a "billed separately" checkbox.
+function partMonthsUI(program, part, i) {
+  const key = `${program.id}:${i}`;
+  const sel = S.partMonths[key] || part.months || [];
+  return `
+    <div class="incur-label sep-bill-label">Billed in: <span class="incur-directive">(set by the program — adjust if needed)</span></div>
+    <div class="incur-chips sep-bill-chips">${MONTH_NAMES.map((m, mi) =>
+      `<button type="button" class="incur-chip part-sep-chip${sel.includes(mi) ? ' on' : ''}" data-pid="${program.id}" data-idx="${i}" data-month="${mi}">${m}</button>`).join('')}</div>`;
+}
+
 // Renders the PM-facing inputs for a component-based program.
 function buildComponentBody(program, parts = program.components, prefix = '') {
   parts = parts || [];
@@ -1160,6 +1184,8 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
     if (prefix !== '' || part.kind === 'tax') return '';
     // Per-month CapEx already places its cost in specific months — no separate billing.
     if (part.kind === 'percent' && part.base === 'capex' && !part.locked) return '';
+    // Admin pre-set months for this part → show its own editable month strip.
+    if (Array.isArray(part.months) && part.months.length && !part.locked) return partMonthsUI(program, part, i);
     if (part.kind === 'options') return part.selectMode === 'multiple' ? partSeparateUI(program, i) : '';
     return multiParts ? partSeparateUI(program, i) : '';
   };
@@ -1739,12 +1765,17 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   el.querySelectorAll('.part-sep-chip').forEach(chip => {
     chip.addEventListener('click', e => {
       e.stopPropagation();
-      const key = `${program.id}:${chip.dataset.idx}`;
+      const pi  = parseInt(chip.dataset.idx);
+      const key = `${program.id}:${pi}`;
       const m   = parseInt(chip.dataset.month);
-      const arr = S.partMonths[key] || [];
-      const idx = arr.indexOf(m);
-      if (idx >= 0) arr.splice(idx, 1); else arr.push(m);
+      const part = (program.components || [])[pi];
+      // Seed from the admin per-part months the first time the PM touches it
+      let arr = S.partMonths[key];
+      if (!arr) arr = (part && Array.isArray(part.months)) ? part.months.slice() : [];
+      const at = arr.indexOf(m);
+      if (at >= 0) arr.splice(at, 1); else arr.push(m);
       S.partMonths[key] = arr;
+      S.partSeparate[key] = true;   // PM has set explicit months for this part
       persistParts(); updateBudgetTotal(); refreshCard(program.id);
     });
   });
