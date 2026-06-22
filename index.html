@@ -8,7 +8,7 @@
   <title>RPM Budget Assumptions</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=98">
+  <link rel="stylesheet" href="css/styles.css?v=99">
 </head>
 <body>
 <div id="app">
@@ -453,6 +453,26 @@
   </div>
 </div>
 
+<!-- ── Modal: Export Acknowledgment ── -->
+<div class="overlay" id="modal-export-ack">
+  <div class="sheet">
+    <div class="sheet-icon warning">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <h3>Internal Use Only</h3>
+    <p>By exporting the Budget Assumptions to Excel, you acknowledge that these will <strong>not be presented to the client</strong>. The assumptions in this format are for <strong>internal use only</strong>.</p>
+    <p><a class="card-guide-link is-placeholder" id="export-client-link" href="#" onclick="return false;">Client-facing assumption details — coming soon</a></p>
+    <label class="export-ack-check">
+      <input type="checkbox" id="export-ack-agree">
+      <span>I agree</span>
+    </label>
+    <div class="sheet-actions">
+      <button class="btn-primary" id="export-ack-continue" disabled>Continue to export</button>
+      <button class="btn-ghost" id="export-ack-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Modal: Edit Unit Count ── -->
 <div class="overlay" id="modal-units">
   <div class="sheet">
@@ -504,6 +524,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=98"></script>
+<script type="module" src="js/app.js?v=99"></script>
 </body>
 </html>

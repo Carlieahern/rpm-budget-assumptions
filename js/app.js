@@ -2182,7 +2182,7 @@ function openSummary() {
   body.innerHTML = html;
   const gv = document.getElementById('sum-grand-val');
   if (gv) gv.textContent = formatCost(grand);
-  document.getElementById('btn-export-csv')?.addEventListener('click', exportSummaryCsv);
+  document.getElementById('btn-export-csv')?.addEventListener('click', () => requestExport(exportSummaryCsv));
 
   const toggleBtn = document.getElementById('btn-prior-year-toggle');
   if (toggleBtn) toggleBtn.style.display = 'none';
@@ -2262,7 +2262,31 @@ async function exportInfoExcel() {
     alert('Export failed: ' + e.message);
   }
 }
-document.getElementById('btn-info-export')?.addEventListener('click', exportInfoExcel);
+// Gate every Excel export behind an internal-use acknowledgment
+let pendingExport = null;
+function requestExport(fn) {
+  pendingExport = fn;
+  const agree = document.getElementById('export-ack-agree');
+  const cont  = document.getElementById('export-ack-continue');
+  if (agree) agree.checked = false;
+  if (cont)  cont.disabled = true;
+  openModal('modal-export-ack');
+}
+document.getElementById('export-ack-agree')?.addEventListener('change', e => {
+  document.getElementById('export-ack-continue').disabled = !e.target.checked;
+});
+document.getElementById('export-ack-cancel')?.addEventListener('click', () => {
+  pendingExport = null;
+  closeModal('modal-export-ack');
+});
+document.getElementById('export-ack-continue')?.addEventListener('click', () => {
+  closeModal('modal-export-ack');
+  const fn = pendingExport;
+  pendingExport = null;
+  fn?.();
+});
+
+document.getElementById('btn-info-export')?.addEventListener('click', () => requestExport(exportInfoExcel));
 
 document.getElementById('btn-summary-back').addEventListener('click', () => showScreen('screen-main'));
 
