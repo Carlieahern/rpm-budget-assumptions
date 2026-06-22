@@ -1527,7 +1527,11 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     // anything — hide the strip so it isn't confusingly lit up.
     const allSeparate = hasComponents(program) && program.components.length > 0 &&
       program.components.every((c, i) => S.partSeparate[`${program.id}:${i}`]);
-    if (!allSeparate) {
+    // Parts carry their own admin months → the program default no longer drives
+    // anything, so don't show a confusing extra strip.
+    const adminPerPartMonths = hasComponents(program) &&
+      program.components.some(c => Array.isArray(c.months) && c.months.length);
+    if (!allSeparate && !adminPerPartMonths) {
       const anySeparate = hasComponents(program) &&
         program.components.some((c, i) => S.partSeparate[`${program.id}:${i}`]);
       const hasDefaults = Array.isArray(program.defaultMonths) && program.defaultMonths.length;
@@ -2070,6 +2074,53 @@ document.getElementById('btn-admin-entry').addEventListener('click', () => {
       renderDeptRows();
     });
   }
+}
+
+// ── Center-panel zoom + auto-collapse to single-column tabs ───────────────────
+const ZOOM_MIN = 0.6, ZOOM_MAX = 1.3, ZOOM_STEP = 0.1;
+const COLLAPSE_THRESHOLD = 680;   // CSS px needed for two cards side-by-side
+let cardZoom = parseFloat(localStorage.getItem('rpm_card_zoom')) || 1;
+
+function applyCardZoom() {
+  const wrap = document.getElementById('cards-zoom');
+  if (wrap) wrap.style.zoom = cardZoom;
+  const lvl = document.getElementById('zoom-level');
+  if (lvl) lvl.textContent = Math.round(cardZoom * 100) + '%';
+  evaluateCollapse();
+}
+function setZoom(z) {
+  cardZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 10) / 10));
+  localStorage.setItem('rpm_card_zoom', cardZoom);
+  applyCardZoom();
+}
+// When the cards (at the current zoom) can't fit two columns, switch to tabs.
+function evaluateCollapse() {
+  const center = document.getElementById('center-col');
+  if (!center) return;
+  const effectiveWidth = center.clientWidth / cardZoom;
+  const collapse = effectiveWidth < COLLAPSE_THRESHOLD;
+  center.classList.toggle('is-collapsed', collapse);
+  const tabs = document.getElementById('cards-tabs');
+  if (tabs) tabs.style.display = collapse ? '' : 'none';
+}
+document.getElementById('zoom-in')?.addEventListener('click', () => setZoom(cardZoom + ZOOM_STEP));
+document.getElementById('zoom-out')?.addEventListener('click', () => setZoom(cardZoom - ZOOM_STEP));
+document.getElementById('tab-nonelective')?.addEventListener('click', () => {
+  document.getElementById('center-col').classList.remove('show-elective');
+  document.getElementById('tab-nonelective').classList.add('is-on');
+  document.getElementById('tab-elective').classList.remove('is-on');
+});
+document.getElementById('tab-elective')?.addEventListener('click', () => {
+  document.getElementById('center-col').classList.add('show-elective');
+  document.getElementById('tab-elective').classList.add('is-on');
+  document.getElementById('tab-nonelective').classList.remove('is-on');
+});
+{
+  const center = document.getElementById('center-col');
+  if (center && 'ResizeObserver' in window) {
+    new ResizeObserver(() => evaluateCollapse()).observe(center);
+  }
+  applyCardZoom();
 }
 
 // ── Mode toggle — flip between Interactive and Info Only without leaving the screen

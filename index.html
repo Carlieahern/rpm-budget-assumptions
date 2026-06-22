@@ -8,7 +8,7 @@
   <title>RPM Budget Assumptions</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=101">
+  <link rel="stylesheet" href="css/styles.css?v=102">
 </head>
 <body>
 <div id="app">
@@ -204,18 +204,31 @@
       </div>
 
       <!-- Center: scrollable cards -->
-      <div class="center-col">
-        <div class="col-headers-row">
-          <div class="col-hdr-cell">
-            <h2 class="col-title">Non-Elective</h2>
-            <p class="col-sub">Budgeted by default. Opting out requires division president approval.</p>
+      <div class="center-col" id="center-col">
+        <div class="cards-toolbar">
+          <div class="cards-tabs" id="cards-tabs" style="display:none;">
+            <button class="cards-tab is-on" id="tab-nonelective" type="button">Non-Elective</button>
+            <button class="cards-tab" id="tab-elective" type="button">Elective</button>
           </div>
-          <div class="col-hdr-cell">
-            <h2 class="col-title">Elective</h2>
-            <p class="col-sub">Select which programs to include in your budget. <span class="col-sub-note">*Must select "Include" to add the expense to the totals.</span></p>
+          <div class="zoom-control" title="Zoom the cards">
+            <button class="zoom-btn" id="zoom-out" type="button" aria-label="Zoom out">−</button>
+            <span class="zoom-level" id="zoom-level">100%</span>
+            <button class="zoom-btn" id="zoom-in" type="button" aria-label="Zoom in">+</button>
           </div>
         </div>
-        <div id="programs-body"></div>
+        <div id="cards-zoom">
+          <div class="col-headers-row">
+            <div class="col-hdr-cell">
+              <h2 class="col-title">Non-Elective</h2>
+              <p class="col-sub">Budgeted by default. Opting out requires division president approval.</p>
+            </div>
+            <div class="col-hdr-cell">
+              <h2 class="col-title">Elective</h2>
+              <p class="col-sub">Select which programs to include in your budget. <span class="col-sub-note">*Must select "Include" to add the expense to the totals.</span></p>
+            </div>
+          </div>
+          <div id="programs-body"></div>
+        </div>
       </div>
 
       <!-- Right panel: Annual total -->
@@ -524,6 +537,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=101"></script>
+<script type="module" src="js/app.js?v=102"></script>
 </body>
 </html>
