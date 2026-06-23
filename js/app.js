@@ -5,6 +5,7 @@ import { loadDecisions, saveDecision, deleteDecision, resetDecisions, loadPriorY
 import { showScreen, openModal, closeModal, groupStyle, formatCost, formatRate,
          renderSummary, populatePropertySelect } from './ui.js';
 import { initAdmin, promptAdminLogin, editProgram, newProgram, isAdminAuthed, openAdmin } from './admin.js';
+import { logActivity } from './activityLog.js';
 
 // ── App State ───────────────────────────────────────────────────────────────
 const S = {
@@ -59,6 +60,7 @@ async function applyLegacyBanner() {
 // ── Bootstrap ───────────────────────────────────────────────────────────────
 async function boot() {
   showScreen('screen-loading');
+  logActivity('Login');
   try {
     await loadPropertyScreen();
   } catch (e) {
@@ -1959,12 +1961,18 @@ async function setDecision(programId, newDec) {
         itemId: existing?.itemId,
       });
       S.decisions[programId] = { ...(existing || {}), itemId, decision: newDec };
+      logActivity(decisionLabel(newDec), S.property, `${decisionLabel(newDec)} — ${program.name} (${S.property})`);
     } catch (e) {
       console.error('Failed to save decision', e);
     }
   }
   refreshCard(programId);
   updateColumnCounts();
+}
+
+function decisionLabel(dec) {
+  return { acknowledged: 'Acknowledged', in: 'Included Elective', out: 'Excluded Elective',
+    'not-applicable': 'Marked Not Applicable', 'opted-out': 'Opted Out', 'needs-followup': 'Opt-Out Requested' }[dec] || dec;
 }
 
 function openOptOutModal(programId) {
@@ -1988,6 +1996,7 @@ async function handleOptOut(hasApproval) {
   });
 
   S.decisions[programId] = { ...(existing || {}), itemId, decision, optOutApproval: hasApproval };
+  logActivity(decisionLabel(decision), S.property, `${decisionLabel(decision)} — ${program.name} (${S.property})`);
   refreshCard(programId);
 }
 
