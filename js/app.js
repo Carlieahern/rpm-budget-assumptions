@@ -1307,7 +1307,7 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
           <div class="capex-grid">
             ${MONTH_NAMES.map((m, mi) => `<label class="capex-cell">
               <span class="capex-cell-m">${m.slice(0,3)}</span>
-              <input class="proj-input" ${pfx} data-pid="${program.id}" data-idx="${i}" data-month="${mi}" type="number" min="0" step="1" placeholder="0" value="${pm[mi] || ''}">
+              <input class="capex-input proj-input" ${pfx} data-pid="${program.id}" data-idx="${i}" data-month="${mi}" type="number" min="0" step="1" placeholder="0" value="${pm[mi] || ''}">
             </label>`).join('')}
           </div>
           <div class="capex-total">${count} ${item}${count === 1 ? '' : 's'} × ${formatRate(rate)} = <strong>${formatCost(rate * count)}</strong></div>
@@ -1601,7 +1601,11 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     // no longer drives anything, so don't show a confusing extra strip.
     const adminPerPartMonths = program.billedTogether === false || (hasComponents(program) &&
       program.components.some(c => Array.isArray(c.months) && c.months.length));
-    if (!allSeparate && !adminPerPartMonths) {
+    // Per-month-input parts (per-project, per-month CapEx) already decide their own
+    // months by where the cost is entered — no separate program month strip needed.
+    const perMonthInput = hasComponents(program) && program.components.some(c =>
+      c.kind === 'project' || (c.kind === 'percent' && c.base === 'capex' && !c.locked));
+    if (!allSeparate && !adminPerPartMonths && !perMonthInput) {
       const anySeparate = hasComponents(program) &&
         program.components.some((c, i) => S.partSeparate[`${program.id}:${i}`]);
       const hasDefaults = Array.isArray(program.defaultMonths) && program.defaultMonths.length;
