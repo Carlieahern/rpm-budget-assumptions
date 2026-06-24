@@ -347,6 +347,7 @@ const PART_KINDS = [
   ['perItem', 'Per item (× a count)'],
   ['percent', '% of income / CapEx'],
   ['options', 'Options (pick one or multiple)'],
+  ['project', 'Per project (rate tiered by units, × projects per month)'],
   ['manual',  'Manual (PM estimates the $)'],
   ['tax',     'Tax (% added to the cost)'],
 ];
@@ -408,6 +409,18 @@ function partFields(part, i) {
              `<div class="ae-field ae-wide"><span>Options</span><div class="ae-popts">${rows}</div><button class="ae-popt-add" data-i="${i}">+ Add option</button></div>` +
              `<label class="ae-follows"><input type="checkbox" class="ae-pf" data-i="${i}" data-k="perUnit"${part.perUnit ? ' checked' : ''}> Multiply the selected option's rate by the unit count</label>`;
     }
+    case 'project': {
+      const tiers = part.tiers || [];
+      const rows = tiers.map((t, ti) => `
+        <div class="ae-popt" data-i="${i}" data-ti="${ti}">
+          <input class="ae-pf-tier" data-i="${i}" data-ti="${ti}" data-k="maxUnits" type="number" min="0" step="1" value="${esc(t.maxUnits)}" placeholder="up to … units (blank = no cap)">
+          <input class="ae-pf-tier" data-i="${i}" data-ti="${ti}" data-k="rate" type="number" step="0.01" value="${esc(t.rate)}" placeholder="Rate per project">
+          <button class="ae-ptier-del" data-i="${i}" data-ti="${ti}">✕</button>
+        </div>`).join('');
+      return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Survey">`) +
+             L("What's counted?", `<input class="ae-pf" data-i="${i}" data-k="itemLabel" type="text" value="${esc(part.itemLabel)}" placeholder="e.g. project">`) +
+             `<div class="ae-field ae-wide"><span>Packages by unit count <span class="label-soft">— each row: cap (≤ units) + rate. Leave the last cap blank for "and above".</span></span><div class="ae-popts">${rows}</div><button class="ae-ptier-add" data-i="${i}">+ Add package</button></div>`;
+    }
     case 'manual':
       return L('What are they budgeting?', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Estimated travel">`);
     case 'tax':
@@ -433,7 +446,7 @@ function partRow(part, i, arr = 'components') {
         <button class="ae-part-del" data-i="${i}" title="Remove part">✕</button>
       </div>
       <div class="ae-part-fields">${partFields(part, i)}</div>
-      ${(arr === 'components' && part.kind !== 'tax' && form.billedTogether === false) ? `
+      ${(arr === 'components' && part.kind !== 'tax' && part.kind !== 'project' && form.billedTogether === false) ? `
       <div class="ae-part-months">
         <span class="ae-part-months-label">Billing months for this part <span class="label-soft">— select the months this part is charged (e.g. spring &amp; fall).</span></span>
         <div class="ae-month-chips ae-part-mchips" data-i="${i}">
@@ -704,6 +717,7 @@ function wireEditor() {
       const arr = arrOf(sel), i = +sel.dataset.i, k = e.target.value;
       form[arr][i] = { kind: k, label: form[arr][i].label || '',
         ...(k === 'options' ? { selectMode: 'one', options: [{ label: '', rate: '' }] } : {}),
+        ...(k === 'project' ? { itemLabel: 'project', tiers: [{ maxUnits: '', rate: '' }] } : {}),
         ...(k === 'perItem' ? { itemLabel: 'item' } : {}) };
       buildEditor();
     }));
@@ -736,6 +750,23 @@ function wireEditor() {
   document.querySelectorAll('.ae-pf-opt').forEach(el =>
     el.addEventListener('input', e => {
       form[arrOf(el)][+el.dataset.i].options[+el.dataset.oi][el.dataset.k] = e.target.value;
+      updatePreview();
+    }));
+  // Per-project package tiers
+  document.querySelectorAll('.ae-ptier-add').forEach(b =>
+    b.addEventListener('click', () => {
+      const arr = arrOf(b), i = +b.dataset.i;
+      (form[arr][i].tiers = form[arr][i].tiers || []).push({ maxUnits: '', rate: '' });
+      buildEditor();
+    }));
+  document.querySelectorAll('.ae-ptier-del').forEach(b =>
+    b.addEventListener('click', () => {
+      form[arrOf(b)][+b.dataset.i].tiers.splice(+b.dataset.ti, 1);
+      buildEditor();
+    }));
+  document.querySelectorAll('.ae-pf-tier').forEach(el =>
+    el.addEventListener('input', e => {
+      form[arrOf(el)][+el.dataset.i].tiers[+el.dataset.ti][el.dataset.k] = e.target.value;
       updatePreview();
     }));
 
@@ -806,6 +837,11 @@ function cleanParts(arr) {
       case 'options': c.selectMode = p.selectMode === 'multiple' ? 'multiple' : 'one';
                       if (p.perUnit) c.perUnit = true;
                       c.options = (p.options || []).filter(o => o.label || o.rate).map(o => ({ label: o.label || '', rate: cleanNum(o.rate) || 0 })); break;
+      case 'project': c.itemLabel = p.itemLabel || 'project';
+                      c.tiers = (p.tiers || []).filter(t => t.rate !== '' && t.rate != null).map(t => ({
+                        maxUnits: (t.maxUnits === '' || t.maxUnits == null) ? null : cleanNum(t.maxUnits),
+                        rate: cleanNum(t.rate) || 0,
+                      })); break;
       case 'tax':     c.pct = cleanNum(p.pct) || 0; break;
       case 'manual':  break; // label only
       case 'formula': c.expr = p.expr || ''; break;

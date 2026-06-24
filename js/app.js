@@ -33,6 +33,7 @@ const S = {
   budgetAmounts:   {},    // programId → manual dollar amount (fallback for complex costs)
   incurMonths:     {},    // programId → [month indices] for as-incurred programs
   capexMonths:     {},    // "programId:partIdx" → [12 amounts] CapEx project cost per month (% of CapEx parts)
+  projectMonths:   {},    // "programId:partIdx" → [12 counts] # of projects per month (per-project parts)
   currentOptOutId: null,
   viewingPrior:    false,
   search:          '',    // dashboard search filter (department / program name / setup fee name)
@@ -181,7 +182,7 @@ document.getElementById('btn-skip').addEventListener('click', () => {
 function clearEphemeralKeys() {
   const yr = S.budgetYear;
   ['rpm_qty','rpm_tiers','rpm_optqty','rpm_compin','rpm_compsel','rpm_partsep',
-   'rpm_partmo','rpm_spread','rpm_setupon','rpm_setupmonth','rpm_budget','rpm_incur','rpm_capex']
+   'rpm_partmo','rpm_spread','rpm_setupon','rpm_setupmonth','rpm_budget','rpm_incur','rpm_capex','rpm_projectmonths']
     .forEach(k => localStorage.removeItem(`${k}_null_${yr}`));
   localStorage.removeItem('rpm_units_null');
   localStorage.removeItem('rpm_transition_null');
@@ -215,7 +216,7 @@ async function launchMain() {
       S.quantities = {}; S.selectedTiers = {}; S.optionQty = {};
       S.compInputs = {}; S.compSel = {}; S.partSeparate = {}; S.partMonths = {};
       S.spreadMonthly = {}; S.setupOn = {}; S.setupMonth = {};
-      S.budgetAmounts = {}; S.incurMonths = {}; S.capexMonths = {};
+      S.budgetAmounts = {}; S.incurMonths = {}; S.capexMonths = {}; S.projectMonths = {};
     } else {
       // Load saved input values for this property + year
       S.unitCount    = parseInt(localStorage.getItem(`rpm_units_${S.property}`)) || 0;
@@ -234,6 +235,7 @@ async function launchMain() {
       try { S.budgetAmounts = JSON.parse(localStorage.getItem(`rpm_budget_${S.property}_${S.budgetYear}`)) || {}; } catch { S.budgetAmounts = {}; }
       try { S.incurMonths   = JSON.parse(localStorage.getItem(`rpm_incur_${S.property}_${S.budgetYear}`))  || {}; } catch { S.incurMonths   = {}; }
       try { S.capexMonths   = JSON.parse(localStorage.getItem(`rpm_capex_${S.property}_${S.budgetYear}`))  || {}; } catch { S.capexMonths   = {}; }
+      try { S.projectMonths = JSON.parse(localStorage.getItem(`rpm_projectmonths_${S.property}_${S.budgetYear}`)) || {}; } catch { S.projectMonths = {}; }
     }
 
     renderMainScreen();
@@ -275,6 +277,11 @@ function partsSummaryRows(parts) {
       case 'perItem': return row(part.label || part.itemLabel || 'Per item', `${formatRate(num(part.rate))}/${(part.itemLabel || 'item').toLowerCase()}`);
       case 'percent': return row(part.label || 'Percentage', `${num(part.pct)}% of ${part.base === 'capex' ? 'CapEx' : 'income'}`);
       case 'options': return (part.options || []).map(o => row(o.label, formatRate(num(o.rate)))).join('');
+      case 'project': return (part.tiers || []).map((t, ti) => {
+        const lo = ti === 0 ? 0 : (num((part.tiers)[ti - 1].maxUnits) + 1);
+        const range = (t.maxUnits == null || t.maxUnits === '') ? `${lo}+ units` : `${lo}–${num(t.maxUnits)} units`;
+        return row(`${part.label || 'Per project'} (${range})`, `${formatRate(num(t.rate))}/${part.itemLabel || 'project'}`);
+      }).join('');
       case 'manual':  return row(part.label || 'Estimated amount', 'Varies');
       case 'tax':     return row(part.label || 'Tax', `+${num(part.pct)}%`);
       default: return '';
@@ -374,9 +381,26 @@ function customResult(program, info) {
 // period amount; resolvedCost annualizes + clamps. PM inputs are keyed "id:idx".
 function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
 
+// Which per-project package (tier) applies: the PM's pick, else the one matching unit count.
+function projectTierIndex(part, key) {
+  const tiers = part.tiers || [];
+  if (S.compSel[key] != null && S.compSel[key] !== '') return Math.min(num(S.compSel[key]), tiers.length - 1);
+  const u = S.unitCount || 0;
+  for (let i = 0; i < tiers.length; i++) {
+    const mx = tiers[i].maxUnits;
+    if (mx == null || mx === '' || u <= num(mx)) return i;
+  }
+  return Math.max(0, tiers.length - 1);
+}
+
 function partPeriodCost(program, part, idx, prefix = '') {
   const key = `${prefix}${program.id}:${idx}`;
   switch (part.kind) {
+    case 'project': {
+      const rate   = num((part.tiers || [])[projectTierIndex(part, key)]?.rate);
+      const counts = S.projectMonths[key] || [];
+      return rate * counts.reduce((s, v) => s + num(v), 0);
+    }
     case 'flat':
       return num(part.amount);
     case 'perUnit': {
@@ -664,6 +688,13 @@ function programMonths12(program) {
       const cm  = S.capexMonths[key] || [];
       const pct = num(c.pct) / 100;
       for (let m = 0; m < 12; m++) arr[m] += num(cm[m]) * pct;
+      return;
+    }
+    // Per-project: each month gets (selected rate × # projects entered that month)
+    if (c.kind === 'project') {
+      const rate = num((c.tiers || [])[projectTierIndex(c, key)]?.rate);
+      const pm   = S.projectMonths[key] || [];
+      for (let m = 0; m < 12; m++) arr[m] += rate * num(pm[m]);
       return;
     }
     const per = partPeriodCost(program, c, i);
@@ -1186,6 +1217,7 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
   const sepUI = (part, i) => {
     if (prefix !== '' || part.kind === 'tax') return '';
     if (part.kind === 'percent' && part.base === 'capex' && !part.locked) return '';
+    if (part.kind === 'project') return '';   // has its own per-month project grid
     // Billed separately → every part shows its own editable month strip, even if no
     // months are pre-selected yet (so the PM can pick them).
     if (program.billedTogether === false && !part.locked) return partMonthsUI(program, part, i);
@@ -1251,6 +1283,35 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
           <span class="calc-rate">${num(part.pct)}%</span>
           ${num(v) > 0 ? `<span class="qty-equals">= <strong>${formatCost(result)}</strong></span>` : ''}
         </div>`;
+      }
+      case 'project': {
+        const tiers = part.tiers || [];
+        const sel   = projectTierIndex(part, key);
+        const rate  = num(tiers[sel]?.rate);
+        const item  = part.itemLabel || 'project';
+        const pm    = S.projectMonths[key] || [];
+        const count = pm.reduce((s, v) => s + num(v), 0);
+        const tierLabel = (t, ti) => {
+          const lo = ti === 0 ? 0 : (num(tiers[ti - 1].maxUnits) + 1);
+          return (t.maxUnits == null || t.maxUnits === '') ? `${lo}+ units` : `${lo}–${num(t.maxUnits)} units`;
+        };
+        const tierRows = tiers.map((t, ti) => `
+          <label class="tier-option${ti === sel ? ' is-selected' : ''}">
+            <input type="radio" class="proj-tier" name="proj-${key}" ${pfx} data-pid="${program.id}" data-idx="${i}" data-ti="${ti}"${ti === sel ? ' checked' : ''}>
+            <span class="tier-label">${tierLabel(t, ti)} <span class="tier-rate">${formatRate(num(t.rate))}/${item}</span></span>
+          </label>`).join('');
+        return `<div class="proj-block" data-key="${key}">
+          <div class="tier-select-label">Select your package</div>
+          <div class="tier-options">${tierRows}</div>
+          <div class="capex-grid-label">How many ${item}s do you expect each month?</div>
+          <div class="capex-grid">
+            ${MONTH_NAMES.map((m, mi) => `<label class="capex-cell">
+              <span class="capex-cell-m">${m.slice(0,3)}</span>
+              <input class="proj-input" ${pfx} data-pid="${program.id}" data-idx="${i}" data-month="${mi}" type="number" min="0" step="1" placeholder="0" value="${pm[mi] || ''}">
+            </label>`).join('')}
+          </div>
+          <div class="capex-total">${count} ${item}${count === 1 ? '' : 's'} × ${formatRate(rate)} = <strong>${formatCost(rate * count)}</strong></div>
+        </div>${sepUI(part, i)}`;
       }
       case 'options': {
         const opts = part.options || [];
@@ -1708,6 +1769,35 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       const totEl = block?.querySelector('.capex-total');
       if (totEl) totEl.innerHTML = `Total CapEx: ${formatCost(total)} × ${pct}% = <strong>${formatCost(total * pct / 100)}</strong>`;
       persistCapex(); updateBudgetTotal(); refreshHero();
+    });
+  });
+  // Per-project: package selection + monthly project counts
+  const persistProject = () =>
+    localStorage.setItem(`rpm_projectmonths_${S.property}_${S.budgetYear}`, JSON.stringify(S.projectMonths));
+  el.querySelectorAll('.proj-tier').forEach(r => {
+    r.addEventListener('change', e => {
+      e.stopPropagation();
+      S.compSel[pfxKey(r.dataset)] = parseInt(r.dataset.ti);
+      persistComp(); updateBudgetTotal(); refreshCard(program.id);   // re-render to update the package rate in the total
+    });
+  });
+  el.querySelectorAll('.proj-input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      e.stopPropagation();
+      const key = pfxKey(inp.dataset);
+      const arr = S.projectMonths[key] || Array(12).fill(0);
+      arr[parseInt(inp.dataset.month)] = parseFloat(e.target.value) || 0;
+      S.projectMonths[key] = arr;
+      // Update the running total in place so typing keeps focus
+      const block = inp.closest('.proj-block');
+      const parts = inp.dataset.prefix === 'setup:' ? (program.setupComponents || []) : (program.components || []);
+      const part  = parts[parseInt(inp.dataset.idx)];
+      const rate  = num((part?.tiers || [])[projectTierIndex(part, key)]?.rate);
+      const item  = part?.itemLabel || 'project';
+      const count = arr.reduce((s, v) => s + num(v), 0);
+      const totEl = block?.querySelector('.capex-total');
+      if (totEl) totEl.innerHTML = `${count} ${item}${count === 1 ? '' : 's'} × ${formatRate(rate)} = <strong>${formatCost(rate * count)}</strong>`;
+      persistProject(); updateBudgetTotal(); refreshHero();
     });
   });
   el.querySelectorAll('.comp-optradio').forEach(r => {
@@ -2310,6 +2400,11 @@ function partsSummaryText(parts) {
       case 'perItem': return `${part.label || part.itemLabel || 'Per item'}: ${formatRate(num(part.rate))}/${(part.itemLabel || 'item').toLowerCase()}`;
       case 'percent': return `${part.label || 'Percent'}: ${num(part.pct)}% of ${part.base === 'capex' ? 'CapEx' : 'income'}`;
       case 'options': return (part.options || []).map(o => `${o.label}: ${formatRate(num(o.rate))}`).join('; ');
+      case 'project': return (part.tiers || []).map((t, ti) => {
+        const lo = ti === 0 ? 0 : (num((part.tiers)[ti - 1].maxUnits) + 1);
+        const range = (t.maxUnits == null || t.maxUnits === '') ? `${lo}+ units` : `${lo}-${num(t.maxUnits)} units`;
+        return `${range}: ${formatRate(num(t.rate))}/${part.itemLabel || 'project'}`;
+      }).join('; ');
       case 'manual':  return `${part.label || 'Estimate'}: varies`;
       case 'tax':     return `${part.label || 'Tax'}: +${num(part.pct)}%`;
       default: return '';
@@ -2469,6 +2564,7 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
     S.budgetAmounts  = {};
     S.incurMonths    = {};
     S.capexMonths    = {};
+    S.projectMonths  = {};
     localStorage.removeItem(`rpm_qty_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_tiers_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_optqty_${S.property}_${S.budgetYear}`);
@@ -2482,6 +2578,7 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
     localStorage.removeItem(`rpm_budget_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_incur_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_capex_${S.property}_${S.budgetYear}`);
+    localStorage.removeItem(`rpm_projectmonths_${S.property}_${S.budgetYear}`);
     renderMainScreen();
     showScreen('screen-main');
   } catch (e) {
