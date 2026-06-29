@@ -62,6 +62,16 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
 
+  // Diagnostic: reports whether the service account is configured and a token can
+  // be obtained. Never returns the token or key — just booleans. Safe to call.
+  if (req.query.diag) {
+    let tokenOk = false, error = null;
+    try { tokenOk = !!(await getAccessToken()); }
+    catch (e) { error = String(e.message || e).slice(0, 200); }
+    res.status(200).json({ configured: !!process.env.FIREBASE_SERVICE_ACCOUNT, tokenOk, error });
+    return;
+  }
+
   const path = (req.query.path || '').toString();
   if (!PATH_OK.test(path)) { res.status(400).json({ error: 'Invalid path' }); return; }
   if (!['GET', 'PUT', 'DELETE'].includes(req.method)) {
