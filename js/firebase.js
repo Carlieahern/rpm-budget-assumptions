@@ -1,6 +1,11 @@
 import CONFIG from './config.js';
 import { MOCK_PROGRAMS } from './mockData.js';
 
+// All Firebase reads/writes go through the /api/db proxy so the database can be
+// locked down (the proxy authenticates server-side). `path` is e.g. "programs",
+// "programs/<id>", or "meta/legacyBanner" — no leading slash, no ".json".
+const dbUrl = (path) => `/api/db?path=${encodeURIComponent(path)}`;
+
 // ── Cache ─────────────────────────────────────────────────────────────────────
 // Programs update once a year — cache for 24 hours so the app opens instantly.
 const CACHE_KEY = 'rpm_firebase_programs';
@@ -35,7 +40,7 @@ export async function fetchPrograms(forceRefresh = false) {
     if (cached) return cached;
   }
 
-  const res = await fetch(`${CONFIG.firebase.url}/programs.json`);
+  const res = await fetch(dbUrl('programs'));
   if (!res.ok) throw new Error(`Firebase error: ${res.status}`);
   const raw = await res.json();
   if (!raw) return [];
@@ -130,13 +135,13 @@ export async function fetchPrograms(forceRefresh = false) {
 // ── Admin: raw read / write to Firebase ────────────────────────────────────────
 // Returns the raw program objects (not the app-shaped version) keyed by id.
 export async function fetchRawPrograms() {
-  const res = await fetch(`${CONFIG.firebase.url}/programs.json`);
+  const res = await fetch(dbUrl('programs'));
   if (!res.ok) throw new Error(`Firebase error: ${res.status}`);
   return (await res.json()) || {};
 }
 
 export async function saveProgram(id, data) {
-  const res = await fetch(`${CONFIG.firebase.url}/programs/${id}.json`, {
+  const res = await fetch(dbUrl(`programs/${id}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -147,7 +152,7 @@ export async function saveProgram(id, data) {
 }
 
 export async function deleteProgram(id) {
-  const res = await fetch(`${CONFIG.firebase.url}/programs/${id}.json`, { method: 'DELETE' });
+  const res = await fetch(dbUrl(`programs/${id}`), { method: 'DELETE' });
   if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
   clearFirebaseCache();
   return true;
@@ -156,7 +161,7 @@ export async function deleteProgram(id) {
 // Admin-added custom cost-basis type names (shared across all admins).
 export async function fetchCostBasisTypes() {
   try {
-    const res = await fetch(`${CONFIG.firebase.url}/meta/costBasisTypes.json`);
+    const res = await fetch(dbUrl('meta/costBasisTypes'));
     if (!res.ok) return [];
     return (await res.json()) || [];
   } catch { return []; }
@@ -166,7 +171,7 @@ export async function addCostBasisType(name) {
   const current = await fetchCostBasisTypes();
   if (current.includes(name)) return current;
   const updated = [...current, name];
-  await fetch(`${CONFIG.firebase.url}/meta/costBasisTypes.json`, {
+  await fetch(dbUrl('meta/costBasisTypes'), {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated),
   });
   return updated;
@@ -175,14 +180,14 @@ export async function addCostBasisType(name) {
 // "Looking for 2026?" home-screen banner config (shown/hidden + links per system)
 export async function fetchLegacyBanner() {
   try {
-    const res = await fetch(`${CONFIG.firebase.url}/meta/legacyBanner.json`);
+    const res = await fetch(dbUrl('meta/legacyBanner'));
     if (!res.ok) return null;
     return await res.json();
   } catch { return null; }
 }
 
 export async function saveLegacyBanner(data) {
-  const res = await fetch(`${CONFIG.firebase.url}/meta/legacyBanner.json`, {
+  const res = await fetch(dbUrl('meta/legacyBanner'), {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error(`Save failed: ${res.status}`);
