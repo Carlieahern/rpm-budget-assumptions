@@ -61,6 +61,11 @@ async function applyLegacyBanner() {
 // ── Bootstrap ───────────────────────────────────────────────────────────────
 async function boot() {
   showScreen('screen-loading');
+  const hubUserParam = new URLSearchParams(location.search).get('hubUser');
+  if (hubUserParam) {
+    localStorage.setItem('rpm_hub_user', hubUserParam);
+    history.replaceState({}, '', location.pathname);
+  }
   logActivity('Login');
   try {
     await loadPropertyScreen();
