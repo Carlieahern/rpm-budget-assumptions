@@ -31,9 +31,11 @@ function getHubUser() {
 
 // action: e.g. 'Login', 'Acknowledged', 'Opted Out', 'Included Elective'
 export async function logActivity(action, property = '', description = '') {
+  const user = getHubUser();
+  // No identity (opened directly, not via the Hub) — skip rather than log "Unknown" noise.
+  if (user.name === 'Unknown' && !user.email) return;
   try {
     await ensureFirebase();
-    const user = getHubUser();
     const expireAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000); // 60-day retention (Firestore TTL field)
     await fbMod.addDoc(fbMod.collection(db, 'activity_log'), {
       name: user.name,
