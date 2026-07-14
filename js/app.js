@@ -492,6 +492,15 @@ function hasComponents(program) {
   return Array.isArray(program.components) && program.components.length > 0;
 }
 
+// Parts where the PM enters a figure per month (monthly / per-project / per-month
+// CapEx). Their partPeriodCost is a whole-year sum, so a monthly-billed program
+// with one of these must show its hero as an average, not that annual sum "/mo".
+function hasPerMonthInput(program) {
+  return hasComponents(program) && program.components.some(c =>
+    c.kind === 'monthly' || c.kind === 'project' ||
+    (c.kind === 'percent' && c.base === 'capex' && !c.locked));
+}
+
 function hasSetupBuilder(program) {
   return Array.isArray(program.setupComponents) && program.setupComponents.length > 0;
 }
@@ -895,6 +904,12 @@ function resolvedMonthlyCost(program) {
 // Monthly-billed programs show their monthly figure; everything else shows annual.
 function heroCost(program) {
   const isMonthly = program.billingPeriod === 'monthly';
+  // Per-month-input parts have no single "per month" rate — show the true average
+  // (annual ÷ 12) so the /mo hero matches what feeds the side-panel totals.
+  if (isMonthly && hasPerMonthInput(program)) {
+    const avg = proratedAnnual(program) / 12;
+    return avg > 0 ? formatCost(avg) : '—';
+  }
   const v = isMonthly ? resolvedMonthlyCost(program) : resolvedCost(program);
   return v > 0 ? formatCost(v) : '—';
 }
