@@ -2805,6 +2805,26 @@ body {
   outline: none;
 }
 .capex-input:focus { border-color: #fff; }
+.capex-cell-cum {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.7);
+  margin-top: 1px;
+}
+.prog-card.is-elective .capex-cell-cum { color: var(--copper); }
+.monthly-accum-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.8);
+  cursor: pointer;
+}
+.prog-card.is-elective .monthly-accum-toggle { color: var(--copper); }
+.monthly-accum-toggle input { accent-color: #fff; }
+.prog-card.is-elective .monthly-accum-toggle input { accent-color: var(--copper); }
 .capex-total { margin-top: 10px; font-size: 13px; color: rgba(255,255,255,0.85); }
 .capex-total strong { color: #fff; font-size: 15px; }
 /* Elective (white) cards — flip to dark text */
