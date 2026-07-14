@@ -348,6 +348,7 @@ const PART_KINDS = [
   ['percent', '% of income / CapEx'],
   ['options', 'Options (pick one or multiple)'],
   ['project', 'Per project (rate tiered by units, × projects per month)'],
+  ['monthly', 'Monthly amount (PM enters $ per month, totals up)'],
   ['manual',  'Manual (PM estimates the $)'],
   ['tax',     'Tax (% added to the cost)'],
 ];
@@ -421,6 +422,9 @@ function partFields(part, i) {
              L("What's counted?", `<input class="ae-pf" data-i="${i}" data-k="itemLabel" type="text" value="${esc(part.itemLabel)}" placeholder="e.g. project">`) +
              `<div class="ae-field ae-wide"><span>Packages by unit count <span class="label-soft">— each row: cap (≤ units) + rate. Leave the last cap blank for "and above".</span></span><div class="ae-popts">${rows}</div><button class="ae-ptier-add" data-i="${i}">+ Add package</button></div>`;
     }
+    case 'monthly':
+      return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Monthly reserve">`) +
+             `<p class="label-soft" style="margin:6px 0 0;">The PM enters a dollar amount for each month; the year totals them up.</p>`;
     case 'manual':
       return L('What are they budgeting?', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Estimated travel">`);
     case 'tax':
@@ -446,7 +450,7 @@ function partRow(part, i, arr = 'components') {
         <button class="ae-part-del" data-i="${i}" title="Remove part">✕</button>
       </div>
       <div class="ae-part-fields">${partFields(part, i)}</div>
-      ${(arr === 'components' && part.kind !== 'tax' && part.kind !== 'project' && form.billedTogether === false) ? `
+      ${(arr === 'components' && part.kind !== 'tax' && part.kind !== 'project' && part.kind !== 'monthly' && form.billedTogether === false) ? `
       <div class="ae-part-months">
         <span class="ae-part-months-label">Billing months for this part <span class="label-soft">— select the months this part is charged (e.g. spring &amp; fall).</span></span>
         <div class="ae-month-chips ae-part-mchips" data-i="${i}">

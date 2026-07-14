@@ -34,6 +34,7 @@ const S = {
   incurMonths:     {},    // programId → [month indices] for as-incurred programs
   capexMonths:     {},    // "programId:partIdx" → [12 amounts] CapEx project cost per month (% of CapEx parts)
   projectMonths:   {},    // "programId:partIdx" → [12 counts] # of projects per month (per-project parts)
+  monthlyEntry:    {},    // "programId:partIdx" → [12 amounts] blank $ entered per month (monthly parts)
   currentOptOutId: null,
   viewingPrior:    false,
   search:          '',    // dashboard search filter (department / program name / setup fee name)
@@ -187,7 +188,7 @@ document.getElementById('btn-skip').addEventListener('click', () => {
 function clearEphemeralKeys() {
   const yr = S.budgetYear;
   ['rpm_qty','rpm_tiers','rpm_optqty','rpm_compin','rpm_compsel','rpm_partsep',
-   'rpm_partmo','rpm_spread','rpm_setupon','rpm_setupmonth','rpm_budget','rpm_incur','rpm_capex','rpm_projectmonths']
+   'rpm_partmo','rpm_spread','rpm_setupon','rpm_setupmonth','rpm_budget','rpm_incur','rpm_capex','rpm_projectmonths','rpm_monthlyentry']
     .forEach(k => localStorage.removeItem(`${k}_null_${yr}`));
   localStorage.removeItem('rpm_units_null');
   localStorage.removeItem('rpm_transition_null');
@@ -221,7 +222,7 @@ async function launchMain() {
       S.quantities = {}; S.selectedTiers = {}; S.optionQty = {};
       S.compInputs = {}; S.compSel = {}; S.partSeparate = {}; S.partMonths = {};
       S.spreadMonthly = {}; S.setupOn = {}; S.setupMonth = {};
-      S.budgetAmounts = {}; S.incurMonths = {}; S.capexMonths = {}; S.projectMonths = {};
+      S.budgetAmounts = {}; S.incurMonths = {}; S.capexMonths = {}; S.projectMonths = {}; S.monthlyEntry = {};
     } else {
       // Load saved input values for this property + year
       S.unitCount    = parseInt(localStorage.getItem(`rpm_units_${S.property}`)) || 0;
@@ -241,6 +242,7 @@ async function launchMain() {
       try { S.incurMonths   = JSON.parse(localStorage.getItem(`rpm_incur_${S.property}_${S.budgetYear}`))  || {}; } catch { S.incurMonths   = {}; }
       try { S.capexMonths   = JSON.parse(localStorage.getItem(`rpm_capex_${S.property}_${S.budgetYear}`))  || {}; } catch { S.capexMonths   = {}; }
       try { S.projectMonths = JSON.parse(localStorage.getItem(`rpm_projectmonths_${S.property}_${S.budgetYear}`)) || {}; } catch { S.projectMonths = {}; }
+      try { S.monthlyEntry  = JSON.parse(localStorage.getItem(`rpm_monthlyentry_${S.property}_${S.budgetYear}`)) || {}; } catch { S.monthlyEntry  = {}; }
     }
 
     renderMainScreen();
@@ -405,6 +407,11 @@ function partPeriodCost(program, part, idx, prefix = '') {
       const rate   = num((part.tiers || [])[projectTierIndex(part, key)]?.rate);
       const counts = S.projectMonths[key] || [];
       return rate * counts.reduce((s, v) => s + num(v), 0);
+    }
+    case 'monthly': {
+      // Blank per-month entry — the year is just the sum of what the PM enters.
+      const me = S.monthlyEntry[key] || [];
+      return me.reduce((s, v) => s + num(v), 0);
     }
     case 'flat':
       return num(part.amount);
@@ -700,6 +707,12 @@ function programMonths12(program) {
       const rate = num((c.tiers || [])[projectTierIndex(c, key)]?.rate);
       const pm   = S.projectMonths[key] || [];
       for (let m = 0; m < 12; m++) arr[m] += rate * num(pm[m]);
+      return;
+    }
+    // Monthly blank entry: each month gets exactly what the PM typed for it
+    if (c.kind === 'monthly') {
+      const me = S.monthlyEntry[key] || [];
+      for (let m = 0; m < 12; m++) arr[m] += num(me[m]);
       return;
     }
     const per = partPeriodCost(program, c, i);
@@ -1318,6 +1331,21 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
           <div class="capex-total">${count} ${item}${count === 1 ? '' : 's'} × ${formatRate(rate)} = <strong>${formatCost(rate * count)}</strong></div>
         </div>${sepUI(part, i)}`;
       }
+      case 'monthly': {
+        const me = S.monthlyEntry[key] || [];
+        const total = me.reduce((s, v) => s + num(v), 0);
+        return `<div class="monthly-block" data-key="${key}">
+          ${part.label ? `<div class="tier-select-label">${part.label}</div>` : ''}
+          <div class="capex-grid-label">Enter the amount for each month — the year totals them up.</div>
+          <div class="capex-grid">
+            ${MONTH_NAMES.map((m, mi) => `<label class="capex-cell">
+              <span class="capex-cell-m">${m.slice(0,3)}</span>
+              <input class="capex-input monthly-input" ${pfx} data-pid="${program.id}" data-idx="${i}" data-month="${mi}" type="number" min="0" step="0.01" placeholder="$" value="${me[mi] || ''}">
+            </label>`).join('')}
+          </div>
+          <div class="capex-total">Year total: <strong>${formatCost(total)}</strong></div>
+        </div>`;
+      }
       case 'options': {
         const opts = part.options || [];
         if (part.selectMode === 'multiple') {
@@ -1609,7 +1637,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     // Per-month-input parts (per-project, per-month CapEx) already decide their own
     // months by where the cost is entered — no separate program month strip needed.
     const perMonthInput = hasComponents(program) && program.components.some(c =>
-      c.kind === 'project' || (c.kind === 'percent' && c.base === 'capex' && !c.locked));
+      c.kind === 'project' || c.kind === 'monthly' || (c.kind === 'percent' && c.base === 'capex' && !c.locked));
     if (!allSeparate && !adminPerPartMonths && !perMonthInput) {
       const anySeparate = hasComponents(program) &&
         program.components.some((c, i) => S.partSeparate[`${program.id}:${i}`]);
@@ -1788,6 +1816,22 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       e.stopPropagation();
       S.compSel[pfxKey(r.dataset)] = parseInt(r.dataset.ti);
       persistComp(); updateBudgetTotal(); refreshCard(program.id);   // re-render to update the package rate in the total
+    });
+  });
+  const persistMonthly = () =>
+    localStorage.setItem(`rpm_monthlyentry_${S.property}_${S.budgetYear}`, JSON.stringify(S.monthlyEntry));
+  el.querySelectorAll('.monthly-input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      e.stopPropagation();
+      const key = pfxKey(inp.dataset);
+      const arr = S.monthlyEntry[key] || Array(12).fill(0);
+      arr[parseInt(inp.dataset.month)] = parseFloat(e.target.value) || 0;
+      S.monthlyEntry[key] = arr;
+      const block = inp.closest('.monthly-block');
+      const total = arr.reduce((s, v) => s + num(v), 0);
+      const totEl = block?.querySelector('.capex-total');
+      if (totEl) totEl.innerHTML = `Year total: <strong>${formatCost(total)}</strong>`;
+      persistMonthly(); updateBudgetTotal(); refreshHero();
     });
   });
   el.querySelectorAll('.proj-input').forEach(inp => {
@@ -2574,6 +2618,7 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
     S.incurMonths    = {};
     S.capexMonths    = {};
     S.projectMonths  = {};
+    S.monthlyEntry   = {};
     localStorage.removeItem(`rpm_qty_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_tiers_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_optqty_${S.property}_${S.budgetYear}`);
@@ -2588,6 +2633,7 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
     localStorage.removeItem(`rpm_incur_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_capex_${S.property}_${S.budgetYear}`);
     localStorage.removeItem(`rpm_projectmonths_${S.property}_${S.budgetYear}`);
+    localStorage.removeItem(`rpm_monthlyentry_${S.property}_${S.budgetYear}`);
     renderMainScreen();
     showScreen('screen-main');
   } catch (e) {
