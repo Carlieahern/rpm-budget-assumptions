@@ -711,10 +711,18 @@ function programMonths12(program) {
       for (let m = 0; m < 12; m++) arr[m] += rate * num(pm[m]);
       return;
     }
-    // Monthly blank entry: each month gets exactly what the PM typed for it
+    // Monthly blank entry. Normally each month gets exactly what the PM typed.
+    // When "compound into a running balance" is on, the raw per-month figures
+    // grow, so the monthly cost is shown as an even average of the year's total.
     if (c.kind === 'monthly') {
       const me = S.monthlyEntry[key] || [];
-      for (let m = 0; m < 12; m++) arr[m] += num(me[m]);
+      if (S.monthlyAccum[key]) {
+        const total = me.reduce((s, v) => s + num(v), 0);
+        const each = monthlyMonths.length ? total / monthlyMonths.length : 0;
+        monthlyMonths.forEach(m => arr[m] += each);
+      } else {
+        for (let m = 0; m < 12; m++) arr[m] += num(me[m]);
+      }
       return;
     }
     const per = partPeriodCost(program, c, i);
@@ -1350,7 +1358,7 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
           <div class="capex-grid-label">Enter the amount for each month${accum ? ' — it builds a running balance' : ' — the year totals them up'}.</div>
           <div class="capex-grid">${cells}</div>
           <label class="monthly-accum-toggle"><input type="checkbox" class="monthly-accum" ${pfx} data-pid="${program.id}" data-idx="${i}"${accum ? ' checked' : ''}> Compound into a running balance (accumulates each month)</label>
-          <div class="capex-total">${accum ? 'Ending balance' : 'Year total'}: <strong>${formatCost(total)}</strong></div>
+          <div class="capex-total">${accum ? `Ending balance: <strong>${formatCost(total)}</strong> · Avg/mo: <strong>${formatCost(total / 12)}</strong>` : `Year total: <strong>${formatCost(total)}</strong>`}</div>
         </div>`;
       }
       case 'options': {
@@ -1838,7 +1846,9 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       const accum = block?.classList.contains('is-accum');
       const total = arr.reduce((s, v) => s + num(v), 0);
       const totEl = block?.querySelector('.capex-total');
-      if (totEl) totEl.innerHTML = `${accum ? 'Ending balance' : 'Year total'}: <strong>${formatCost(total)}</strong>`;
+      if (totEl) totEl.innerHTML = accum
+        ? `Ending balance: <strong>${formatCost(total)}</strong> · Avg/mo: <strong>${formatCost(total / 12)}</strong>`
+        : `Year total: <strong>${formatCost(total)}</strong>`;
       if (accum && block) {   // update the running balance under each month, in place
         let run = 0;
         block.querySelectorAll('.capex-cell').forEach((cell, mi) => {
