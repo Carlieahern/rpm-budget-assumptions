@@ -2806,10 +2806,10 @@ body {
 }
 .capex-input:focus { border-color: #fff; }
 .capex-cell-cum {
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
-  color: rgba(255,255,255,0.7);
-  margin-top: 1px;
+  color: rgba(255,255,255,0.9);
+  margin-top: 3px;
 }
 .prog-card.is-elective .capex-cell-cum { color: var(--copper); }
 .monthly-accum-toggle {
