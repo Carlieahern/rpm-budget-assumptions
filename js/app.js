@@ -1632,8 +1632,9 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
   if ((program.baseQty || 0) > 0 && ['per-unit', 'per-quantity', 'custom'].includes(info.type)) {
     bodyHtml += `<div class="input-note">Includes ${program.baseQty} by default — enter any additional above.</div>`;
   }
-  // Optional clarification note shown by the entry box
-  if (program.inputNote) bodyHtml += `<div class="input-note">${program.inputNote}</div>`;
+  // Optional clarification note — rendered at the TOP of the body (below the cost
+  // summary, above the cost-builder formulas) so PMs read it before entering data.
+  const inputNoteHtml = program.inputNote ? `<div class="input-note input-note-top">${program.inputNote}</div>` : '';
 
   // Min/Max shown on the card face
   bodyHtml += minMaxLine(program);
@@ -1746,6 +1747,7 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
       </div>
     </div>
     ${bodyHtml ? '<div class="card-divider"></div>' : ''}
+    ${inputNoteHtml}
     ${bodyHtml}
     <div class="card-foot">
       <button class="details-toggle" type="button">▾ Details</button>

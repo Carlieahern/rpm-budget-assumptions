@@ -3438,6 +3438,7 @@ body {
 .addrow-total { font-size: 14px; font-weight: 700; color: #fff; margin-left: auto; }
 
 .input-note { font-size: 12px; font-style: italic; color: rgba(255,255,255,0.7); margin-top: 8px; line-height: 1.4; }
+.input-note-top { margin-top: 0; margin-bottom: 14px; font-weight: 600; }
 .min-note { font-size: 12px; font-weight: 700; color: #ff6b6b; margin-top: 8px; line-height: 1.4; }
 
 /* Min/Max shown on the card face */
