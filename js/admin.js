@@ -384,7 +384,8 @@ function partFields(part, i) {
   switch (part.kind) {
     case 'flat':
       return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Base fee">`) +
-             L('Amount ($)', `<input class="ae-pf" data-i="${i}" data-k="amount" type="number" step="0.01" value="${esc(part.amount)}" placeholder="0.00">`);
+             L('Amount ($)', `<input class="ae-pf" data-i="${i}" data-k="amount" type="number" step="0.01" value="${esc(part.amount)}" placeholder="0.00">`) +
+             `<label class="ae-follows"><input type="checkbox" class="ae-pf" data-i="${i}" data-k="eachMonth"${part.eachMonth ? ' checked' : ''}> Charge this amount in EACH selected billing month (selecting 3 months = 3× the amount)</label>`;
     case 'perUnit':
       return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. License">`) +
              L('Rate per unit ($)', `<input class="ae-pf" data-i="${i}" data-k="rate" type="number" step="0.01" value="${esc(part.rate)}" placeholder="0.00">`);
@@ -834,7 +835,7 @@ function cleanParts(arr) {
     const c = { kind: p.kind, label: p.label || '' };
     if (p.locked) c.locked = true;
     switch (p.kind) {
-      case 'flat':    c.amount = cleanNum(p.amount) || 0; break;
+      case 'flat':    c.amount = cleanNum(p.amount) || 0; if (p.eachMonth) c.eachMonth = true; break;
       case 'perUnit': c.rate = cleanNum(p.rate) || 0; if (cleanNum(p.baseQty)) c.baseQty = cleanNum(p.baseQty); break;
       case 'perItem': c.rate = cleanNum(p.rate) || 0; c.itemLabel = p.itemLabel || 'item'; if (cleanNum(p.baseQty)) c.baseQty = cleanNum(p.baseQty); if (p.rateEditable) c.rateEditable = true; break;
       case 'percent': c.pct = cleanNum(p.pct) || 0; c.base = p.base || 'income'; if (cleanNum(p.baseDefault)) c.baseDefault = cleanNum(p.baseDefault); break;

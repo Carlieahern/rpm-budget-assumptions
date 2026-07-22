@@ -402,6 +402,17 @@ function projectTierIndex(part, key) {
   return Math.max(0, tiers.length - 1);
 }
 
+// Months a flat "charge each month" part bills in: PM override, else admin
+// per-part months, else the program's active months (transition applied).
+function flatEachMonths(program, part, idx) {
+  const key = `${program.id}:${idx}`;
+  let ms;
+  if (S.partSeparate[key]) ms = S.partMonths[key] || [];
+  else if (Array.isArray(part.months) && part.months.length) ms = part.months;
+  else ms = activeMonthsFor(program);
+  return S.transitionMonth == null ? ms : ms.filter(m => m >= S.transitionMonth);
+}
+
 function partPeriodCost(program, part, idx, prefix = '') {
   const key = `${prefix}${program.id}:${idx}`;
   switch (part.kind) {
@@ -416,6 +427,11 @@ function partPeriodCost(program, part, idx, prefix = '') {
       return me.reduce((s, v) => s + num(v), 0);
     }
     case 'flat':
+      // "Each month" flat: the amount is charged once per selected billing month,
+      // so the period cost is amount × number of months (3 months = 3× the amount).
+      if (part.eachMonth && prefix === '') {
+        return num(part.amount) * flatEachMonths(program, part, idx).length;
+      }
       return num(part.amount);
     case 'perUnit': {
       // Editable box defaults to the property unit count; PM can override (unless locked)
@@ -711,6 +727,11 @@ function programMonths12(program) {
       const cm  = S.capexMonths[key] || [];
       const pct = num(c.pct) / 100;
       for (let m = 0; m < 12; m++) arr[m] += num(cm[m]) * pct;
+      return;
+    }
+    // Flat "each month": the full amount lands in every selected billing month
+    if (c.kind === 'flat' && c.eachMonth) {
+      flatEachMonths(program, c, i).forEach(m => arr[m] += num(c.amount));
       return;
     }
     // Per-project: each month gets (selected rate × # projects entered that month)
@@ -1270,8 +1291,13 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
   return parts.map((part, i) => {
     const key = `${prefix}${program.id}:${i}`;
     switch (part.kind) {
-      case 'flat':
-        return `<div class="comp-line"><span class="comp-label">${part.label || 'Flat fee'}</span><span class="comp-val">${formatCost(num(part.amount))}</span></div>`;
+      case 'flat': {
+        if (part.eachMonth && prefix === '') {
+          const n = flatEachMonths(program, part, i).length;
+          return `<div class="comp-line"><span class="comp-label">${part.label || 'Flat fee'}</span><span class="comp-val">${formatCost(num(part.amount))} × ${n} month${n === 1 ? '' : 's'} = ${formatCost(num(part.amount) * n)}</span></div>${sepUI(part, i)}`;
+        }
+        return `<div class="comp-line"><span class="comp-label">${part.label || 'Flat fee'}</span><span class="comp-val">${formatCost(num(part.amount))}</span></div>${sepUI(part, i)}`;
+      }
       case 'perUnit': {
         const unitWord = part.label || 'units';
         if (part.locked) return `<div class="comp-line"><span class="comp-label">${part.label || 'Per unit'}</span><span class="comp-val">${formatRate(num(part.rate))}/unit × ${S.unitCount} ${unitWord}</span></div>`;
