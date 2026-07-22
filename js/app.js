@@ -1369,9 +1369,12 @@ function buildComponentBody(program, parts = program.components, prefix = '') {
             <input type="radio" class="proj-tier" name="proj-${key}" ${pfx} data-pid="${program.id}" data-idx="${i}" data-ti="${ti}"${ti === sel ? ' checked' : ''}>
             <span class="tier-label">${tierLabel(t, ti)} <span class="tier-rate">${formatRate(num(t.rate))}/${item}</span></span>
           </label>`).join('');
+        // Single package (one flat rate, not unit-based) → skip the selector, just show the rate
+        const pickerHtml = tiers.length > 1
+          ? `<div class="tier-select-label">Select your package</div><div class="tier-options">${tierRows}</div>`
+          : `<div class="comp-line"><span class="comp-label">${part.label || 'Rate'}</span><span class="comp-val">${formatRate(rate)}/${item}</span></div>`;
         return `<div class="proj-block" data-key="${key}">
-          <div class="tier-select-label">Select your package</div>
-          <div class="tier-options">${tierRows}</div>
+          ${pickerHtml}
           <div class="capex-grid-label">How many ${item}s do you expect each month?</div>
           <div class="capex-grid">
             ${MONTH_NAMES.map((m, mi) => `<label class="capex-cell">

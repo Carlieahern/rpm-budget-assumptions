@@ -421,7 +421,7 @@ function partFields(part, i) {
         </div>`).join('');
       return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Survey">`) +
              L("What's counted?", `<input class="ae-pf" data-i="${i}" data-k="itemLabel" type="text" value="${esc(part.itemLabel)}" placeholder="e.g. project">`) +
-             `<div class="ae-field ae-wide"><span>Packages by unit count <span class="label-soft">— each row: cap (≤ units) + rate. Leave the last cap blank for "and above".</span></span><div class="ae-popts">${rows}</div><button class="ae-ptier-add" data-i="${i}">+ Add package</button></div>`;
+             `<div class="ae-field ae-wide"><span>Packages by unit count <span class="label-soft">— each row: cap (≤ units) + rate. Leave the last cap blank for "and above". Just ONE row (cap blank) = a flat rate per ${(part.itemLabel || 'project').toLowerCase()}, no package picker.</span></span><div class="ae-popts">${rows}</div><button class="ae-ptier-add" data-i="${i}">+ Add package</button></div>`;
     }
     case 'monthly':
       return L('Label (optional)', `<input class="ae-pf" data-i="${i}" data-k="label" type="text" value="${esc(part.label)}" placeholder="e.g. Monthly reserve">`) +
