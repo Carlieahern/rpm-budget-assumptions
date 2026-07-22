@@ -2727,7 +2727,10 @@ document.getElementById('btn-confirm-reset').addEventListener('click', async () 
 document.getElementById('btn-cancel-reset').addEventListener('click', () => closeModal('modal-reset'));
 
 // ── Close overlays on backdrop click ──────────────────────────────────────────
+// The admin program editor is exempt — a stray click outside it must not throw
+// away in-progress edits. It only closes via its own Save/Delete/Cancel buttons.
 document.querySelectorAll('.overlay').forEach(overlay => {
+  if (overlay.id === 'modal-admin-editor') return;
   overlay.addEventListener('click', e => {
     if (e.target === overlay) overlay.classList.remove('open');
   });
