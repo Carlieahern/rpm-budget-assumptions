@@ -409,6 +409,8 @@ function flatEachMonths(program, part, idx) {
   let ms;
   if (S.partSeparate[key]) ms = S.partMonths[key] || [];
   else if (Array.isArray(part.months) && part.months.length) ms = part.months;
+  // Billed separately with no months selected → charges nothing until months are picked
+  else if (program.billedTogether === false) ms = [];
   else ms = activeMonthsFor(program);
   return S.transitionMonth == null ? ms : ms.filter(m => m >= S.transitionMonth);
 }
@@ -765,12 +767,15 @@ function programMonths12(program) {
     // Months this part lands in, in priority order:
     //  1. PM override ("billed separately" / adjusted chips)
     //  2. Admin per-part months, respecting the transition
-    //  3. The program default (or every month, for manual)
+    //  3. The program default (or every month, for manual) — but a billed-separately
+    //     program has no shared schedule: a part with no months selected charges nothing.
     let ms;
     if (S.partSeparate[key]) {
       ms = S.partMonths[key] || [];
     } else if (hasAdminMonths) {
       ms = c.months.filter(m => S.transitionMonth == null || m >= S.transitionMonth);
+    } else if (program.billedTogether === false && !isManual) {
+      ms = [];
     } else {
       ms = isManual ? monthlyMonths : progMonths;
     }
