@@ -1,6 +1,6 @@
 import CONFIG from './config.js';
 import { fetchProperties, clearMondayCache } from './monday.js';
-import { fetchPrograms, filterBySystem, clearFirebaseCache, fetchLegacyBanner } from './firebase.js';
+import { fetchPrograms, filterBySystem, clearFirebaseCache, fetchLegacyBanner, fetchSideAssumptions } from './firebase.js';
 import { loadDecisions, saveDecision, deleteDecision, resetDecisions, loadPriorYearDecisions } from './sharepoint.js';
 import { showScreen, openModal, closeModal, groupStyle, formatCost, formatRate,
          renderSummary, populatePropertySelect } from './ui.js';
@@ -2631,6 +2631,30 @@ document.getElementById('btn-menu').addEventListener('click', () => {
 
 document.getElementById('menu-close').addEventListener('click',    () => closeModal('modal-menu'));
 document.getElementById('btn-hdr-help')?.addEventListener('click', () => openModal('modal-help'));
+
+// ── Utility Assumptions pop-up — informational, never counts toward totals ─────
+document.getElementById('btn-side-assumptions')?.addEventListener('click', async () => {
+  const body = document.getElementById('side-assumptions-body');
+  body.innerHTML = '<p class="admin-loading">Loading…</p>';
+  openModal('modal-side-assumptions');
+  let list = [];
+  try { list = (await fetchSideAssumptions()) || []; } catch {}
+  list = list.filter(a => a && (a.title || (a.sections || []).some(s => s.sub || s.text)));
+  body.innerHTML = list.length ? list.map(a => `
+    <div class="sa-card">
+      <div class="sa-card-head">
+        <h4 class="sa-title">${a.title || ''}</h4>
+        <span class="sa-badge ${a.elective === 'non' ? 'sa-non' : 'sa-elec'}">${a.elective === 'non' ? 'Non-Elective' : 'Elective'}</span>
+      </div>
+      ${(a.sections || []).filter(s => s.sub || s.text).map(s => `
+        <div class="sa-sec-view">
+          ${s.sub ? `<div class="sa-sub">${s.sub}</div>` : ''}
+          ${s.text ? `<p class="sa-text">${s.text}</p>` : ''}
+        </div>`).join('')}
+      ${a.guideUrl ? `<a class="card-guide-link" href="${a.guideUrl}" target="_blank" rel="noopener">Click here for the program guide →</a>` : ''}
+    </div>`).join('') : '<p class="admin-loading">No utility assumptions have been added yet.</p>';
+});
+document.getElementById('side-assumptions-close')?.addEventListener('click', () => closeModal('modal-side-assumptions'));
 document.getElementById('help-close').addEventListener('click', () => closeModal('modal-help'));
 document.getElementById('mi-refresh-data').addEventListener('click', async () => {
   closeModal('modal-menu');

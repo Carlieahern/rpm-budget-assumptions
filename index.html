@@ -8,7 +8,7 @@
   <title>RPM Budget Assumptions</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css?v=120">
+  <link rel="stylesheet" href="css/styles.css?v=121">
 </head>
 <body>
 <div id="app">
@@ -164,15 +164,18 @@
         </div>
       </div>
       <div class="main-hdr-side main-hdr-right">
-        <button class="btn-mode-toggle" id="btn-mode-toggle" type="button"></button>
-        <button class="btn-summary-link" id="btn-info-export" type="button" style="display:none;">⬇ Export to Excel</button>
-        <button class="btn-summary-link" id="btn-view-summary">View Summary</button>
-        <button class="icon-btn" id="btn-refresh" title="Refresh program data" aria-label="Refresh">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-        </button>
-        <button class="icon-btn" id="btn-menu" aria-label="Menu">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-        </button>
+        <div class="hdr-right-row">
+          <button class="btn-mode-toggle" id="btn-mode-toggle" type="button"></button>
+          <button class="btn-summary-link" id="btn-info-export" type="button" style="display:none;">⬇ Export to Excel</button>
+          <button class="btn-summary-link" id="btn-view-summary">View Summary</button>
+          <button class="icon-btn" id="btn-refresh" title="Refresh program data" aria-label="Refresh">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+          </button>
+          <button class="icon-btn" id="btn-menu" aria-label="Menu">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+          </button>
+        </div>
+        <button class="utility-assump-link" id="btn-side-assumptions" type="button">⚡ Utility Assumptions</button>
       </div>
     </header>
 
@@ -284,6 +287,15 @@
       <label class="lb-field"><span>Pace + OneSite link</span><input id="lb-pace" type="text" placeholder="https://…"></label>
       <button class="btn-primary" id="lb-save" style="margin-top:10px;">Save box settings</button>
       <span class="lb-saved" id="lb-saved"></span>
+    </details>
+
+    <details class="admin-settings">
+      <summary>Utility Assumptions — noted outside the budget</summary>
+      <p class="label-soft" style="margin:8px 0 12px;">These show in a pop-up from the main screen header. They are informational only and never count toward any totals. Same content for all systems.</p>
+      <div id="sa-editor"></div>
+      <button class="btn-secondary" id="sa-add" style="margin-top:10px;">+ Add assumption</button>
+      <button class="btn-primary" id="sa-save" style="margin-top:10px;">Save utility assumptions</button>
+      <span class="lb-saved" id="sa-saved"></span>
     </details>
 
     <div class="admin-search-wrap">
@@ -486,6 +498,16 @@
   </div>
 </div>
 
+<!-- ── Modal: Utility Assumptions ── -->
+<div class="overlay" id="modal-side-assumptions">
+  <div class="sheet sheet-wide">
+    <h3>Utility Assumptions</h3>
+    <p class="help-lead">Expenses to be aware of that aren't built into the budget totals.</p>
+    <div id="side-assumptions-body"></div>
+    <button class="sheet-close" id="side-assumptions-close">Close</button>
+  </div>
+</div>
+
 <!-- ── Modal: Edit Unit Count ── -->
 <div class="overlay" id="modal-units">
   <div class="sheet">
@@ -537,6 +559,6 @@
   </div>
 </div>
 
-<script type="module" src="js/app.js?v=120"></script>
+<script type="module" src="js/app.js?v=121"></script>
 </body>
 </html>

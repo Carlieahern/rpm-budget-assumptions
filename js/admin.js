@@ -2,7 +2,7 @@
 // Light-touch gated editor for the Firebase program catalog.
 // Login = any name + passcode "Budgets". Edits write straight to Firebase.
 
-import { fetchRawPrograms, saveProgram, deleteProgram, fetchCostBasisTypes, addCostBasisType, fetchLegacyBanner, saveLegacyBanner } from './firebase.js';
+import { fetchRawPrograms, saveProgram, deleteProgram, fetchCostBasisTypes, addCostBasisType, fetchLegacyBanner, saveLegacyBanner, fetchSideAssumptions, saveSideAssumptions } from './firebase.js';
 import { showScreen, openModal, closeModal } from './ui.js';
 
 const PASSCODE = 'Budgets';
@@ -53,6 +53,11 @@ export function initAdmin() {
   });
   document.getElementById('imp-commit')?.addEventListener('click', commitImport);
   document.getElementById('lb-save')?.addEventListener('click', saveLegacyBannerSettings);
+  document.getElementById('sa-add')?.addEventListener('click', () => {
+    sideAssumps.push({ title: '', elective: 'elective', guideUrl: '', sections: [{ sub: '', text: '' }] });
+    renderSaEditor();
+  });
+  document.getElementById('sa-save')?.addEventListener('click', saveSideAssumptionsSettings);
   document.getElementById('admin-search')?.addEventListener('input', e => { adminSearch = e.target.value; renderList(true); });
   document.getElementById('imp-template')?.addEventListener('click', downloadImportTemplate);
   document.getElementById('imp-export')?.addEventListener('click', exportProgramsCsv);
@@ -116,7 +121,70 @@ export async function openAdmin() {
   document.getElementById('admin-user-note').textContent = `Signed in as ${adminName} · changes save to Firebase for everyone`;
   try { extraTypes = await fetchCostBasisTypes(); } catch { extraTypes = []; }
   loadLegacyBannerSettings();
+  loadSideAssumptions();
   await renderList();
+}
+
+// ── Utility Assumptions editor (informational, no cost builder) ────────────────
+let sideAssumps = [];
+
+async function loadSideAssumptions() {
+  try { sideAssumps = (await fetchSideAssumptions()) || []; } catch { sideAssumps = []; }
+  if (!Array.isArray(sideAssumps)) sideAssumps = [];
+  renderSaEditor();
+}
+
+function renderSaEditor() {
+  const box = document.getElementById('sa-editor');
+  if (!box) return;
+  box.innerHTML = sideAssumps.length ? sideAssumps.map((a, i) => `
+    <div class="sa-item" data-i="${i}">
+      <div class="sa-item-head">
+        <input class="sa-f" data-i="${i}" data-k="title" type="text" placeholder="Title (e.g. Electric)" value="${esc(a.title)}">
+        <select class="sa-f" data-i="${i}" data-k="elective">
+          <option value="elective"${a.elective !== 'non' ? ' selected' : ''}>Elective</option>
+          <option value="non"${a.elective === 'non' ? ' selected' : ''}>Non-elective</option>
+        </select>
+        <button class="sa-del" data-i="${i}" title="Remove assumption">✕</button>
+      </div>
+      <input class="sa-f sa-guide" data-i="${i}" data-k="guideUrl" type="text" placeholder="Program guide link (https://…)" value="${esc(a.guideUrl)}">
+      ${(a.sections || []).map((s, si) => `
+        <div class="sa-sec">
+          <input class="sa-sf" data-i="${i}" data-si="${si}" data-k="sub" type="text" placeholder="Subheader" value="${esc(s.sub)}">
+          <textarea class="sa-sf" data-i="${i}" data-si="${si}" data-k="text" rows="2" placeholder="Text / description">${esc(s.text)}</textarea>
+          <button class="sa-sec-del" data-i="${i}" data-si="${si}">✕ Remove section</button>
+        </div>`).join('')}
+      <button class="sa-sec-add" data-i="${i}">+ Add subheader &amp; text</button>
+    </div>`).join('') : '<p class="label-soft">None yet — add one below.</p>';
+
+  box.querySelectorAll('.sa-f').forEach(el =>
+    el.addEventListener('input', e => { sideAssumps[+el.dataset.i][el.dataset.k] = e.target.value; }));
+  box.querySelectorAll('.sa-sf').forEach(el =>
+    el.addEventListener('input', e => { sideAssumps[+el.dataset.i].sections[+el.dataset.si][el.dataset.k] = e.target.value; }));
+  box.querySelectorAll('.sa-del').forEach(b =>
+    b.addEventListener('click', () => { sideAssumps.splice(+b.dataset.i, 1); renderSaEditor(); }));
+  box.querySelectorAll('.sa-sec-del').forEach(b =>
+    b.addEventListener('click', () => { sideAssumps[+b.dataset.i].sections.splice(+b.dataset.si, 1); renderSaEditor(); }));
+  box.querySelectorAll('.sa-sec-add').forEach(b =>
+    b.addEventListener('click', () => {
+      (sideAssumps[+b.dataset.i].sections = sideAssumps[+b.dataset.i].sections || []).push({ sub: '', text: '' });
+      renderSaEditor();
+    }));
+}
+
+async function saveSideAssumptionsSettings() {
+  const cleaned = sideAssumps
+    .map(a => ({
+      title: (a.title || '').trim(),
+      elective: a.elective === 'non' ? 'non' : 'elective',
+      guideUrl: (a.guideUrl || '').trim() || null,
+      sections: (a.sections || []).map(s => ({ sub: (s.sub || '').trim(), text: (s.text || '').trim() }))
+        .filter(s => s.sub || s.text),
+    }))
+    .filter(a => a.title || a.sections.length);
+  const note = document.getElementById('sa-saved');
+  try { await saveSideAssumptions(cleaned); sideAssumps = cleaned; renderSaEditor(); if (note) note.textContent = ' ✓ Saved'; }
+  catch (e) { if (note) note.textContent = ' Save failed: ' + e.message; }
 }
 
 async function loadLegacyBannerSettings() {

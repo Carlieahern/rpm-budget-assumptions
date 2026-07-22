@@ -186,6 +186,24 @@ export async function fetchLegacyBanner() {
   } catch { return null; }
 }
 
+// Side assumptions — informational expenses shown in a pop-up, not in the totals.
+// Shape: [{ title, elective: 'elective'|'non', guideUrl, sections: [{ sub, text }] }]
+export async function fetchSideAssumptions() {
+  try {
+    const res = await fetch(dbUrl('meta/sideAssumptions'));
+    if (!res.ok) return [];
+    return (await res.json()) || [];
+  } catch { return []; }
+}
+
+export async function saveSideAssumptions(data) {
+  const res = await fetch(dbUrl('meta/sideAssumptions'), {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Save failed: ${res.status}`);
+  return true;
+}
+
 export async function saveLegacyBanner(data) {
   const res = await fetch(dbUrl('meta/legacyBanner'), {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
