@@ -1792,7 +1792,8 @@ function buildProgramCard(program, decision, priorDecision, isRequired) {
     </div>
   `;
 
-  // Details collapsible
+  // Details collapsible — open by default so the info is visible without a click
+  if (!collapsed) el.classList.add('details-open');
   el.querySelector('.details-toggle')?.addEventListener('click', e => {
     e.stopPropagation();
     el.classList.toggle('details-open');
