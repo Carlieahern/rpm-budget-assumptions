@@ -507,14 +507,31 @@ function partFields(part, i) {
   }
 }
 
+// What each part type does and how the PM fills it in — shown as an info bubble
+// next to the part selector so anyone editing knows which one to reach for.
+const PART_HELP = {
+  flat:    'A set dollar amount. Enter the amount and it charges once per billing period. Tick "charge in EACH selected month" if the same amount should repeat in every billing month (3 months selected = 3× the amount).',
+  perUnit: "Rate × the property's unit count. Enter the rate per unit; the PM's card pre-fills the unit count from their property and they can adjust it.",
+  perItem: 'Rate × a count the PM enters (elevators, associates, checks…). Set what\'s counted, the rate, and an optional default quantity. Tick "let the PM edit the rate" if the price varies by property.',
+  percent: 'A percentage of income or CapEx. Enter the % and pick the base. If you pick CapEx, the PM gets a 12-month grid to enter each project\'s cost and the % applies to each — landing in the month it was entered.',
+  options: 'A list the PM chooses from. "Pick just one" = radio buttons (e.g. tiers). "Pick one or more" = checkboxes with quantities. Optionally multiply the chosen rate by the unit count.',
+  project: 'A cost per occurrence, with the rate optionally tiered by unit count. Add one package row (leave the cap blank) for a flat rate per project. Add two or more rows to give the PM a package choice. They then enter how many happen each month.',
+  monthly: 'A blank 12-month grid — the PM types a dollar amount for each month. Use when the cost varies month to month by property. The PM can also tick "compound" to see it build as a running balance.',
+  manual:  'No calculation — the PM types their own estimated dollar amount. Use as a fallback when the cost is unpredictable.',
+  tax:     'A percentage added on top of all the other parts in this builder. Enter just the rate.',
+  formula: 'A custom expression using "units" and "qty".',
+};
+
 function partRow(part, i, arr = 'components') {
   const showLock = ['perItem', 'percent', 'formula'].includes(part.kind);
+  const help = PART_HELP[part.kind] || '';
   return `
     <div class="ae-part" data-arr="${arr}" data-i="${i}">
       <div class="ae-part-head">
         <select class="ae-part-kind" data-i="${i}">
           ${PART_KINDS.map(([v, label]) => `<option value="${v}"${part.kind === v ? ' selected' : ''}>${label}</option>`).join('')}
         </select>
+        ${help ? `<span class="ae-info" tabindex="0">i<span class="ae-tip">${esc(help)}</span></span>` : ''}
         ${showLock ? `<label class="ae-part-lock"><input type="checkbox" class="ae-part-locked" data-i="${i}"${part.locked ? ' checked' : ''}> PM can't edit</label>` : '<span></span>'}
         <button class="ae-part-del" data-i="${i}" title="Remove part">✕</button>
       </div>

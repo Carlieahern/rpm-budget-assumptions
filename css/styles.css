@@ -3630,7 +3630,29 @@ body {
 .ae-section-label { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
 .ae-builder { background: #fdf6ec; border: 1px solid #f0d9bb; }
 .ae-part { background: #fff; border: 1px solid var(--border); border-radius: 9px; padding: 12px; margin-bottom: 10px; }
-.ae-part-head { display: grid; grid-template-columns: 1fr auto 28px; gap: 8px; align-items: center; margin-bottom: 10px; }
+.ae-part-head { display: grid; grid-template-columns: 1fr auto auto 28px; gap: 8px; align-items: center; margin-bottom: 10px; }
+
+/* Info bubble explaining each cost-builder part type */
+.ae-info {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: var(--copper); color: #fff;
+  font-size: 11px; font-weight: 700; font-style: italic;
+  cursor: help; position: relative; flex-shrink: 0;
+}
+.ae-info:hover .ae-tip, .ae-info:focus .ae-tip { display: block; }
+.ae-tip {
+  display: none; position: absolute; top: calc(100% + 8px); right: -6px;
+  background: var(--navy); color: #fff;
+  font-size: 12px; font-weight: 400; font-style: normal; line-height: 1.5;
+  padding: 10px 12px; border-radius: 8px; width: 300px;
+  z-index: 999; white-space: normal; text-align: left;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.22);
+}
+.ae-tip::after {
+  content: ''; position: absolute; bottom: 100%; right: 10px;
+  border: 6px solid transparent; border-bottom-color: var(--navy);
+}
 .ae-part-head > select { padding: 7px 10px; font-size: 13px; border: 1.5px solid var(--border); border-radius: 7px; font-family: inherit; font-weight: 600; }
 .ae-part-lock { font-size: 12px; color: var(--text2); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .ae-part-del { background: none; border: none; color: var(--red); cursor: pointer; font-size: 15px; }
